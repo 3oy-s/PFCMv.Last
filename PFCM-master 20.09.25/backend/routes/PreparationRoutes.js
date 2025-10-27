@@ -2186,8 +2186,8 @@ router.post("/prep/manage/saveTrolley", async (req, res) => {
     cold,
     deliveryType,
     mat,
-    batch_before,         // fallback
-    batch_after           // fallback
+    // batch_before,        
+    // batch_after           
   } = req.body;
 
   const sql = require("mssql");
@@ -2281,72 +2281,65 @@ router.post("/prep/manage/saveTrolley", async (req, res) => {
     if (Dest === "เข้าห้องเย็น" && deliveryType === "รอกลับมาเตรียม") rm_status = "รอกลับมาเตรียม";
 
     // 9️⃣ Insert TrolleyRMMapping ก่อน
-    const mappingResult = await transaction
-      .request()
-      .input("tro_id", license_plate)
-      .input("rmfp_id", rmfpID)
-      .input("tro_production_id", prod_rm_id)
-      .input("rm_status", rm_status)
-      .input("weight_RM", weightTotal)
-      .input("tray_count", ntray)
-      .input("stay_place", "จุดเตรียม")
-      .input("process_id", Process)
-      .input("level_eu", level_eu)
-      .input("dest", Dest)
-      .input("cold_time", cold)
-      .input("rmm_line_name", rmfp_line_name)
-      .input("tl_status", "1.8")
-      .query(`
-        INSERT INTO TrolleyRMMapping 
-        (tro_id, rmfp_id, tro_production_id, batch_id, tray_count, stay_place, 
-         dest, rm_status, process_id, weight_RM, level_eu, cold_time, 
-         rmm_line_name, tl_status)
-        OUTPUT INSERTED.mapping_id
-        VALUES (@tro_id, @rmfp_id, @tro_production_id, NULL, @tray_count, 
-                @stay_place, @dest, @rm_status, @process_id, @weight_RM, 
-                @level_eu, @cold_time, @rmm_line_name, @tl_status)
-      `);
+   const mappingResult = await transaction
+  .request()
+  .input("tro_id", license_plate)
+  .input("rmfp_id", rmfpID)
+  .input("tro_production_id", prod_rm_id)
+  .input("rm_status", rm_status)
+  .input("weight_RM", weightTotal)
+  .input("tray_count", ntray)
+  .input("stay_place", "จุดเตรียม")
+  .input("process_id", Process)
+  .input("level_eu", level_eu)
+  .input("dest", Dest)
+  .input("cold_time", cold)
+  .input("rmm_line_name", rmfp_line_name)
+  .input("tl_status", "1.8")
+  .query(`
+    INSERT INTO [dbo].[TrolleyRMMapping] 
+      (tro_id, rmfp_id, tro_production_id, batch_id, tray_count, stay_place, 
+       dest, rm_status, process_id, weight_RM, level_eu, cold_time, 
+       rmm_line_name, tl_status)
+    OUTPUT INSERTED.mapping_id
+    VALUES (@tro_id, @rmfp_id, @tro_production_id, NULL, @tray_count, 
+            @stay_place, @dest, @rm_status, @process_id, @weight_RM, 
+            @level_eu, @cold_time, @rmm_line_name, @tl_status)
+  `);
 
-    const mapping_id = mappingResult.recordset[0].mapping_id;
+const mapping_id = mappingResult.recordset[0].mapping_id;
+console.log("New mapping_id:", mapping_id);
+
 
     // 10️⃣ Insert Batch ตาม batchAfterArray
-    const batchIds = [];
-    if (Array.isArray(batchAfterArray) && batchAfterArray.length > 0) {
-      for (const item of batchAfterArray) {
-        const beforeVal = item.batch_before?.trim() || "";
-        const afterVal = item.batch_after?.trim() || "";
+const batchIds = [];
 
-        if (beforeVal && afterVal) {
-          const batchResult = await transaction
-            .request()
-            .input("mapping_id", mapping_id)
-            .input("batch_before", beforeVal)
-            .input("batch_after", afterVal)
-            .query(`
-              INSERT INTO Batch (mapping_id, batch_before, batch_after)
-              OUTPUT INSERTED.batch_id
-              VALUES (@mapping_id, @batch_before, @batch_after)
-            `);
-          batchIds.push(batchResult.recordset[0].batch_id);
-        }
-      }
-    } else {
-      // fallback
-      if (!batch_before || !batch_after)
-        throw new Error("กรุณาส่ง batch_before และ batch_after");
+if (!Array.isArray(batchAfterArray) || batchAfterArray.length === 0) {
+  throw new Error("กรุณาส่ง batchAfterArray อย่างน้อย 1 แถว");
+}
 
-      const batchResult = await transaction
-        .request()
-        .input("mapping_id", mapping_id)
-        .input("batch_before", batch_before.trim())
-        .input("batch_after", batch_after.trim())
-        .query(`
-          INSERT INTO Batch (mapping_id, batch_before, batch_after)
-          OUTPUT INSERTED.batch_id
-          VALUES (@mapping_id, @batch_before, @batch_after)
-        `);
-      batchIds.push(batchResult.recordset[0].batch_id);
-    }
+for (const item of batchAfterArray) {
+  const beforeVal = item.batch_before?.trim();
+  const afterVal = item.batch_after?.trim();
+
+  if (!beforeVal || !afterVal) {
+    throw new Error("batch_before และ batch_after ต้องไม่เป็นค่าว่าง");
+  }
+
+  const batchResult = await transaction
+    .request()
+    .input("mapping_id", mapping_id)
+    .input("batch_before", beforeVal)
+    .input("batch_after", afterVal)
+    .query(`
+      INSERT INTO Batch (mapping_id, batch_before, batch_after)
+      OUTPUT INSERTED.batch_id
+      VALUES (@mapping_id, @batch_before, @batch_after)
+    `);
+
+  batchIds.push(batchResult.recordset[0].batch_id);
+}
+
 
     // 11️⃣ Insert History
     await transaction
@@ -5846,63 +5839,71 @@ router.post("/prep/manage/saveTrolley", async (req, res) => {
       const occupiedTrolleysResult = await pool
         .request()
         .query(`
-                SELECT DISTINCT
-                    rmm.tro_id as trolley_number,
-                    'มีวัตถุดิบ' as trolley_status,
-                    rmm.dest,
-                    rmm.stay_place,
-                    rmm.rmm_line_name,
-                    rmm.rm_status,
-                    rm.mat,
-                    rm.mat_name,
-                    rmfp.batch,
-                    CONCAT(pdt.doc_no,'(', rmm.rmm_line_name,')') AS production,
+           SELECT 
+    rmm.mapping_id,
+    rmm.tro_id AS trolley_number,
+    'มีวัตถุดิบ' AS trolley_status,
+    rmm.dest,
+    rmm.stay_place,
+    rmm.rmm_line_name,
+    rmm.rm_status,
+    rm.mat,
+    rm.mat_name,
+    STRING_AGG(b.batch_after, ',') AS batch, -- รวม batch
+    CONCAT(pdt.doc_no, '(', rmm.rmm_line_name, ')') AS production,
+    CONVERT(VARCHAR, htr.cooked_date, 120) AS cooked_date,
+    CONVERT(VARCHAR, htr.rmit_date, 120) AS rmit_date,
+    htr.location,
+    'occupied' AS trolley_type,
+    CASE 
+        WHEN (rmm.dest = 'เข้าห้องเย็น' OR rmm.dest = 'ไปบรรจุ') AND rmm.rm_status = 'รอQCตรวจสอบ' 
+            THEN CONCAT('รอQC ตรวจสอบ ณ ', ISNULL(htr.location, '-'))
+        WHEN (rmm.dest = 'บรรจุ') 
+              THEN CONCAT('รอบรรจุทำรายการรับเข้า ', 
+              COALESCE(MAX(htr.three_prod), MAX(htr.two_prod), MAX(htr.first_prod), '-'))
+        WHEN rmm.dest = 'เข้าห้องเย็น' AND (rmm.rm_status IN 
+              ('QcCheck', 'QcCheck รอกลับมาเตรียม', 'QcCheck รอ MD', 'รอกลับมาเตรียม', 'รอแก้ไข', 'เหลือจากไลน์ผลิต')) 
+            THEN 'รอห้องเย็นรับเข้า'
+        WHEN (rmm.dest IN ('ไปบรรจุ', 'บรรจุ')) AND rmm.rm_status = 'QcCheck' 
+            THEN CONCAT('รอบรรจุรับ (', ISNULL(rmm.rmm_line_name, '-'), ')')
+        WHEN (rmm.dest IN ('เข้าห้องเย็น', 'จุดเตรียม')) AND rmm.rm_status = 'QcCheck รอแก้ไข' 
+            THEN CONCAT('QC ส่งกลับมาแก้ไข ณ ', ISNULL(htr.location, '-'))
+        WHEN rmm.dest = 'หม้ออบ' AND rmm.rm_status = 'ปกติ' 
+            THEN 'รออบเสร็จ'
+        WHEN rmm.dest = 'จุดเตรียม' AND (rmm.rm_status IN ('รอแก้ไข', 'รับฝาก-รอแก้ไข')) 
+            THEN CONCAT('รอแก้ไข ณ ', ISNULL(htr.location, '-'))
+        WHEN rmm.dest = 'หม้ออบ' AND rmm.rm_status = 'รอแก้ไข' 
+            THEN CONCAT('รอแก้ไข ณ ', ISNULL(htr.location, '-'))
+        WHEN rmm.dest = 'จุดเตรียม' AND (rmm.rm_status IN ('รอกลับมาเตรียม', 'QcCheck รอ MD')) 
+            THEN CONCAT('รอกลับมาเตรียม ณ ', ISNULL(htr.location, '-'))
+        WHEN rmm.dest = 'ห้องเย็น' AND (rmm.rm_status IN 
+              ('รอแก้ไข', 'รอQCตรวจสอบ', 'QcCheck', 'QcCheck รอ MD', 'รอกลับมาเตรียม', 'เหลือจากไลน์ผลิต')) 
+            THEN 'อยู่ในห้องเย็น'
+        ELSE '-'
+    END AS trolley_location
+FROM 
+    TrolleyRMMapping rmm
+JOIN 
+    History htr ON rmm.mapping_id = htr.mapping_id
+JOIN 
+    RMForProd rmfp ON rmm.rmfp_id = rmfp.rmfp_id
+JOIN 
+    ProdRawMat prod ON rmfp.prod_rm_id = prod.prod_rm_id
+JOIN 
+    RawMat rm ON prod.mat = rm.mat
+JOIN 
+    Production pdt ON prod.prod_id = pdt.prod_id
+JOIN 
+    Batch b ON rmm.mapping_id = b.mapping_id
+WHERE 
+    rmm.tro_id IS NOT NULL
+GROUP BY 
+    rmm.mapping_id, rmm.tro_id, rmm.dest, rmm.stay_place, rmm.rmm_line_name, 
+    rmm.rm_status, rm.mat, rm.mat_name, pdt.doc_no, 
+    htr.cooked_date, htr.rmit_date, htr.location
+ORDER BY 
+    rmm.tro_id;
 
-                    CONVERT(VARCHAR, htr.cooked_date, 120) AS cooked_date,
-                    CONVERT(VARCHAR, htr.rmit_date, 120) AS rmit_date,
-                    htr.location,
-                    'occupied' as trolley_type,
-                    CASE 
-                        WHEN (rmm.dest = 'เข้าห้องเย็น' OR rmm.dest = 'ไปบรรจุ') AND rmm.rm_status = 'รอQCตรวจสอบ' 
-                            THEN CONCAT('รอQC ตรวจสอบ ณ ', ISNULL(htr.location, '-'))
-                        WHEN (rmm.dest = 'บรรจุ') 
-                              THEN CONCAT(
-                              'รอบรรจุทำรายการรับเข้า ', 
-                              COALESCE(htr.three_prod, htr.two_prod, htr.first_prod, '-')
-                              )
-                        WHEN rmm.dest = 'เข้าห้องเย็น' AND (rmm.rm_status = 'QcCheck' OR rmm.rm_status = 'QcCheck รอกลับมาเตรียม' OR rmm.rm_status = 'QcCheck รอ MD' OR rmm.rm_status = 'รอกลับมาเตรียม' OR rmm.rm_status = 'รอแก้ไข' OR rmm.rm_status = 'เหลือจากไลน์ผลิต') 
-                            THEN 'รอห้องเย็นรับเข้า'
-                        WHEN (rmm.dest = 'ไปบรรจุ' OR rmm.dest = 'บรรจุ') AND rmm.rm_status = 'QcCheck' 
-                            THEN CONCAT('รอบรรจุรับ (', ISNULL(rmm.rmm_line_name, '-'), ')')
-                        WHEN (rmm.dest = 'เข้าห้องเย็น' OR rmm.dest = 'จุดเตรียม') AND rmm.rm_status = 'QcCheck รอแก้ไข' 
-                            THEN CONCAT('QC ส่งกลับมาแก้ไข ณ ', ISNULL(htr.location, '-'))
-                        WHEN rmm.dest = 'หม้ออบ' AND rmm.rm_status = 'ปกติ' 
-                            THEN 'รออบเสร็จ'
-                        WHEN rmm.dest = 'จุดเตรียม' AND (rmm.rm_status = 'รอแก้ไข' OR rmm.rm_status = 'รับฝาก-รอแก้ไข') 
-                            THEN CONCAT('รอแก้ไข ณ ', ISNULL(htr.location, '-'))
-                        WHEN rmm.dest = 'หม้ออบ' AND rmm.rm_status = 'รอแก้ไข' 
-                            THEN CONCAT('รอแก้ไข ณ ', ISNULL(htr.location, '-'))
-                        WHEN rmm.dest = 'จุดเตรียม' AND (rmm.rm_status = 'รอกลับมาเตรียม' OR rmm.rm_status = 'QcCheck รอ MD') 
-                            THEN CONCAT('รอกลับมาเตรียม ณ ', ISNULL(htr.location, '-'))
-                        WHEN rmm.dest = 'ห้องเย็น' AND (rmm.rm_status = 'รอแก้ไข' OR rmm.rm_status = 'รอQCตรวจสอบ' OR rmm.rm_status = 'QcCheck' OR rmm.rm_status = 'QcCheck รอ MD' OR rmm.rm_status = 'รอกลับมาเตรียม' OR rmm.rm_status = 'เหลือจากไลน์ผลิต') 
-                            THEN 'อยู่ในห้องเย็น'
-                        ELSE '-'
-                    END as trolley_location
-                FROM 
-                    TrolleyRMMapping rmm
-                JOIN 
-                    History htr ON rmm.mapping_id = htr.mapping_id
-                JOIN 
-                    RMForProd rmfp ON rmm.rmfp_id = rmfp.rmfp_id
-                JOIN 
-                    ProdRawMat prod ON rmfp.prod_rm_id = prod.prod_rm_id
-                JOIN 
-                    RawMat rm ON prod.mat = rm.mat
-                JOIN 
-                    Production pdt ON prod.prod_id = pdt.prod_id
-                WHERE 
-                    rmm.tro_id IS NOT NULL
-                ORDER BY rmm.tro_id
             `);
 
       // ดึงข้อมูลรถเข็นรอจัดส่ง

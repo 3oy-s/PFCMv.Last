@@ -5,23 +5,20 @@ module.exports = (io) => {
 	const router = express.Router();
 
 	router.get("/qc/main/fetchRMForProd", async (req, res) => {
+  try {
+    const { rm_type_ids } = req.query;
 
-		try {
+    if (!rm_type_ids) {
+      return res.status(400).json({ success: false, error: "RM Type IDs are required" });
+    }
 
-			const { rm_type_ids } = req.query;
+    const rmTypeIdsArray = rm_type_ids.split(',');
+    const pool = await connectToDatabase();
 
-			if (!rm_type_ids) {
-				return res.status(400).json({ success: false, error: "RM Type IDs are required" });
-			}
-
-			const rmTypeIdsArray = rm_type_ids.split(',');
-			const pool = await connectToDatabase();
-
-			// 2. Main query with user type filtering
-			const query = `
+    const query = `
       SELECT
         rmf.rmfp_id,
-        b.batch_after,
+        STRING_AGG(b.batch_after, ', ') AS batch, -- ✅ รวมค่าทั้งหมดใน mapping เดียว
         rm.mat,
         rm.mat_name,
         CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,
@@ -34,7 +31,7 @@ module.exports = (io) => {
         rmm.dest,
         rmm.stay_place,
         rmm.rm_status,
-        htr.cooked_date
+        MAX(htr.cooked_date) AS cooked_date -- ใช้ MAX ป้องกัน GROUP BY error
       FROM
         RMForProd rmf
       JOIN 
@@ -50,7 +47,7 @@ module.exports = (io) => {
       JOIN
         RawMatGroup rmg ON rmcg.rm_group_id = rmg.rm_group_id
       LEFT JOIN 
-        Batch b ON rmm.batch_id = b.batch_id
+        Batch b ON rmm.mapping_id = b.mapping_id  -- ✅ เปลี่ยน join เงื่อนไขตรงนี้
       JOIN
         History htr ON rmm.mapping_id = htr.mapping_id
       WHERE 
@@ -61,54 +58,62 @@ module.exports = (io) => {
         )
         AND rmf.rm_group_id = rmg.rm_group_id
         AND rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')})
-      ORDER BY htr.cooked_date DESC
+      GROUP BY
+        rmf.rmfp_id,
+        rm.mat,
+        rm.mat_name,
+        p.doc_no,
+        rmm.rmm_line_name,
+        rmm.tro_id,
+        rmm.level_eu,
+        rmm.weight_RM,
+        rmm.tray_count,
+        rmg.rm_type_id,
+        rmm.mapping_id,
+        rmm.dest,
+        rmm.stay_place,
+        rmm.rm_status
+      ORDER BY MAX(htr.cooked_date) DESC
     `;
 
-			const result = await pool.request().query(query);
+    const result = await pool.request().query(query);
 
-			console.log("Data fetched from the database:", result.recordset);
+    const formattedData = result.recordset.map(item => {
+      const date = new Date(item.cooked_date);
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      const hours = String(date.getUTCHours()).padStart(2, '0');
+      const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+      item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
+      delete item.cooked_date;
+      return item;
+    });
 
-			const formattedData = result.recordset.map(item => {
-				const date = new Date(item.cooked_date);
-				const year = date.getUTCFullYear();
-				const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-				const day = String(date.getUTCDate()).padStart(2, '0');
-				const hours = String(date.getUTCHours()).padStart(2, '0');
-				const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    res.json({ success: true, data: formattedData });
+  } catch (err) {
+    console.error("SQL error", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
-				item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
 
-				delete item.cooked_date;
+router.get("/qc/fetchRMForProd", async (req, res) => {
+  try {
+    const { rm_type_ids } = req.query;
 
-				return item;
-			});
+    if (!rm_type_ids) {
+      return res.status(400).json({ success: false, error: "RM Type IDs are required" });
+    }
 
-			res.json({ success: true, data: formattedData });
-		} catch (err) {
-			console.error("SQL error", err);
-			res.status(500).json({ success: false, error: err.message });
-		}
-	});
+    const rmTypeIdsArray = rm_type_ids.split(',');
+    const pool = await connectToDatabase();
 
-	router.get("/qc/fetchRMForProd", async (req, res) => {
-		try {
-
-			const { rm_type_ids } = req.query;
-
-			if (!rm_type_ids) {
-				return res.status(400).json({ success: false, error: "RM Type IDs are required" });
-			}
-
-			const rmTypeIdsArray = rm_type_ids.split(',');
-			
-			const pool = await connectToDatabase();
-
-			// 2. Main query with user type filtering
-			const query = `
+    const query = `
       SELECT
         rmm.mapping_id,
         rmf.rmfp_id,
-        b.batch_after,
+        STRING_AGG(b.batch_after, ', ') AS batch_after,  -- ✅ รวมค่า batch_after ในแถวเดียว
         pc.process_name,
         rm.mat,
         rm.mat_name,
@@ -125,18 +130,17 @@ module.exports = (io) => {
         rmm.rm_status,
         rmg.prep_to_pack,
         rmm.rework_time,
-        htr.cooked_date,
-        htr.rmit_date,
-        htr.withdraw_date,
-        REPLACE(LEFT(htr.withdraw_date, 16), 'T', ' ') AS withdraw_date_formatted,
-        htr.name_edit_prod_two,
-        htr.name_edit_prod_three,
-        htr.first_prod,
-        htr.two_prod,
-        htr.three_prod,
-        htr.edit_rework,
-        htr.remark_rework,
-        htr.remark_rework_cold
+        MAX(htr.cooked_date) AS cooked_date,        -- ✅ ใช้ MAX ป้องกัน group by error
+        MAX(htr.rmit_date) AS rmit_date,
+        MAX(htr.withdraw_date) AS withdraw_date,
+        MAX(htr.name_edit_prod_two) AS name_edit_prod_two,
+        MAX(htr.name_edit_prod_three) AS name_edit_prod_three,
+        MAX(htr.first_prod) AS first_prod,
+        MAX(htr.two_prod) AS two_prod,
+        MAX(htr.three_prod) AS three_prod,
+        MAX(htr.edit_rework) AS edit_rework,
+        MAX(htr.remark_rework) AS remark_rework,
+        MAX(htr.remark_rework_cold) AS remark_rework_cold
       FROM
         RMForProd rmf
       JOIN 
@@ -156,53 +160,70 @@ module.exports = (io) => {
       JOIN
         History htr ON rmm.mapping_id = htr.mapping_id
       LEFT JOIN 
-        Batch b ON rmm.batch_id = b.batch_id
+        Batch b ON rmm.mapping_id = b.mapping_id  -- ✅ เปลี่ยนจาก batch_id เป็น mapping_id
       WHERE 
         rmm.stay_place IN ('จุดเตรียม','หม้ออบ')
         AND rmm.dest IN ('ไปบรรจุ', 'เข้าห้องเย็น','Qc')
         AND rmm.rm_status IN ('รอQCตรวจสอบ' ,'รอ MD')
         AND rmf.rm_group_id = rmg.rm_group_id
         AND rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')})
-      ORDER BY htr.cooked_date DESC
+      GROUP BY
+        rmm.mapping_id,
+        rmf.rmfp_id,
+        pc.process_name,
+        rm.mat,
+        rm.mat_name,
+        p.doc_no,
+        rmm.rmm_line_name,
+        rmm.dest,
+        rmm.weight_RM,
+        rmm.tray_count,
+        rmg.rm_type_id,
+        rmm.tro_id,
+        rmm.level_eu,
+        rmf.rm_group_id,
+        rmg.rm_group_id,
+        rmm.rm_status,
+        rmg.prep_to_pack,
+        rmm.rework_time
+      ORDER BY MAX(htr.cooked_date) DESC;
     `;
 
-			const result = await pool.request().query(query);
+    const result = await pool.request().query(query);
 
-			console.log("Data fetched from the database:", result.recordset);
+    const formattedData = result.recordset.map(item => {
+      // Format cooked_date
+      if (item.cooked_date) {
+        const cookedDate = new Date(item.cooked_date);
+        const year = cookedDate.getUTCFullYear();
+        const month = String(cookedDate.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(cookedDate.getUTCDate()).padStart(2, '0');
+        const hours = String(cookedDate.getUTCHours()).padStart(2, '0');
+        const minutes = String(cookedDate.getUTCMinutes()).padStart(2, '0');
+        item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
+        delete item.cooked_date;
+      }
 
-			const formattedData = result.recordset.map(item => {
-				// Format cooked_date
-				if (item.cooked_date) {
-					const cookedDate = new Date(item.cooked_date);
-					const year = cookedDate.getUTCFullYear();
-					const month = String(cookedDate.getUTCMonth() + 1).padStart(2, '0');
-					const day = String(cookedDate.getUTCDate()).padStart(2, '0');
-					const hours = String(cookedDate.getUTCHours()).padStart(2, '0');
-					const minutes = String(cookedDate.getUTCMinutes()).padStart(2, '0');
-					item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
-					delete item.cooked_date;
-				}
+      // Format rmit_date
+      if (item.rmit_date) {
+        const rmitDate = new Date(item.rmit_date);
+        const year = rmitDate.getUTCFullYear();
+        const month = String(rmitDate.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(rmitDate.getUTCDate()).padStart(2, '0');
+        const hours = String(rmitDate.getUTCHours()).padStart(2, '0');
+        const minutes = String(rmitDate.getUTCMinutes()).padStart(2, '0');
+        item.rmit_date = `${year}-${month}-${day} ${hours}:${minutes}`;
+      }
 
-				// Format rmit_date
-				if (item.rmit_date) {
-					const rmitDate = new Date(item.rmit_date);
-					const year = rmitDate.getUTCFullYear();
-					const month = String(rmitDate.getUTCMonth() + 1).padStart(2, '0');
-					const day = String(rmitDate.getUTCDate()).padStart(2, '0');
-					const hours = String(rmitDate.getUTCHours()).padStart(2, '0');
-					const minutes = String(rmitDate.getUTCMinutes()).padStart(2, '0');
-					item.rmit_date = `${year}-${month}-${day} ${hours}:${minutes}`;
-				}
+      return item;
+    });
 
-				return item;
-			});
-
-			res.json({ success: true, data: formattedData });
-		} catch (err) {
-			console.error("SQL error", err);
-			res.status(500).json({ success: false, error: err.message });
-		}
-	});
+    res.json({ success: true, data: formattedData });
+  } catch (err) {
+    console.error("SQL error", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 
 	router.post("/qc/check", async (req, res) => {
@@ -634,7 +655,7 @@ module.exports = (io) => {
 		}
 	});
 
-	router.get("/qc/History/All", async (req, res) => {
+router.get("/qc/History/All", async (req, res) => {
   try {
     const { page = 1, pageSize = 20 } = req.query;
     const rm_type_ids = req.query.rm_type_ids; // รับ rm_type_ids จาก query parameters
@@ -671,87 +692,131 @@ module.exports = (io) => {
 
     // 2. Query หลักพร้อม pagination และกรอง rm_type_id
     const mainQuery = `
-      SELECT
-        rmm.mapping_id,
-        rmf.rmfp_id,
-        b.batch_after,
-        rm.mat,
-        rm.mat_name,
-        CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,
-        htr.rmm_line_name,
-        htr.tray_count,
-        htr.weight_RM,
-        htr.dest,
-        rmg.rm_type_id,
-        ps.process_name,
-        htr.tro_id,
-        rmm.level_eu,
-        rmf.rm_group_id AS rmf_rm_group_id,
-        rmg.rm_group_id AS rmg_rm_group_id,
-        rmm.rm_status,
-        htr.cooked_date,
-        q.general_remark,
-        q.sq_remark,
-        q.md,
-        q.md_remark,
-        q.defect,
-        q.defect_remark,
-        q.md_no,
-        CONCAT(q.WorkAreaCode, '-', mwa.WorkAreaName) AS WorkAreaCode,
-        q.qccheck,
-        q.mdcheck,
-        q.defectcheck,
-        q.sq_acceptance,
-        q.defect_acceptance,
-        htr.receiver,
-        htr.receiver_qc,
-        q.Moisture,
-        q.Temp,
-        FORMAT(q.md_time, 'yyyy-MM-dd HH:mm') AS md_time_formatted,
-        q.percent_fine,
-        FORMAT(q.qc_datetime, 'yyyy-MM-dd HH:mm') AS qc_datetime_formatted,
-        FORMAT(htr.rmit_date, 'yyyy-MM-dd HH:mm') AS rmit_date,
-        REPLACE(LEFT(htr.withdraw_date, 16), 'T', ' ') AS withdraw_date_formatted,
-        htr.rework_time,
-        htr.prep_to_pack_time,
-        htr.first_prod,
-        htr.two_prod,
-        htr.three_prod,
-        htr.name_edit_prod_two,
-        htr.name_edit_prod_three,
-        htr.prepare_mor_night,
-        htr.remark_rework,
-        htr.remark_rework_cold,
-        htr.edit_rework,
-        htr.created_at
-      FROM
-        RMForProd rmf
-      JOIN 
-        TrolleyRMMapping rmm ON rmf.rmfp_id = rmm.rmfp_id
-      JOIN
-        ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
-      JOIN
-        RawMat rm ON pr.mat = rm.mat
-      JOIN
-        Process ps ON rmm.process_id = ps.process_id
-      JOIN
-        Production p ON pr.prod_id = p.prod_id
-      JOIN
-        RawMatGroup rmg ON rmg.rm_group_id = rmf.rm_group_id
-      JOIN
-        History htr ON rmm.mapping_id = htr.mapping_id
-      JOIN 
-        Batch b ON rmm.batch_id = b.batch_id
-      JOIN
-        QC q ON rmm.qc_id = q.qc_id
-      LEFT JOIN 
-        WorkAreas mwa ON q.WorkAreaCode = mwa.WorkAreaCode
-      WHERE rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')}) 
-        AND htr.stay_place = 'จุดเตรียม' 
-        AND (htr.dest = 'เข้าห้องเย็น' OR htr.dest = 'ไปบรรจุ')
-      ORDER BY q.qc_datetime DESC
-      OFFSET @offset ROWS
-      FETCH NEXT @pageSize ROWS ONLY
+     SELECT
+    rmm.mapping_id,
+    rmf.rmfp_id,
+    STRING_AGG(CAST(b.batch_after AS VARCHAR(50)), ',') AS batch_after,
+    rm.mat,
+    rm.mat_name,
+    CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,
+    htr.rmm_line_name,
+    htr.tray_count,
+    htr.weight_RM,
+    htr.dest,
+    rmg.rm_type_id,
+    ps.process_name,
+    htr.tro_id,
+    rmm.level_eu,
+    rmf.rm_group_id AS rmf_rm_group_id,
+    rmg.rm_group_id AS rmg_rm_group_id,
+    rmm.rm_status,
+    htr.cooked_date,
+    q.general_remark,
+    q.sq_remark,
+    q.md,
+    q.md_remark,
+    q.defect,
+    q.defect_remark,
+    q.md_no,
+    CONCAT(q.WorkAreaCode, '-', mwa.WorkAreaName) AS WorkAreaCode,
+    q.qccheck,
+    q.mdcheck,
+    q.defectcheck,
+    q.sq_acceptance,
+    q.defect_acceptance,
+    htr.receiver,
+    htr.receiver_qc,
+    q.Moisture,
+    q.Temp,
+    FORMAT(q.md_time, 'yyyy-MM-dd HH:mm') AS md_time_formatted,
+    q.percent_fine,
+    FORMAT(q.qc_datetime, 'yyyy-MM-dd HH:mm') AS qc_datetime_formatted,
+    FORMAT(htr.rmit_date, 'yyyy-MM-dd HH:mm') AS rmit_date,
+    REPLACE(LEFT(htr.withdraw_date, 16), 'T', ' ') AS withdraw_date_formatted,
+    htr.rework_time,
+    htr.prep_to_pack_time,
+    htr.first_prod,
+    htr.two_prod,
+    htr.three_prod,
+    htr.name_edit_prod_two,
+    htr.name_edit_prod_three,
+    htr.prepare_mor_night,
+    htr.remark_rework,
+    htr.remark_rework_cold,
+    htr.edit_rework,
+    htr.created_at
+  FROM
+    RMForProd rmf
+  JOIN TrolleyRMMapping rmm ON rmf.rmfp_id = rmm.rmfp_id
+  JOIN ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
+  JOIN RawMat rm ON pr.mat = rm.mat
+  JOIN Process ps ON rmm.process_id = ps.process_id
+  JOIN Production p ON pr.prod_id = p.prod_id
+  JOIN RawMatGroup rmg ON rmg.rm_group_id = rmf.rm_group_id
+  JOIN History htr ON rmm.mapping_id = htr.mapping_id
+  JOIN Batch b ON rmm.mapping_id = b.mapping_id  -- เปลี่ยน join ให้ตรงกับ mapping_id
+  JOIN QC q ON rmm.qc_id = q.qc_id
+  LEFT JOIN WorkAreas mwa ON q.WorkAreaCode = mwa.WorkAreaCode
+  WHERE rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')})
+    AND htr.stay_place = 'จุดเตรียม'
+    AND (htr.dest = 'เข้าห้องเย็น' OR htr.dest = 'ไปบรรจุ')
+  GROUP BY
+    rmm.mapping_id,
+    rmf.rmfp_id,
+    rm.mat,
+    rm.mat_name,
+    p.doc_no,
+    rmm.rmm_line_name,
+    htr.rmm_line_name,
+    htr.tray_count,
+    htr.weight_RM,
+    htr.dest,
+    rmg.rm_type_id,
+    ps.process_name,
+    htr.tro_id,
+    rmm.level_eu,
+    rmf.rm_group_id,
+    rmg.rm_group_id,
+    rmm.rm_status,
+    htr.cooked_date,
+    q.general_remark,
+    q.sq_remark,
+    q.md,
+    q.md_remark,
+    q.defect,
+    q.defect_remark,
+    q.md_no,
+    q.WorkAreaCode,
+    mwa.WorkAreaName,
+    q.qccheck,
+    q.mdcheck,
+    q.defectcheck,
+    q.sq_acceptance,
+    q.defect_acceptance,
+    htr.receiver,
+    htr.receiver_qc,
+    q.Moisture,
+    q.Temp,
+    q.md_time,
+    q.percent_fine,
+    q.qc_datetime,
+    htr.rmit_date,
+    htr.withdraw_date,
+    htr.rework_time,
+    htr.prep_to_pack_time,
+    htr.first_prod,
+    htr.two_prod,
+    htr.three_prod,
+    htr.name_edit_prod_two,
+    htr.name_edit_prod_three,
+    htr.prepare_mor_night,
+    htr.remark_rework,
+    htr.remark_rework_cold,
+    htr.edit_rework,
+    htr.created_at
+  ORDER BY qc_datetime DESC
+  OFFSET @offset ROWS
+  FETCH NEXT @pageSize ROWS ONLY
     `;
 
     const result = await pool.request()
@@ -784,7 +849,6 @@ module.exports = (io) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 
 
 	router.put("/update-destination", async (req, res) => {

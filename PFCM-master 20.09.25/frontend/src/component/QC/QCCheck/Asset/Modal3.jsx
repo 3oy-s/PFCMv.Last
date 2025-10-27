@@ -588,17 +588,43 @@ const Modal3 = ({ open, onClose, data, onEdit, dataForModal3 }) => {
 							ชื่อวัตถุดิบ : {mat_name || "ไม่มีข้อมูล"}
 						</Typography>
 
-						<Typography variant="h6" className="print-text" sx={{
-							color: "#464646",
-							fontSize: "22px",
-							margin: "10px",
-							'@media print': {
-								fontSize: '10px',
-								margin: '2px 0',
-							},
-						}}>
-							Batch : {batch_after || "ไม่มีข้อมูล"}
-						</Typography>
+						{batch_after ? (
+							batch_after.split(',').map((batch, index) => (
+								<Typography
+									key={index}
+									variant="h6"
+									className="print-text"
+									sx={{
+										color: "#464646",
+										fontSize: "22px",
+										margin: "10px",
+										'@media print': {
+											fontSize: '10px',
+											margin: '2px 0',
+										},
+									}}
+								>
+									Batch {index + 1} : {batch.trim()}
+								</Typography>
+							))
+						) : (
+							<Typography
+								variant="h6"
+								className="print-text"
+								sx={{
+									color: "#464646",
+									fontSize: "22px",
+									margin: "10px",
+									'@media print': {
+										fontSize: '10px',
+										margin: '2px 0',
+									},
+								}}
+							>
+								Batch : ไม่มีข้อมูล
+							</Typography>
+						)}
+
 
 						<Typography variant="h6" className="print-text" sx={{
 							color: "#464646",

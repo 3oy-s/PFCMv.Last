@@ -160,9 +160,9 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
       const payload = {
   license_plate: Array.isArray(inputValues) ? inputValues.join(" ") : inputValues,
   rmfpID: rmfp_id || "",
-  batch_before: batchBefore || "",
-  batch_after: batchAfter || "", // อันนี้ optional ขึ้นอยู่กับ backend
-  batch_after_array: batchAfterArray || [], // <-- ส่งแบบ object
+  // batch_before: batchBefore || "",
+  // batch_after: batchAfter || "", // อันนี้ optional ขึ้นอยู่กับ backend
+  batchAfterArray: batchAfterArray || [], // <-- ส่งแบบ object
   cookedDateTimeNew: formattedDateTime || "",
   preparedDateTimeNew: formattedPreparedTime || "",
   weightTotal: weightTotal,
