@@ -33,63 +33,91 @@ module.exports = (io) => {
     router.get("/coldstorage/main/md/fetchSlotRawMat", async (req, res) => {
         try {
             const pool = await connectToDatabase();
-            const result = await pool
-                .request()
-                .query(`
-                SELECT
-                    rmf.rmfp_id, 
-                    rmm.tro_id,
-                    b.batch_after,
-                    rm.mat,
-                    rm.mat_name,
-                    CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,
-                    rmm.level_eu,
-                    FORMAT(rmm.prep_to_cold_time, 'N2') AS remaining_time,
-                    FORMAT(rmg.prep_to_cold, 'N2') AS standard_time,
-                    FORMAT(rmm.rework_time, 'N2') AS remaining_rework_time,
-                    FORMAT(rmg.rework, 'N2') AS standard_rework_time,
-                    rmm.rm_status,
-                    rmm.dest,
-                    rmm.weight_RM,
-                    rmm.tray_count,
-                    FORMAT(htr.cooked_date, 'yyyy-MM-dd HH:mm:ss') AS cooked_date,
-                    FORMAT(htr.rmit_date, 'yyyy-MM-dd HH:mm:ss') AS rmit_date,
-                    FORMAT(htr.qc_date, 'yyyy-MM-dd HH:mm:ss') AS qc_date,
-                    FORMAT(htr.out_cold_date, 'yyyy-MM-dd HH:mm:ss') AS out_cold_date,
-                    FORMAT(htr.out_cold_date_two, 'yyyy-MM-dd HH:mm:ss') AS out_cold_date_two,
-                    FORMAT(htr.out_cold_date_three, 'yyyy-MM-dd HH:mm:ss') AS out_cold_date_three
-                FROM
-                    TrolleyRMMapping rmm
-                JOIN  
-                    RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id  
-                LEFT JOIN
-                    Batch b ON rmm.batch_id = b.batch_id
-                JOIN
-                    ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
-                JOIN
-                    RawMat rm ON pr.mat = rm.mat
-                JOIN
-                    Production p ON pr.prod_id = p.prod_id
-                JOIN
-                    RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
-               -- JOIN
-                   -- QC qc ON rmm.qc_id = qc.qc_id
-                JOIN
-                    History htr ON rmm.mapping_id = htr.mapping_id
-                WHERE 
-                    rmm.rm_status IN ('QcCheck','เหลือจากไลน์ผลิต','รอแก้ไข','รอกลับมาเตรียม','รอ Qc','QcCheck รอ MD','QcCheck รอกลับมาเตรียม','รอQCตรวจสอบ')
-                    AND rmf.rm_group_id = rmg.rm_group_id
-                    AND rmm.tro_id IS NOT NULL
-                    AND rmm.dest = 'เข้าห้องเย็น'
-
-
-          `);
+            const result = await pool.request().query(`
+      SELECT
+          rmm.mapping_id, 
+          rmf.rmfp_id, 
+          rmm.tro_id,
+          STRING_AGG(b.batch_after, ', ') AS batch_after,  -- ✅ รวม batch_after ที่ mapping_id เดียวกัน
+          rm.mat,
+          rm.mat_name,
+          CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,
+          rmm.level_eu,
+          FORMAT(rmm.prep_to_cold_time, 'N2') AS remaining_time,
+          FORMAT(rmg.prep_to_cold, 'N2') AS standard_time,
+          FORMAT(rmm.rework_time, 'N2') AS remaining_rework_time,
+          FORMAT(rmg.rework, 'N2') AS standard_rework_time,
+          rmm.rm_status,
+          rmm.dest,
+          rmm.weight_RM,
+          rmm.tray_count,
+          FORMAT(htr.cooked_date, 'yyyy-MM-dd HH:mm:ss') AS cooked_date,
+          FORMAT(htr.rmit_date, 'yyyy-MM-dd HH:mm:ss') AS rmit_date,
+          FORMAT(htr.qc_date, 'yyyy-MM-dd HH:mm:ss') AS qc_date,
+          FORMAT(htr.out_cold_date, 'yyyy-MM-dd HH:mm:ss') AS out_cold_date,
+          FORMAT(htr.out_cold_date_two, 'yyyy-MM-dd HH:mm:ss') AS out_cold_date_two,
+          FORMAT(htr.out_cold_date_three, 'yyyy-MM-dd HH:mm:ss') AS out_cold_date_three
+      FROM
+          TrolleyRMMapping rmm
+      JOIN  
+          RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id  
+      LEFT JOIN
+          Batch b ON rmm.mapping_id = b.mapping_id   -- ✅ join ด้วย mapping_id
+      JOIN
+          ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
+      JOIN
+          RawMat rm ON pr.mat = rm.mat
+      JOIN
+          Production p ON pr.prod_id = p.prod_id
+      JOIN
+          RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
+      JOIN
+          History htr ON rmm.mapping_id = htr.mapping_id
+      WHERE 
+          rmm.rm_status IN (
+              'QcCheck',
+              'เหลือจากไลน์ผลิต',
+              'รอแก้ไข',
+              'รอกลับมาเตรียม',
+              'รอ Qc',
+              'QcCheck รอ MD',
+              'QcCheck รอกลับมาเตรียม',
+              'รอQCตรวจสอบ'
+          )
+          AND rmf.rm_group_id = rmg.rm_group_id
+          AND rmm.tro_id IS NOT NULL
+          AND rmm.dest = 'เข้าห้องเย็น'
+      GROUP BY
+          rmm.mapping_id,
+          rmf.rmfp_id,
+          rmm.tro_id,
+          rm.mat,
+          rm.mat_name,
+          p.doc_no,
+          rmm.rmm_line_name,
+          rmm.level_eu,
+          rmm.prep_to_cold_time,
+          rmg.prep_to_cold,
+          rmm.rework_time,
+          rmg.re_status,
+          rmm.dework,
+          rmm.rmst,
+          rmm.weight_RM,
+          rmm.tray_count,
+          htr.cooked_date,
+          htr.rmit_date,
+          htr.qc_date,
+          htr.out_cold_date,
+          htr.out_cold_date_two,
+          htr.out_cold_date_three
+      ORDER BY 
+          rmm.mapping_id DESC
+    `);
 
             const formattedData = result.recordset.map(item => {
                 console.log("item :", item);
                 return item;
             });
-
 
             res.json({ success: true, data: formattedData });
         } catch (err) {
@@ -97,6 +125,7 @@ module.exports = (io) => {
             res.status(500).json({ success: false, error: err.message });
         }
     });
+
 
     router.get("/coldstorage/main/mix/fetchSlotRawMat", async (req, res) => {
         try {
@@ -761,58 +790,63 @@ module.exports = (io) => {
             const result = await pool.request()
                 .input('slot_id', slot_id)
                 .query(`
-                    SELECT 
-                        s.slot_id,
-                        s.tro_id,
-                        rmm.mapping_id,
-                        rmm.tray_count,
-                        rmm.weight_RM,
-                        rmm.rm_status,
-                        CASE 
-                            WHEN rmm.batch_id IS NOT NULL THEN b.batch_after
-                            ELSE rmp.batch
-                        END AS batch,
-                        rm.mat_name,
-                        CONCAT(p.doc_no, '(', rmm.rmm_line_name, ')') AS production,
-                        FORMAT(rmm.prep_to_cold_time, 'N2') AS ptc_time,
-                        FORMAT(COALESCE(rmm.cold_time, rmg.cold), 'N2') AS cold,
-                        FORMAT(rmg.cold, 'N2') AS standard_cold,
-                        FORMAT(rmm.rework_time, 'N2') AS rework_time,
-                        FORMAT(rmg.rework, 'N2') AS standard_rework,
-                        rmp.rmfp_id,
-                        prm.mat,
-                        h.cooked_date,
-                        h.rmit_date,
-                        CONVERT(VARCHAR, h.come_cold_date, 120) AS come_cold_date,
-                        CONVERT(VARCHAR, h.come_cold_date_two, 120) AS come_cold_date_two,
-                        CONVERT(VARCHAR, h.come_cold_date_three, 120) AS come_cold_date_three,
-                        s.cs_id
-                    FROM 
-                        Slot s
-                    JOIN 
-                        Trolley t ON s.tro_id = t.tro_id
-                    JOIN 
-                        TrolleyRMMapping rmm ON rmm.tro_id = s.tro_id
-                    JOIN 
-                        RMForProd rmp ON rmp.rmfp_id = rmm.rmfp_id
-                    JOIN 
-                        ProdRawMat prm ON prm.prod_rm_id = rmm.tro_production_id
-                    JOIN 
-                        RawMat rm ON rm.mat = prm.mat
-                    LEFT JOIN
-                        batch b ON rmm.batch_id = b.batch_id
-                    JOIN 
-                        ColdStorage c ON c.cs_id = s.cs_id
-                    JOIN 
-                        Production p ON p.prod_id = prm.prod_id
-                    JOIN
-                        RawMatGroup rmg ON rmp.rm_group_id = rmg.rm_group_id
-                    JOIN
-                        History h ON rmm.mapping_id = h.mapping_id
-                    WHERE
-                        s.slot_id = @slot_id AND rmm.dest = 'ห้องเย็น'
-                        AND rmp.rm_group_id = rmg.rm_group_id
-                `);
+                SELECT 
+                    s.slot_id,
+                    s.tro_id,
+                    rmm.mapping_id,
+                    rmm.tray_count,
+                    rmm.weight_RM,
+                    rmm.rm_status,
+                    rm.mat_name,
+                    CONCAT(p.doc_no, '(', rmm.rmm_line_name, ')') AS production,
+                    FORMAT(rmm.prep_to_cold_time, 'N2') AS ptc_time,
+                    FORMAT(COALESCE(rmm.cold_time, rmg.cold), 'N2') AS cold,
+                    FORMAT(rmg.cold, 'N2') AS standard_cold,
+                    FORMAT(rmm.rework_time, 'N2') AS rework_time,
+                    FORMAT(rmg.rework, 'N2') AS standard_rework,
+                    rmp.rmfp_id,
+                    prm.mat,
+                    h.cooked_date,
+                    h.rmit_date,
+                    CONVERT(VARCHAR, h.come_cold_date, 120) AS come_cold_date,
+                    CONVERT(VARCHAR, h.come_cold_date_two, 120) AS come_cold_date_two,
+                    CONVERT(VARCHAR, h.come_cold_date_three, 120) AS come_cold_date_three,
+                    s.cs_id,
+                    -- รวมค่า batch_after ทุกตัวใน mapping เดียวกัน
+                    STRING_AGG(b.batch_after, ', ') AS batch_after_list
+                FROM 
+                    Slot s
+                JOIN 
+                    Trolley t ON s.tro_id = t.tro_id
+                JOIN 
+                    TrolleyRMMapping rmm ON rmm.tro_id = s.tro_id
+                JOIN 
+                    RMForProd rmp ON rmp.rmfp_id = rmm.rmfp_id
+                JOIN 
+                    ProdRawMat prm ON prm.prod_rm_id = rmm.tro_production_id
+                JOIN 
+                    RawMat rm ON rm.mat = prm.mat
+                LEFT JOIN
+                    batch b ON rmm.mapping_id = b.mapping_id
+                JOIN 
+                    ColdStorage c ON c.cs_id = s.cs_id
+                JOIN 
+                    Production p ON p.prod_id = prm.prod_id
+                JOIN
+                    RawMatGroup rmg ON rmp.rm_group_id = rmg.rm_group_id
+                JOIN
+                    History h ON rmm.mapping_id = h.mapping_id
+                WHERE
+                    s.slot_id = @slot_id AND rmm.dest = N'ห้องเย็น'
+                    AND rmp.rm_group_id = rmg.rm_group_id
+                GROUP BY
+                    s.slot_id, s.tro_id, rmm.mapping_id, rmm.tray_count, rmm.weight_RM, 
+                    rmm.rm_status, rm.mat_name, p.doc_no, rmm.rmm_line_name,
+                    rmm.prep_to_cold_time, rmm.cold_time, rmg.cold, 
+                    rmm.rework_time, rmg.rework, rmp.rmfp_id, prm.mat,
+                    h.cooked_date, h.rmit_date, h.come_cold_date, 
+                    h.come_cold_date_two, h.come_cold_date_three, s.cs_id
+            `);
 
             if (result.recordset.length === 0) {
                 return res.status(404).json({ success: false, error: "No data found for the given slot_id." });
@@ -834,20 +868,6 @@ module.exports = (io) => {
                     item.CookedDateTime = null;
                 }
 
-                // if (item.come_cold_date) {
-                //     const cookedDate = new Date(item.come_cold_date);
-                //     const cookedYear = cookedDate.getUTCFullYear();
-                //     const cookedMonth = String(cookedDate.getUTCMonth() + 1).padStart(2, '0');
-                //     const cookedDay = String(cookedDate.getUTCDate()).padStart(2, '0');
-                //     const cookedHours = String(cookedDate.getUTCHours()).padStart(2, '0');
-                //     const cookedMinutes = String(cookedDate.getUTCMinutes()).padStart(2, '0');
-
-                //     item.ComeColdDate = `${cookedYear}-${cookedMonth}-${cookedDay} ${cookedHours}:${cookedMinutes}`;
-                //     delete item.come_cold_date;
-                // } else {
-                //     item.ComeColdDate = null;
-                // }
-
                 if (item.rmit_date) {
                     const cookedDate = new Date(item.rmit_date);
                     const cookedYear = cookedDate.getUTCFullYear();
@@ -862,6 +882,10 @@ module.exports = (io) => {
                     item.RawmatTransForm = null;
                 }
 
+                // เปลี่ยนชื่อ field batch_after_list → batch
+                item.batch = item.batch_after_list || null;
+                delete item.batch_after_list;
+
                 return item;
             });
 
@@ -871,6 +895,7 @@ module.exports = (io) => {
             res.status(500).json({ success: false, error: `An error occurred while fetching data: ${error.message}` });
         }
     });
+
 
     router.get("/coldstorage/mixed/fetchSlotRawMat", async (req, res) => {
         try {
@@ -1731,102 +1756,152 @@ module.exports = (io) => {
     router.get("/coldstorage/export/fetchSlotRawMat", async (req, res) => {
         try {
             const pool = await connectToDatabase();
-            const result = await pool
-                .request()
-                .query(`
-                    SELECT
-                        rmf.rmfp_id,
-                        COALESCE(b.batch_after, rmf.batch) AS batch,
-                        rmm.mix_code,
-                        rm.mat,
-                        rm.mat_name,
-                        CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,
-                        FORMAT(rmm.prep_to_cold_time, 'N2') AS ptc_time,
-                        FORMAT(rmg.prep_to_cold, 'N2') AS standard_ptc,
-                        FORMAT(rmm.rework_time, 'N2') AS remaining_rework_time,
-                        FORMAT(rmg.rework, 'N2') AS standard_rework_time,
-                        FORMAT(COALESCE(rmm.cold_time, rmg.cold), 'N2') AS cold,
-                        FORMAT(rmg.cold, 'N2') AS standard_cold,
-                        rmf.rm_group_id AS rmf_rm_group_id,
-                        rmg.rm_group_id AS rmg_rm_group_id,
-                        rmm.tro_id,
-                        rmm.level_eu,
-                        rmm.rm_cold_status,
-                        rmm.rm_status,
-                        rmm.rmm_line_name,
-                        s.slot_id,
-                        rmm.dest,
-                        rmm.weight_RM,
-                        rmm.tray_count,
-                        rmm.mapping_id,
-                        q.sq_remark,
-                        q.md_remark,
-                        q.defect_remark,
-                        q.qccheck,
-                        q.mdcheck,
-                        q.defectcheck,
-                        q.sq_acceptance,
-                        q.defect_acceptance,
-                        htr.first_prod,
-                        htr.two_prod,
-                        htr.three_prod,
-                        htr.name_edit_prod_two,
-                        htr.name_edit_prod_three,
-                        htr.remark_rework,
-                        htr.edit_rework,
-                        htr.remark_rework_cold,
-                        htr.receiver_qc_cold,
-                        htr.qccheck_cold,
-                        htr.prepare_mor_night,
-                        
-                        CONCAT(COALESCE(q.WorkAreaCode, ''), 
-                        CASE 
-                            WHEN q.WorkAreaCode IS NOT NULL AND mwa.WorkAreaName IS NOT NULL 
-                            THEN CONCAT('-', mwa.WorkAreaName, '/', q.md_no) 
-                            ELSE ''
-                        END) AS machine_MD,
-                        CONVERT(VARCHAR, htr.cooked_date, 120) AS cooked_date,
-                        CONVERT(VARCHAR, htr.withdraw_date, 120) AS withdraw_date,
-                        CONVERT(VARCHAR, htr.rmit_date, 120) AS rmit_date,
-                        CONVERT(VARCHAR, htr.come_cold_date, 120) AS come_cold_date,
-                        CONVERT(VARCHAR, htr.come_cold_date_two, 120) AS come_cold_date_two,
-                        CONVERT(VARCHAR, htr.come_cold_date_three, 120) AS come_cold_date_three
-                    FROM
-                        TrolleyRMMapping rmm
-                    JOIN  
-                        RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id  -- แก้ตรงนี้ให้ถูกต้อง
-                    LEFT JOIN 
-                        Batch b ON rmm.batch_id = b.batch_id
-                    JOIN
-                        ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
-                    JOIN
-                        RawMat rm ON pr.mat = rm.mat
-                    JOIN
-                        Production p ON pr.prod_id = p.prod_id
-                    JOIN
-                        RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
-                    JOIN
-                        Slot s ON rmm.tro_id = s.tro_id
-                    JOIN
-                        History htr ON rmm.mapping_id = htr.mapping_id
-                    LEFT JOIN
-                        Qc q ON rmm.qc_id = q.qc_id
-                    LEFT JOIN
-				        WorkAreas mwa ON q.WorkAreaCode = mwa.WorkAreaCode
-                    WHERE 
-                        rmm.dest = 'ห้องเย็น'
-                        AND rmm.stay_place = 'เข้าห้องเย็น'
-                        AND rmf.rm_group_id = rmg.rm_group_id;
-
-          `);
-
+            const result = await pool.request().query(`
+      SELECT
+          rmm.mapping_id,
+          rmf.rmfp_id,
+          COALESCE(STRING_AGG(b.batch_after, ', '), rmf.batch) AS batch,  -- ✅ รวม batch_after ต่อ mapping_id
+          rmm.mix_code,
+          rm.mat,
+          rm.mat_name,
+          CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,
+          FORMAT(rmm.prep_to_cold_time, 'N2') AS ptc_time,
+          FORMAT(rmg.prep_to_cold, 'N2') AS standard_ptc,
+          FORMAT(rmm.rework_time, 'N2') AS remaining_rework_time,
+          FORMAT(rmg.rework, 'N2') AS standard_rework_time,
+          FORMAT(COALESCE(rmm.cold_time, rmg.cold), 'N2') AS cold,
+          FORMAT(rmg.cold, 'N2') AS standard_cold,
+          rmf.rm_group_id AS rmf_rm_group_id,
+          rmg.rm_group_id AS rmg_rm_group_id,
+          rmm.tro_id,
+          rmm.level_eu,
+          rmm.rm_cold_status,
+          rmm.rm_status,
+          rmm.rmm_line_name,
+          s.slot_id,
+          rmm.dest,
+          rmm.weight_RM,
+          rmm.tray_count,
+          q.sq_remark,
+          q.md_remark,
+          q.defect_remark,
+          q.qccheck,
+          q.mdcheck,
+          q.defectcheck,
+          q.sq_acceptance,
+          q.defect_acceptance,
+          htr.first_prod,
+          htr.two_prod,
+          htr.three_prod,
+          htr.name_edit_prod_two,
+          htr.name_edit_prod_three,
+          htr.remark_rework,
+          htr.edit_rework,
+          htr.remark_rework_cold,
+          htr.receiver_qc_cold,
+          htr.qccheck_cold,
+          htr.prepare_mor_night,
+          CONCAT(
+              COALESCE(q.WorkAreaCode, ''), 
+              CASE 
+                  WHEN q.WorkAreaCode IS NOT NULL AND mwa.WorkAreaName IS NOT NULL 
+                  THEN CONCAT('-', mwa.WorkAreaName, '/', q.md_no) 
+                  ELSE ''
+              END
+          ) AS machine_MD,
+          CONVERT(VARCHAR, htr.cooked_date, 120) AS cooked_date,
+          CONVERT(VARCHAR, htr.withdraw_date, 120) AS withdraw_date,
+          CONVERT(VARCHAR, htr.rmit_date, 120) AS rmit_date,
+          CONVERT(VARCHAR, htr.come_cold_date, 120) AS come_cold_date,
+          CONVERT(VARCHAR, htr.come_cold_date_two, 120) AS come_cold_date_two,
+          CONVERT(VARCHAR, htr.come_cold_date_three, 120) AS come_cold_date_three
+      FROM
+          TrolleyRMMapping rmm
+      JOIN  
+          RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id  
+      LEFT JOIN 
+          Batch b ON rmm.mapping_id = b.mapping_id   -- ✅ เปลี่ยนจาก batch_id เป็น mapping_id
+      JOIN
+          ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
+      JOIN
+          RawMat rm ON pr.mat = rm.mat
+      JOIN
+          Production p ON pr.prod_id = p.prod_id
+      JOIN
+          RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
+      JOIN
+          Slot s ON rmm.tro_id = s.tro_id
+      JOIN
+          History htr ON rmm.mapping_id = htr.mapping_id
+      LEFT JOIN
+          Qc q ON rmm.qc_id = q.qc_id
+      LEFT JOIN
+          WorkAreas mwa ON q.WorkAreaCode = mwa.WorkAreaCode
+      WHERE 
+          rmm.dest = 'ห้องเย็น'
+          AND rmm.stay_place = 'เข้าห้องเย็น'
+          AND rmf.rm_group_id = rmg.rm_group_id
+      GROUP BY
+          rmm.mapping_id,
+          rmf.rmfp_id,
+          rmf.batch,
+          rmm.mix_code,
+          rm.mat,
+          rm.mat_name,
+          p.doc_no,
+          rmm.rmm_line_name,
+          rmm.prep_to_cold_time,
+          rmg.prep_to_cold,
+          rmm.rework_time,
+          rmg.rework,
+          rmm.cold_time,
+          rmg.cold,
+          rmf.rm_group_id,
+          rmg.rm_group_id,
+          rmm.tro_id,
+          rmm.level_eu,
+          rmm.rm_cold_status,
+          rmm.rm_status,
+          s.slot_id,
+          rmm.dest,
+          rmm.weight_RM,
+          rmm.tray_count,
+          q.sq_remark,
+          q.md_remark,
+          q.defect_remark,
+          q.qccheck,
+          q.mdcheck,
+          q.defectcheck,
+          q.sq_acceptance,
+          q.defect_acceptance,
+          htr.first_prod,
+          htr.two_prod,
+          htr.three_prod,
+          htr.name_edit_prod_two,
+          htr.name_edit_prod_three,
+          htr.remark_rework,
+          htr.edit_rework,
+          htr.remark_rework_cold,
+          htr.receiver_qc_cold,
+          htr.qccheck_cold,
+          htr.prepare_mor_night,
+          q.WorkAreaCode,
+          mwa.WorkAreaName,
+          q.md_no,
+          htr.cooked_date,
+          htr.withdraw_date,
+          htr.rmit_date,
+          htr.come_cold_date,
+          htr.come_cold_date_two,
+          htr.come_cold_date_three
+      ORDER BY 
+          rmm.mapping_id DESC;
+    `);
 
             const formattedData = result.recordset.map(item => {
-
-                console.log(item)
+                console.log("item:", item);
                 return item;
             });
-
 
             res.json({ success: true, data: formattedData });
         } catch (err) {
@@ -1834,6 +1909,7 @@ module.exports = (io) => {
             res.status(500).json({ success: false, error: err.message });
         }
     });
+
 
     router.get("/coldstorage/mix/export/fetchSlotRawMat", async (req, res) => {
         try {
@@ -2547,75 +2623,113 @@ module.exports = (io) => {
     router.get("/coldstorage/incold/fetchSlotRawMat", async (req, res) => {
         try {
             const pool = await connectToDatabase();
-            const result = await pool
-                .request()
-                .query(`
-                    SELECT
-                        rmm.mapping_id,
-                        rmf.rmfp_id,
-                        COALESCE(b.batch_after, rmf.batch) AS batch,
-                        rm.mat,
-                        rm.mat_name,
-                        CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,
-                        FORMAT(rmm.prep_to_cold_time, 'N2') AS ptc_time,
-                        FORMAT(COALESCE(rmm.cold_time, rmg.cold), 'N2') AS cold,
-                        FORMAT(rmm.rework_time, 'N2') AS rework_time,
-                        FORMAT(rmm.mix_time, 'N2') AS mix_time,
-                        FORMAT(rmg.cold, 'N2') AS standard_cold,
-                        FORMAT(rmg.rework, 'N2') AS standard_rework,
-                        rmf.rm_group_id AS rmf_rm_group_id,
-                        rmg.rm_group_id AS rmg_rm_group_id,
-                        rmm.tro_id,
-                        rmm.rm_cold_status,
-                        rmm.rm_status,
-                        rmm.dest,
-                        rmm.weight_RM,
-                        rmm.tray_count,
-                        rmm.level_eu,
-                        htr.hist_id,
-                        cs.cs_name,
-                        s.slot_id,
-                        htr.qccheck_cold,
-                        htr.remark_rework_cold,
-                        CONVERT(VARCHAR, htr.withdraw_date, 120) AS withdraw_date,
-                        CONVERT(VARCHAR, htr.cooked_date, 120) AS cooked_date,
-                        CONVERT(VARCHAR, htr.rmit_date, 120) AS rmit_date,
-                        CONVERT(VARCHAR, htr.come_cold_date, 120) AS come_cold_date,
-                        CONVERT(VARCHAR, htr.come_cold_date_two, 120) AS come_cold_date_two,
-                        CONVERT(VARCHAR, htr.come_cold_date_three, 120) AS come_cold_date_three,
-                        CONVERT(VARCHAR, htr.out_cold_date, 120) AS out_cold_date,
-                        CONVERT(VARCHAR, htr.out_cold_date_two, 120) AS out_cold_date_two,
-                        CONVERT(VARCHAR, htr.out_cold_date_three, 120) AS out_cold_date_three,
-                        CONVERT(VARCHAR, htr.rework_date, 120) AS rework_date
-                    FROM
-                        TrolleyRMMapping rmm
-                    LEFT JOIN
-                        QC q ON rmm.qc_id = q.qc_id
-                    JOIN
-                        RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
-                    JOIN
-                        ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
-                    JOIN
-                        RawMat rm ON pr.mat = rm.mat
-                    JOIN
-                        Production p ON pr.prod_id = p.prod_id
-                    JOIN
-                        RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
-                    JOIN
-                        History htr ON rmm.mapping_id = htr.mapping_id
-                    JOIN
-                        Slot s ON rmm.tro_id = s.tro_id
-                    JOIN
-                        ColdStorage cs ON s.cs_id = cs.cs_id
-                    LEFT JOIN
-                        Batch b ON rmm.batch_id = b.batch_id
-                    WHERE
-                        rmm.dest = 'ห้องเย็น'
-                        AND rmm.stay_place = 'เข้าห้องเย็น'
-                        AND rmf.rm_group_id = rmg.rm_group_id
-                        AND rmm.mapping_id = htr.mapping_id
-                        AND rmm.tro_id IS NOT NULL
-                `);
+            const result = await pool.request().query(`
+      SELECT
+          rmm.mapping_id,
+          rmf.rmfp_id,
+          COALESCE(STRING_AGG(b.batch_after, ', '), rmf.batch) AS batch,  -- ✅ รวม batch_after ตาม mapping_id
+          rm.mat,
+          rm.mat_name,
+          CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,
+          FORMAT(rmm.prep_to_cold_time, 'N2') AS ptc_time,
+          FORMAT(COALESCE(rmm.cold_time, rmg.cold), 'N2') AS cold,
+          FORMAT(rmm.rework_time, 'N2') AS rework_time,
+          FORMAT(rmm.mix_time, 'N2') AS mix_time,
+          FORMAT(rmg.cold, 'N2') AS standard_cold,
+          FORMAT(rmg.rework, 'N2') AS standard_rework,
+          rmf.rm_group_id AS rmf_rm_group_id,
+          rmg.rm_group_id AS rmg_rm_group_id,
+          rmm.tro_id,
+          rmm.rm_cold_status,
+          rmm.rm_status,
+          rmm.dest,
+          rmm.weight_RM,
+          rmm.tray_count,
+          rmm.level_eu,
+          htr.hist_id,
+          cs.cs_name,
+          s.slot_id,
+          htr.qccheck_cold,
+          htr.remark_rework_cold,
+          CONVERT(VARCHAR, htr.withdraw_date, 120) AS withdraw_date,
+          CONVERT(VARCHAR, htr.cooked_date, 120) AS cooked_date,
+          CONVERT(VARCHAR, htr.rmit_date, 120) AS rmit_date,
+          CONVERT(VARCHAR, htr.come_cold_date, 120) AS come_cold_date,
+          CONVERT(VARCHAR, htr.come_cold_date_two, 120) AS come_cold_date_two,
+          CONVERT(VARCHAR, htr.come_cold_date_three, 120) AS come_cold_date_three,
+          CONVERT(VARCHAR, htr.out_cold_date, 120) AS out_cold_date,
+          CONVERT(VARCHAR, htr.out_cold_date_two, 120) AS out_cold_date_two,
+          CONVERT(VARCHAR, htr.out_cold_date_three, 120) AS out_cold_date_three,
+          CONVERT(VARCHAR, htr.rework_date, 120) AS rework_date
+      FROM
+          TrolleyRMMapping rmm
+      LEFT JOIN
+          QC q ON rmm.qc_id = q.qc_id
+      JOIN
+          RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
+      JOIN
+          ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
+      JOIN
+          RawMat rm ON pr.mat = rm.mat
+      JOIN
+          Production p ON pr.prod_id = p.prod_id
+      JOIN
+          RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
+      JOIN
+          History htr ON rmm.mapping_id = htr.mapping_id
+      JOIN
+          Slot s ON rmm.tro_id = s.tro_id
+      JOIN
+          ColdStorage cs ON s.cs_id = cs.cs_id
+      LEFT JOIN
+          Batch b ON rmm.mapping_id = b.mapping_id   -- ✅ เปลี่ยน join key
+      WHERE
+          rmm.dest = 'ห้องเย็น'
+          AND rmm.stay_place = 'เข้าห้องเย็น'
+          AND rmf.rm_group_id = rmg.rm_group_id
+          AND rmm.mapping_id = htr.mapping_id
+          AND rmm.tro_id IS NOT NULL
+      GROUP BY
+          rmm.mapping_id,
+          rmf.rmfp_id,
+          rmf.batch,
+          rm.mat,
+          rm.mat_name,
+          p.doc_no,
+          rmm.rmm_line_name,
+          rmm.prep_to_cold_time,
+          rmm.cold_time,
+          rmg.cold,
+          rmm.rework_time,
+          rmm.mix_time,
+          rmg.rework,
+          rmf.rm_group_id,
+          rmg.rm_group_id,
+          rmm.tro_id,
+          rmm.rm_cold_status,
+          rmm.rm_status,
+          rmm.dest,
+          rmm.weight_RM,
+          rmm.tray_count,
+          rmm.level_eu,
+          htr.hist_id,
+          cs.cs_name,
+          s.slot_id,
+          htr.qccheck_cold,
+          htr.remark_rework_cold,
+          htr.withdraw_date,
+          htr.cooked_date,
+          htr.rmit_date,
+          htr.come_cold_date,
+          htr.come_cold_date_two,
+          htr.come_cold_date_three,
+          htr.out_cold_date,
+          htr.out_cold_date_two,
+          htr.out_cold_date_three,
+          htr.rework_date
+      ORDER BY
+          rmm.mapping_id DESC;
+    `);
 
             // แก้ไขรูปแบบวันที่ให้เป็นแบบเดียวกันทั้งหมด (แทนที่ T ด้วยช่องว่าง)
             const formattedData = result.recordset.map(record => {
@@ -5357,30 +5471,37 @@ module.exports = (io) => {
             status = ''
         } = req.query;
 
+
         // Convert page and pageSize to numbers
         const pageNum = parseInt(page, 10) || 1;
         const pageSizeNum = parseInt(pageSize, 10) || 100;
+
 
         try {
             const pool = await connectToDatabase();
             // Use converted variables for page and pageSize
             const offset = (pageNum - 1) * pageSizeNum;
 
+
             // Format dates to cover the entire day
             let formattedStartDate = startDate;
             let formattedEndDate = endDate;
+
 
             // If format is YYYY-MM-DD (without time), add time
             if (formattedStartDate.length === 10) {
                 formattedStartDate += ' 00:00:00';
             }
 
+
             if (formattedEndDate.length === 10) {
                 formattedEndDate += ' 23:59:59';
             }
 
+
             // Create additional conditions for WHERE clause
             let additionalWhereConditions = '';
+
 
             console.log('Filtering params:', {
                 startDate: formattedStartDate,
@@ -5388,11 +5509,12 @@ module.exports = (io) => {
                 filterType
             });
 
+
             // Add condition: filter only entries with cold room entry or exit
             additionalWhereConditions += `
                 AND (
-                    h.come_cold_date IS NOT NULL 
-                    OR h.come_cold_date_two IS NOT NULL 
+                    h.come_cold_date IS NOT NULL
+                    OR h.come_cold_date_two IS NOT NULL
                     OR h.come_cold_date_three IS NOT NULL
                     OR h.out_cold_date IS NOT NULL
                     OR h.out_cold_date_two IS NOT NULL
@@ -5400,10 +5522,12 @@ module.exports = (io) => {
                 )
             `;
 
+
             // Add search condition
             if (searchTerm) {
                 additionalWhereConditions += ` AND (rm.mat_name LIKE @searchTerm OR rm.mat LIKE @searchTerm)`;
             }
+
 
             // Add status condition
             if (status) {
@@ -5434,6 +5558,7 @@ module.exports = (io) => {
                 }
             }
 
+
             // Add date range filter condition
             if (startDate && endDate) {
                 if (filterType === 'exit') {
@@ -5441,23 +5566,23 @@ module.exports = (io) => {
                     additionalWhereConditions += `
                     AND (
                         (
-                            h.out_cold_date_three IS NOT NULL 
-                            AND CONVERT(DATETIME, h.out_cold_date_three) 
+                            h.out_cold_date_three IS NOT NULL
+                            AND CONVERT(DATETIME, h.out_cold_date_three)
                             BETWEEN CONVERT(DATETIME, @startDate) AND CONVERT(DATETIME, @endDate)
                         )
-                        OR 
+                        OR
                         (
-                            h.out_cold_date_three IS NULL 
-                            AND h.out_cold_date_two IS NOT NULL 
-                            AND CONVERT(DATETIME, h.out_cold_date_two) 
+                            h.out_cold_date_three IS NULL
+                            AND h.out_cold_date_two IS NOT NULL
+                            AND CONVERT(DATETIME, h.out_cold_date_two)
                             BETWEEN CONVERT(DATETIME, @startDate) AND CONVERT(DATETIME, @endDate)
                         )
-                        OR 
+                        OR
                         (
-                            h.out_cold_date_three IS NULL 
-                            AND h.out_cold_date_two IS NULL 
-                            AND h.out_cold_date IS NOT NULL 
-                            AND CONVERT(DATETIME, h.out_cold_date) 
+                            h.out_cold_date_three IS NULL
+                            AND h.out_cold_date_two IS NULL
+                            AND h.out_cold_date IS NOT NULL
+                            AND CONVERT(DATETIME, h.out_cold_date)
                             BETWEEN CONVERT(DATETIME, @startDate) AND CONVERT(DATETIME, @endDate)
                         )
                     )
@@ -5467,29 +5592,30 @@ module.exports = (io) => {
                     additionalWhereConditions += `
                     AND (
                         (
-                            h.come_cold_date_three IS NOT NULL 
-                            AND CONVERT(DATETIME, h.come_cold_date_three) 
+                            h.come_cold_date_three IS NOT NULL
+                            AND CONVERT(DATETIME, h.come_cold_date_three)
                             BETWEEN CONVERT(DATETIME, @startDate) AND CONVERT(DATETIME, @endDate)
                         )
-                        OR 
+                        OR
                         (
-                            h.come_cold_date_three IS NULL 
-                            AND h.come_cold_date_two IS NOT NULL 
-                            AND CONVERT(DATETIME, h.come_cold_date_two) 
+                            h.come_cold_date_three IS NULL
+                            AND h.come_cold_date_two IS NOT NULL
+                            AND CONVERT(DATETIME, h.come_cold_date_two)
                             BETWEEN CONVERT(DATETIME, @startDate) AND CONVERT(DATETIME, @endDate)
                         )
-                        OR 
+                        OR
                         (
-                            h.come_cold_date_three IS NULL 
-                            AND h.come_cold_date_two IS NULL 
-                            AND h.come_cold_date IS NOT NULL 
-                            AND CONVERT(DATETIME, h.come_cold_date) 
+                            h.come_cold_date_three IS NULL
+                            AND h.come_cold_date_two IS NULL
+                            AND h.come_cold_date IS NOT NULL
+                            AND CONVERT(DATETIME, h.come_cold_date)
                             BETWEEN CONVERT(DATETIME, @startDate) AND CONVERT(DATETIME, @endDate)
                         )
                     )
                 `;
                 }
             }
+
 
             // Count total query
             const countQuery = `
@@ -5505,9 +5631,10 @@ module.exports = (io) => {
             ${additionalWhereConditions}
         `;
 
+
             // Main query
             const mainQuery = `
-            SELECT 
+            SELECT
                 rm.mat_name AS rawMaterialName,
                 rm.mat AS mat,
                 COALESCE(b.batch_after, rmf.batch) AS batch,
@@ -5516,13 +5643,13 @@ module.exports = (io) => {
                 s.slot_id,
                 h.weight_RM AS weight,
                 h.tray_count AS trayCount,
-				q.sq_remark,
-				q.md_remark,
+                q.sq_remark,
+                q.md_remark,
                 rmm.level_eu,
-				q.defect_remark,
-				q.qccheck,
-				q.mdcheck,
-				q.defectcheck,
+                q.defect_remark,
+                q.qccheck,
+                q.mdcheck,
+                q.defectcheck,
                 q.sq_acceptance,
                 q.defect_acceptance,
                 h.name_edit_prod_two,
@@ -5533,10 +5660,10 @@ module.exports = (io) => {
                 h.qccheck_cold,
                 h.receiver_qc_cold,
                 h.prepare_mor_night,
-				h.remark_rework,
-				h.receiver_qc_cold,
+                h.remark_rework,
+                h.receiver_qc_cold,
                 CONCAT(q.WorkAreaCode, \'-\', mwa.WorkAreaName, '/', q.md_no) AS machine_MD,
-				CONVERT(VARCHAR, h.rmit_date, 120) AS prepCompleteTime,
+                CONVERT(VARCHAR, h.rmit_date, 120) AS prepCompleteTime,
                 FORMAT(rmm.prep_to_cold_time, 'N2') AS ptc_time,
                 FORMAT(rmg.prep_to_cold, 'N2') AS standard_ptc,
                 CONVERT(VARCHAR, h.withdraw_date, 120) AS withdraw_date,
@@ -5556,48 +5683,51 @@ module.exports = (io) => {
                 h.cold_to_pack_time,
                 rmg.cold_to_pack,
                 h.cold_dest
-            FROM 
+            FROM
                 History h
-            JOIN 
+            JOIN
                 TrolleyRMMapping rmm ON h.mapping_id = rmm.mapping_id
-            JOIN 
+            JOIN
                 RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
-            JOIN 
+            JOIN
                 ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
-            JOIN 
+            JOIN
                 RawMat rm ON pr.mat = rm.mat
-            JOIN 
+            JOIN
                 Production p ON pr.prod_id = p.prod_id
-			LEFT JOIN
-				Qc q ON rmm.qc_id = q.qc_id
-            LEFT JOIN 
-				WorkAreas mwa ON q.WorkAreaCode = mwa.WorkAreaCode
+            LEFT JOIN
+                Qc q ON rmm.qc_id = q.qc_id
+            LEFT JOIN
+                WorkAreas mwa ON q.WorkAreaCode = mwa.WorkAreaCode
             JOIN
                 RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
-            LEFT JOIN 
+            LEFT JOIN
                 Slot s ON rmm.tro_id = s.tro_id
-			LEFT JOIN 
-				Batch b ON rmm.batch_id = b.batch_id
+            LEFT JOIN
+                Batch b ON rmm.batch_id = b.batch_id
             ${additionalWhereConditions}
-            ORDER BY 
+            ORDER BY
                 COALESCE(
                     h.come_cold_date_three, h.out_cold_date_three,
                     h.come_cold_date_two, h.out_cold_date_two,
                     h.come_cold_date, h.out_cold_date
                 ) DESC
-            OFFSET @offset ROWS 
+            OFFSET @offset ROWS
             FETCH NEXT @pageSize ROWS ONLY
         `;
+
 
             // Prepare requests
             const countRequest = pool.request();
             const mainRequest = pool.request();
+
 
             // Add parameters
             if (searchTerm) {
                 countRequest.input('searchTerm', `%${searchTerm}%`);
                 mainRequest.input('searchTerm', `%${searchTerm}%`);
             }
+
 
             // Add parameters for date range filtering
             if (startDate && endDate) {
@@ -5607,21 +5737,27 @@ module.exports = (io) => {
                 mainRequest.input('endDate', formattedEndDate);
             }
 
+
             mainRequest.input('offset', offset);
             mainRequest.input('pageSize', pageSizeNum); // Use converted value
+
 
             // Get total count
             const totalCountResult = await countRequest.query(countQuery);
             const totalCount = totalCountResult.recordset[0].total;
 
+
             console.log(`Found ${totalCount} total records matching criteria`);
+
 
             // Get data
             const result = await mainRequest.query(mainQuery);
 
+
             // Format data
             const formattedData = result.recordset.map(record => {
                 const newRecord = { ...record };
+
 
                 // Format date fields
                 const dateFields = [
@@ -5630,14 +5766,17 @@ module.exports = (io) => {
                     'exitColdTime1', 'exitColdTime2', 'exitColdTime3'
                 ];
 
+
                 dateFields.forEach(field => {
                     if (newRecord[field]) {
                         newRecord[field] = newRecord[field].replace('T', ' ');
                     }
                 });
 
+
                 // Create entry/exit history
                 newRecord.entryExitHistory = [];
+
 
                 // Add cold room entry history
                 [
@@ -5655,6 +5794,7 @@ module.exports = (io) => {
                     }
                 });
 
+
                 // Add cold room exit history
                 [
                     { time: 'exitColdTime1', seq: 1, nameField: 'exitOperator1' },
@@ -5671,26 +5811,33 @@ module.exports = (io) => {
                     }
                 });
 
+
                 // Sort history by time
                 newRecord.entryExitHistory.sort((a, b) => new Date(b.time) - new Date(a.time));
+
 
                 // Add summary fields
                 newRecord.latestStatus = newRecord.entryExitHistory.length > 0 ?
                     newRecord.entryExitHistory[0].type : '-';
 
+
                 newRecord.latestStatusTime = newRecord.entryExitHistory.length > 0 ?
                     newRecord.entryExitHistory[0].time : null;
+
 
                 // Add latest exit time field (used for filtering and display)
                 const lastExitHistory = newRecord.entryExitHistory.find(h => h.type === 'exitColdRoom');
                 newRecord.latestExitTime = lastExitHistory ? lastExitHistory.time : null;
 
+
                 // Add latest entry time field
                 const lastEnterHistory = newRecord.entryExitHistory.find(h => h.type === 'enterColdRoom');
                 newRecord.latestEnterTime = lastEnterHistory ? lastEnterHistory.time : null;
 
+
                 return newRecord;
             });
+
 
             // Send data with metadata
             return res.json({
@@ -5712,6 +5859,11 @@ module.exports = (io) => {
             });
         }
     });
+
+
+
+
+
 
     // API สำหรับดึงข้อมูลน้ำหนักตามสถานะย้อนหลังตามช่วงเวลา
     router.get("/coldstorage/history/getWeightStats", async (req, res) => {

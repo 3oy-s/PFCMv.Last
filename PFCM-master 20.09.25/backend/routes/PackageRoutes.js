@@ -1504,7 +1504,7 @@ module.exports = (io) => {
       const result = await request.query(`
       SELECT
           rmf.rmfp_id,
-          b.batch_after,
+          STRING_AGG(b.batch_after, ', ') AS batch_after,
           rm.mat,
           rm.mat_name,
           rmm.mapping_id,
@@ -1535,13 +1535,13 @@ module.exports = (io) => {
           CONVERT(VARCHAR, h.receiver_qc, 120) AS receiver_qc,
           l.line_name,
           CONCAT(p.doc_no, ' (',rmm.rmm_line_name, ')') AS code,
-          q.*
+          q.qc_id
       FROM
           RMForProd rmf
       JOIN
           TrolleyRMMapping rmm ON rmf.rmfp_id = rmm.rmfp_id
       LEFT JOIN
-          Batch b ON rmm.batch_id = b.batch_id
+          Batch b ON rmm.mapping_id = b.mapping_id
       JOIN
           ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
       JOIN
@@ -1554,13 +1554,47 @@ module.exports = (io) => {
           RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
       JOIN  
           History h ON rmm.mapping_id = h.mapping_id
-      JOIN
+      LEFT JOIN
           QC q ON rmm.qc_id = q.qc_id
       WHERE 
           rmm.stay_place IN ('จุดเตรียม','ออกห้องเย็น') 
           AND rmm.dest IN ('ไปบรรจุ', 'บรรจุ')
           AND rmf.rm_group_id = rmg.rm_group_id
           ${lineFilter}
+      GROUP BY
+          rmf.rmfp_id,
+          rm.mat,
+          rm.mat_name,
+          rmm.mapping_id,
+          rmm.dest,
+          rmm.stay_place,
+          rmg.rm_type_id,
+          rmm.rm_status,
+          rmm.tray_count,
+          rmm.weight_RM,
+          rmm.level_eu,
+          rmm.tro_id,
+          rmm.cold_to_pack_time,
+          rmg.cold_to_pack,
+          rmm.prep_to_pack_time,
+          rmg.prep_to_pack,
+          rmm.rework_time,
+          rmg.rework,
+          h.cooked_date,
+          h.rmit_date,
+          h.come_cold_date,
+          h.out_cold_date,
+          h.come_cold_date_two,
+          h.out_cold_date_two,
+          h.come_cold_date_three,
+          h.out_cold_date_three,
+          h.qc_date,
+          h.receiver,
+          h.receiver_qc,
+          l.line_name,
+          p.doc_no,
+          rmm.rmm_line_name,
+          q.qc_id
     `);
 
       const formattedData = result.recordset.map(item => {
@@ -1573,7 +1607,6 @@ module.exports = (io) => {
 
         item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
         delete item.cooked_date;
-
         return item;
       });
 
@@ -1583,6 +1616,8 @@ module.exports = (io) => {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
+
 
   //name
   router.get("/pack/select/Trolley", async (req, res) => {

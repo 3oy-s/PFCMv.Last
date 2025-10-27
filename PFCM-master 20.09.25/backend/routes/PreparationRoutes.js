@@ -46,7 +46,7 @@ module.exports = (io) => {
             .input("stay_place", stayPlace)
             .input("dest", Dest)
             .input("level_eu", level_eu !== "-" ? level_eu : null)
-            .input("b_status",  "1")
+            .input("b_status", "1")
             .query(`
             INSERT INTO RMMixBatch (mat, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu, b_status)
             OUTPUT INSERTED.rmfbatch_id
@@ -1256,7 +1256,7 @@ module.exports = (io) => {
     }
   });
 
-   router.post("/prep/mix/batch", async (req, res) => {
+  router.post("/prep/mix/batch", async (req, res) => {
     const {
       mat,
       batch,
@@ -2076,18 +2076,18 @@ module.exports = (io) => {
      *                    example: "Internal server error"
      */
 
-router.get("/prep/manage/fetchRMForProd", async (req, res) => {
-try {
-const { rm_type_ids } = req.query;
+  router.get("/prep/manage/fetchRMForProd", async (req, res) => {
+    try {
+      const { rm_type_ids } = req.query;
 
-if (!rm_type_ids) {
-  return res.status(400).json({ success: false, error: "RM Type IDs are required" });
-}
+      if (!rm_type_ids) {
+        return res.status(400).json({ success: false, error: "RM Type IDs are required" });
+      }
 
-const rmTypeIdsArray = rm_type_ids.split(",");
-const pool = await connectToDatabase();
+      const rmTypeIdsArray = rm_type_ids.split(",");
+      const pool = await connectToDatabase();
 
-const query = `
+      const query = `
   SELECT
       rmf.rmfp_id,
       CASE 
@@ -2125,178 +2125,178 @@ const query = `
       htr.cooked_date DESC;
 `;
 
-const request = pool.request();
-rmTypeIdsArray.forEach((id, i) => {
-  request.input(`rmTypeId${i}`, id);
-});
+      const request = pool.request();
+      rmTypeIdsArray.forEach((id, i) => {
+        request.input(`rmTypeId${i}`, id);
+      });
 
-const result = await request.query(query);
+      const result = await request.query(query);
 
-// ✅ แปลงข้อมูล
-const formattedData = result.recordset.map(item => {
-  // ➜ batchArray
-  if (item.batch && item.batch.includes(",")) {
-    item.batchArray = item.batch.split(",").map(v => v.trim());
-  } else {
-    item.batchArray = item.batch ? [item.batch.trim()] : [];
-  }
+      // ✅ แปลงข้อมูล
+      const formattedData = result.recordset.map(item => {
+        // ➜ batchArray
+        if (item.batch && item.batch.includes(",")) {
+          item.batchArray = item.batch.split(",").map(v => v.trim());
+        } else {
+          item.batchArray = item.batch ? [item.batch.trim()] : [];
+        }
 
-  // ➜ จัดรูปแบบวันที่
-  const date = new Date(item.cooked_date);
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const hours = String(date.getUTCHours()).padStart(2, "0");
-  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+        // ➜ จัดรูปแบบวันที่
+        const date = new Date(item.cooked_date);
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(date.getUTCDate()).padStart(2, "0");
+        const hours = String(date.getUTCHours()).padStart(2, "0");
+        const minutes = String(date.getUTCMinutes()).padStart(2, "0");
 
-  item.CookedDateTime = `${day}/${month}/${year} ${hours}:${minutes}`;
-  delete item.cooked_date;
+        item.CookedDateTime = `${day}/${month}/${year} ${hours}:${minutes}`;
+        delete item.cooked_date;
 
-  return item;
-});
+        return item;
+      });
 
-// ✅ Broadcast ไปยังทุก client (ถ้ามี socket.io)
-if (io) io.to("saveRMForProdRoom").emit("dataUpdated", formattedData);
+      // ✅ Broadcast ไปยังทุก client (ถ้ามี socket.io)
+      if (io) io.to("saveRMForProdRoom").emit("dataUpdated", formattedData);
 
-res.json({ success: true, data: formattedData });
-
-
+      res.json({ success: true, data: formattedData });
 
 
-} catch (err) {
-console.error("SQL error", err);
-res.status(500).json({ success: false, error: err.message });
-}
-});
+
+
+    } catch (err) {
+      console.error("SQL error", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
 
 
   //API สำหรับเลือกรถเข็นและบันทึกข้อมูลการจัดการรถเข็น
-router.post("/prep/manage/saveTrolley", async (req, res) => {
-  const {
-    license_plate,
-    rmfpID,
-    batchAfterArray,      // Array จาก frontend [{batch_before, batch_after}]
-    ntray,
-    recorder,
-    weightTotal,
-    Dest,
-    Process,
-    cookedDateTimeNew,
-    preparedDateTimeNew,
-    cold,
-    deliveryType,
-    mat,
-    // batch_before,        
-    // batch_after           
-  } = req.body;
+  router.post("/prep/manage/saveTrolley", async (req, res) => {
+    const {
+      license_plate,
+      rmfpID,
+      batchAfterArray,      // Array จาก frontend [{batch_before, batch_after}]
+      ntray,
+      recorder,
+      weightTotal,
+      Dest,
+      Process,
+      cookedDateTimeNew,
+      preparedDateTimeNew,
+      cold,
+      deliveryType,
+      mat,
+      // batch_before,        
+      // batch_after           
+    } = req.body;
 
-  const sql = require("mssql");
-  const pool = await connectToDatabase();
-  const transaction = new sql.Transaction(pool);
+    const sql = require("mssql");
+    const pool = await connectToDatabase();
+    const transaction = new sql.Transaction(pool);
 
-  try {
-    // 1️⃣ ตรวจสอบ trolley
-    const checkTrolley = await pool
-      .request()
-      .input("tro_id", license_plate)
-      .query(`SELECT tro_status, rsrv_timestamp FROM Trolley WHERE tro_id = @tro_id`);
+    try {
+      // 1️⃣ ตรวจสอบ trolley
+      const checkTrolley = await pool
+        .request()
+        .input("tro_id", license_plate)
+        .query(`SELECT tro_status, rsrv_timestamp FROM Trolley WHERE tro_id = @tro_id`);
 
-    if (checkTrolley.recordset.length === 0)
-      return res.status(404).json({ success: false, error: "ไม่พบรถเข็นนี้ในระบบ" });
+      if (checkTrolley.recordset.length === 0)
+        return res.status(404).json({ success: false, error: "ไม่พบรถเข็นนี้ในระบบ" });
 
-    const { tro_status, rsrv_timestamp } = checkTrolley.recordset[0];
-    if (tro_status !== "rsrv")
-      return res.status(400).json({ success: false, error: "ไม่สามารถทำรายการได้ เนื่องจากเลยเวลาที่กำหนด 5 นาที" });
+      const { tro_status, rsrv_timestamp } = checkTrolley.recordset[0];
+      if (tro_status !== "rsrv")
+        return res.status(400).json({ success: false, error: "ไม่สามารถทำรายการได้ เนื่องจากเลยเวลาที่กำหนด 5 นาที" });
 
-    const now = new Date();
-    const reservedTime = new Date(rsrv_timestamp);
-    if ((now - reservedTime) / 1000 / 60 > 5)
-      return res.status(400).json({ success: false, error: "ไม่สามารถทำรายการได้ เนื่องจากเลยเวลาที่กำหนด 5 นาที" });
+      const now = new Date();
+      const reservedTime = new Date(rsrv_timestamp);
+      if ((now - reservedTime) / 1000 / 60 > 5)
+        return res.status(400).json({ success: false, error: "ไม่สามารถทำรายการได้ เนื่องจากเลยเวลาที่กำหนด 5 นาที" });
 
-    // 2️⃣ เริ่ม Transaction
-    await transaction.begin();
+      // 2️⃣ เริ่ม Transaction
+      await transaction.begin();
 
-    // 3️⃣ ปรับสถานะ trolley เป็นใช้งาน
-    await transaction
-      .request()
-      .input("tro_id", license_plate)
-      .query(`UPDATE Trolley SET tro_status = '0', rsrv_timestamp = NULL WHERE tro_id = @tro_id`);
+      // 3️⃣ ปรับสถานะ trolley เป็นใช้งาน
+      await transaction
+        .request()
+        .input("tro_id", license_plate)
+        .query(`UPDATE Trolley SET tro_status = '0', rsrv_timestamp = NULL WHERE tro_id = @tro_id`);
 
-    // 4️⃣ ลบ tro_id ใน TrolleyRMMapping และ Slot
-    await transaction
-      .request()
-      .input("tro_id", license_plate)
-      .query(`UPDATE TrolleyRMMapping SET tro_id = NULL, tl_status = '1707' WHERE tro_id = @tro_id`);
+      // 4️⃣ ลบ tro_id ใน TrolleyRMMapping และ Slot
+      await transaction
+        .request()
+        .input("tro_id", license_plate)
+        .query(`UPDATE TrolleyRMMapping SET tro_id = NULL, tl_status = '1707' WHERE tro_id = @tro_id`);
 
-    await transaction
-      .request()
-      .input("tro_id", license_plate)
-      .query(`UPDATE Slot SET tro_id = NULL, status = '1708' WHERE tro_id = @tro_id`);
+      await transaction
+        .request()
+        .input("tro_id", license_plate)
+        .query(`UPDATE Slot SET tro_id = NULL, status = '1708' WHERE tro_id = @tro_id`);
 
-    // 5️⃣ ดึงข้อมูล RMForProd
-    const dataRMForProd = await transaction
-      .request()
-      .input("rmfp_id", rmfpID)
-      .query(`
+      // 5️⃣ ดึงข้อมูล RMForProd
+      const dataRMForProd = await transaction
+        .request()
+        .input("rmfp_id", rmfpID)
+        .query(`
         SELECT prod_rm_id, rmfp_line_name, level_eu, rm_group_id, hist_id_rmfp
         FROM RMForProd
         WHERE rmfp_id = @rmfp_id
       `);
 
-    if (dataRMForProd.recordset.length === 0)
-      throw new Error(`ไม่พบข้อมูล RMForProd สำหรับ rmfp_id: ${rmfpID}`);
+      if (dataRMForProd.recordset.length === 0)
+        throw new Error(`ไม่พบข้อมูล RMForProd สำหรับ rmfp_id: ${rmfpID}`);
 
-    const { prod_rm_id, rmfp_line_name, level_eu, rm_group_id, hist_id_rmfp } = dataRMForProd.recordset[0];
+      const { prod_rm_id, rmfp_line_name, level_eu, rm_group_id, hist_id_rmfp } = dataRMForProd.recordset[0];
 
-    // 6️⃣ ดึงประเภทวัตถุดิบ
-    const PullTypeRaw = await transaction
-      .request()
-      .input("mat", mat)
-      .input("rm_group_id", rm_group_id)
-      .query(`
+      // 6️⃣ ดึงประเภทวัตถุดิบ
+      const PullTypeRaw = await transaction
+        .request()
+        .input("mat", mat)
+        .input("rm_group_id", rm_group_id)
+        .query(`
         SELECT rmt.rm_type_name
         FROM RawMatCookedGroup rmcg
         JOIN RawMatType rmt ON rmcg.rm_type_id = rmt.rm_type_id
         WHERE rmcg.mat = @mat AND rmcg.rm_group_id = @rm_group_id
       `);
 
-    if (PullTypeRaw.recordset.length === 0)
-      throw new Error(`ไม่พบข้อมูลประเภทวัตถุดิบ สำหรับ mat: ${mat}`);
+      if (PullTypeRaw.recordset.length === 0)
+        throw new Error(`ไม่พบข้อมูลประเภทวัตถุดิบ สำหรับ mat: ${mat}`);
 
-    const RawMat = PullTypeRaw.recordset[0].rm_type_name;
+      const RawMat = PullTypeRaw.recordset[0].rm_type_name;
 
-    // 7️⃣ ดึงข้อมูล History
-    const dataHisRMForProd = await transaction
-      .request()
-      .input("hist_id_rmfp", hist_id_rmfp)
-      .query(`
+      // 7️⃣ ดึงข้อมูล History
+      const dataHisRMForProd = await transaction
+        .request()
+        .input("hist_id_rmfp", hist_id_rmfp)
+        .query(`
         SELECT withdraw_date, first_prod, two_prod, three_prod, 
                name_edit_prod_two, name_edit_prod_three, weight_RM, tray_count
         FROM History
         WHERE hist_id = @hist_id_rmfp
       `);
 
-    // 8️⃣ กำหนด rm_status
-    let rm_status = "รอQCตรวจสอบ";
-    if (Dest === "เข้าห้องเย็น" && deliveryType === "รอกลับมาเตรียม") rm_status = "รอกลับมาเตรียม";
+      // 8️⃣ กำหนด rm_status
+      let rm_status = "รอQCตรวจสอบ";
+      if (Dest === "เข้าห้องเย็น" && deliveryType === "รอกลับมาเตรียม") rm_status = "รอกลับมาเตรียม";
 
-    // 9️⃣ Insert TrolleyRMMapping ก่อน
-   const mappingResult = await transaction
-  .request()
-  .input("tro_id", license_plate)
-  .input("rmfp_id", rmfpID)
-  .input("tro_production_id", prod_rm_id)
-  .input("rm_status", rm_status)
-  .input("weight_RM", weightTotal)
-  .input("tray_count", ntray)
-  .input("stay_place", "จุดเตรียม")
-  .input("process_id", Process)
-  .input("level_eu", level_eu)
-  .input("dest", Dest)
-  .input("cold_time", cold)
-  .input("rmm_line_name", rmfp_line_name)
-  .input("tl_status", "1.8")
-  .query(`
+      // 9️⃣ Insert TrolleyRMMapping ก่อน
+      const mappingResult = await transaction
+        .request()
+        .input("tro_id", license_plate)
+        .input("rmfp_id", rmfpID)
+        .input("tro_production_id", prod_rm_id)
+        .input("rm_status", rm_status)
+        .input("weight_RM", weightTotal)
+        .input("tray_count", ntray)
+        .input("stay_place", "จุดเตรียม")
+        .input("process_id", Process)
+        .input("level_eu", level_eu)
+        .input("dest", Dest)
+        .input("cold_time", cold)
+        .input("rmm_line_name", rmfp_line_name)
+        .input("tl_status", "1.8")
+        .query(`
     INSERT INTO [dbo].[TrolleyRMMapping] 
       (tro_id, rmfp_id, tro_production_id, batch_id, tray_count, stay_place, 
        dest, rm_status, process_id, weight_RM, level_eu, cold_time, 
@@ -2307,62 +2307,62 @@ router.post("/prep/manage/saveTrolley", async (req, res) => {
             @level_eu, @cold_time, @rmm_line_name, @tl_status)
   `);
 
-const mapping_id = mappingResult.recordset[0].mapping_id;
-console.log("New mapping_id:", mapping_id);
+      const mapping_id = mappingResult.recordset[0].mapping_id;
+      console.log("New mapping_id:", mapping_id);
 
 
-    // 10️⃣ Insert Batch ตาม batchAfterArray
-const batchIds = [];
+      // 10️⃣ Insert Batch ตาม batchAfterArray
+      const batchIds = [];
 
-if (!Array.isArray(batchAfterArray) || batchAfterArray.length === 0) {
-  throw new Error("กรุณาส่ง batchAfterArray อย่างน้อย 1 แถว");
-}
+      if (!Array.isArray(batchAfterArray) || batchAfterArray.length === 0) {
+        throw new Error("กรุณาส่ง batchAfterArray อย่างน้อย 1 แถว");
+      }
 
-for (const item of batchAfterArray) {
-  const beforeVal = item.batch_before?.trim();
-  const afterVal = item.batch_after?.trim();
+      for (const item of batchAfterArray) {
+        const beforeVal = item.batch_before?.trim();
+        const afterVal = item.batch_after?.trim();
 
-  if (!beforeVal || !afterVal) {
-    throw new Error("batch_before และ batch_after ต้องไม่เป็นค่าว่าง");
-  }
+        if (!beforeVal || !afterVal) {
+          throw new Error("batch_before และ batch_after ต้องไม่เป็นค่าว่าง");
+        }
 
-  const batchResult = await transaction
-    .request()
-    .input("mapping_id", mapping_id)
-    .input("batch_before", beforeVal)
-    .input("batch_after", afterVal)
-    .query(`
+        const batchResult = await transaction
+          .request()
+          .input("mapping_id", mapping_id)
+          .input("batch_before", beforeVal)
+          .input("batch_after", afterVal)
+          .query(`
       INSERT INTO Batch (mapping_id, batch_before, batch_after)
       OUTPUT INSERTED.batch_id
       VALUES (@mapping_id, @batch_before, @batch_after)
     `);
 
-  batchIds.push(batchResult.recordset[0].batch_id);
-}
+        batchIds.push(batchResult.recordset[0].batch_id);
+      }
 
 
-    // 11️⃣ Insert History
-    await transaction
-      .request()
-      .input("mapping_id", mapping_id)
-      .input("tro_id", license_plate)
-      .input("cooked_date", cookedDateTimeNew)
-      .input("prepared_date", preparedDateTimeNew)
-      .input("withdraw_date", dataHisRMForProd.recordset[0].withdraw_date)
-      .input("receiver", recorder)
-      .input("first_prod", dataHisRMForProd.recordset[0].first_prod)
-      .input("two_prod", dataHisRMForProd.recordset[0].two_prod)
-      .input("three_prod", dataHisRMForProd.recordset[0].three_prod)
-      .input("name_edit_prod_two", dataHisRMForProd.recordset[0].name_edit_prod_two)
-      .input("name_edit_prod_three", dataHisRMForProd.recordset[0].name_edit_prod_three)
-      .input("weight_RM", weightTotal)
-      .input("tray_count", ntray)
-      .input("rm_status", rm_status)
-      .input("dest", Dest)
-      .input("rmm_line_name", rmfp_line_name)
-      .input("stay_place", "จุดเตรียม")
-      .input("location", `จุดเตรียม${RawMat}`)
-      .query(`
+      // 11️⃣ Insert History
+      await transaction
+        .request()
+        .input("mapping_id", mapping_id)
+        .input("tro_id", license_plate)
+        .input("cooked_date", cookedDateTimeNew)
+        .input("prepared_date", preparedDateTimeNew)
+        .input("withdraw_date", dataHisRMForProd.recordset[0].withdraw_date)
+        .input("receiver", recorder)
+        .input("first_prod", dataHisRMForProd.recordset[0].first_prod)
+        .input("two_prod", dataHisRMForProd.recordset[0].two_prod)
+        .input("three_prod", dataHisRMForProd.recordset[0].three_prod)
+        .input("name_edit_prod_two", dataHisRMForProd.recordset[0].name_edit_prod_two)
+        .input("name_edit_prod_three", dataHisRMForProd.recordset[0].name_edit_prod_three)
+        .input("weight_RM", weightTotal)
+        .input("tray_count", ntray)
+        .input("rm_status", rm_status)
+        .input("dest", Dest)
+        .input("rmm_line_name", rmfp_line_name)
+        .input("stay_place", "จุดเตรียม")
+        .input("location", `จุดเตรียม${RawMat}`)
+        .query(`
         INSERT INTO History
         (mapping_id, tro_id, rmit_date, cooked_date, withdraw_date, receiver, 
          first_prod, two_prod, three_prod, name_edit_prod_two, name_edit_prod_three, 
@@ -2375,22 +2375,22 @@ for (const item of batchAfterArray) {
                 @rmm_line_name, @stay_place, GETDATE(), @location)
       `);
 
-    // 12️⃣ Commit transaction
-    await transaction.commit();
+      // 12️⃣ Commit transaction
+      await transaction.commit();
 
-    res.status(200).json({
-      success: true,
-      message: "Data saved successfully",
-      mapping_id,
-      batchIds
-    });
+      res.status(200).json({
+        success: true,
+        message: "Data saved successfully",
+        mapping_id,
+        batchIds
+      });
 
-  } catch (err) {
-    if (transaction) await transaction.rollback();
-    console.error("SQL error:", err.message, err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+    } catch (err) {
+      if (transaction) await transaction.rollback();
+      console.error("SQL error:", err.message, err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
 
   /**
      * @swagger
@@ -4039,15 +4039,14 @@ for (const item of batchAfterArray) {
                   JOIN
                       History htr ON rmm.mapping_id = htr.mapping_id
                  
-                  WHERE 
-                      rmm.stay_place IN ('ออกห้องเย็น' ,'บรรจุ','หม้ออบ','จุดเตรียม') 
+                  WHERE
+                      rmm.stay_place IN ('ออกห้องเย็น' ,'บรรจุ','หม้ออบ','จุดเตรียม')
                         AND rmm.dest = 'จุดเตรียม'
-                        AND rmm.rm_status IN ('รอแก้ไข','QcCheck รอแก้ไข') 
+                        AND rmm.rm_status IN ('รอแก้ไข','QcCheck รอแก้ไข')
                         AND rmf.rm_group_id = rmg.rm_group_id
                         AND rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')})
                         ORDER BY htr.cooked_date DESC
               `);
-
 
       const formattedData = result.recordset.map(item => {
         const date = new Date(item.cooked_date);
@@ -4061,12 +4060,12 @@ for (const item of batchAfterArray) {
 
         item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
 
-
-
         delete item.cooked_date;
 
         return item;
       });
+
+
 
 
       res.json({ success: true, data: formattedData });
@@ -4075,6 +4074,10 @@ for (const item of batchAfterArray) {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
+
+
+
 
   router.get("/prep/mat/rework/fetchRMForProdNoBatchAfter", async (req, res) => {
     try {
@@ -4744,7 +4747,6 @@ for (const item of batchAfterArray) {
 
   router.get("/prep/matimport/fetchRMForProd", async (req, res) => {
     try {
-
       const { rm_type_ids } = req.query;
 
       if (!rm_type_ids) {
@@ -4754,12 +4756,11 @@ for (const item of batchAfterArray) {
       const rmTypeIdsArray = rm_type_ids.split(',');
       const pool = await connectToDatabase();
 
-
-      // 2. ดึงข้อมูลตามสิทธิ์ผู้ใช้
+      // SQL query ดึงข้อมูลพร้อม batch_after
       const query = `
       SELECT
         rmf.rmfp_id,
-        rmf.batch,
+        STRING_AGG(b.batch_after, ',') AS batch_after_array
         rm.mat,
         rm.mat_name,
         rmm.dest,
@@ -4770,7 +4771,7 @@ for (const item of batchAfterArray) {
         rmm.mapping_id,
         rmm.level_eu,
         htr.cooked_date,
-        htr.edit_rework
+        htr.edit_rework, 
       FROM
         RMForProd rmf
       JOIN
@@ -4787,18 +4788,36 @@ for (const item of batchAfterArray) {
         RawMatGroup rmg ON rmcg.rm_group_id = rmg.rm_group_id
       JOIN
         History htr ON rmm.mapping_id = htr.mapping_id
+      LEFT JOIN
+        Batch b ON rmm.mapping_id = b.mapping_id
       WHERE 
         rmm.stay_place IN ('ออกห้องเย็น' ,'หม้ออบ','จุดเตรียม')
         AND rmm.dest = 'จุดเตรียม'
         AND rmm.rm_status IN ('QcCheck รอกลับมาเตรียม','QcCheck รอ MD','รอกลับมาเตรียม','รอ Qc')
         AND rmf.rm_group_id = rmg.rm_group_id
         AND rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')})
+      GROUP BY
+        rmf.rmfp_id,
+        rmf.batch,
+        rm.mat,
+        rm.mat_name,
+        rmm.dest,
+        rmm.stay_place,
+        p.doc_no,
+        rmm.rmm_line_name,
+        rmg.rm_type_id,
+        rmm.tro_id,
+        rmm.mapping_id,
+        rmm.level_eu,
+        htr.cooked_date,
+        htr.edit_rework
       ORDER BY
         htr.cooked_date DESC
     `;
 
       const result = await pool.request().query(query);
 
+      // แปลงวันที่เหมือนเดิม
       const formattedData = result.recordset.map(item => {
         const date = new Date(item.cooked_date);
         const year = date.getUTCFullYear();
@@ -4806,12 +4825,17 @@ for (const item of batchAfterArray) {
         const day = String(date.getUTCDate()).padStart(2, '0');
         const hours = String(date.getUTCHours()).padStart(2, '0');
         const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-        const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-        const milliseconds = String(date.getUTCMilliseconds()).padStart(3, '0');
 
         item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
 
         delete item.cooked_date;
+
+        // แปลง batch_after_array เป็น array จริง ๆ
+        if (item.batch_after_array) {
+          item.batch_after_array = item.batch_after_array.split(',');
+        } else {
+          item.batch_after_array = [];
+        }
 
         return item;
       });
@@ -4822,6 +4846,7 @@ for (const item of batchAfterArray) {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
 
   // router.post("/prep/matimport/add/saveTrolley", async (req, res) => {
   //   const { license_plate, batch_after, batch_before, operator, desttype, ntray, Process, weightTotal, mapping_id, dest, tro_id, cookedDateTimeNew, level_eu, preparedDateTimeNew } = req.body;
