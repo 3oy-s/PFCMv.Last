@@ -242,6 +242,7 @@ const ParentComponent = () => {
       batch: data.batch,
       material: data.mat,
       withdraw_date: data.withdraw_date,
+      hu: data.hu,
 
     };
 
@@ -392,6 +393,7 @@ const ParentComponent = () => {
           batch={dataForEditModal.batch}
           sap_re_id={dataForEditModal.sap_re_id}
           withdraw_date={dataForEditModal.withdraw_date}
+          hu={dataForEditModal.hu}
           onSuccess={handleEditSuccess}
         />
       )}

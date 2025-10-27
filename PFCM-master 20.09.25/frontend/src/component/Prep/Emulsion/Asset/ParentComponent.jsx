@@ -339,7 +339,7 @@ const handleOpenDeleteModal = (data) => {
     }
   };
 
-const handleConfirmCameraModal = ({ primaryBatch, secondaryBatch, weightTotal, selectedMaterials }) => {
+const handleConfirmCameraModal = ({ primaryBatch, secondaryBatch, weightTotal, selectedMaterials,hu }) => {
   setPrimaryBatch(primaryBatch);
   setSecondaryBatch(secondaryBatch);
   setWeightTotal(weightTotal);
@@ -350,6 +350,7 @@ const handleConfirmCameraModal = ({ primaryBatch, secondaryBatch, weightTotal, s
     material: primaryBatch,
     batch: secondaryBatch,
     emulsionweightTotal: weightTotal,
+    hu: hu,
     selectedMaterials
   });
 

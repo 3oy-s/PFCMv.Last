@@ -19,7 +19,8 @@ module.exports = (io) => {
       Receiver,
       userID,
       Dest,
-      level_eu
+      level_eu,
+      hu
     } = req.body;
 
     let transaction;
@@ -44,13 +45,14 @@ module.exports = (io) => {
             .input("weight", weight)
             .input("rmfp_line_name", line_name)
             .input("stay_place", stayPlace)
+            .input("hu", hu)
             .input("dest", Dest)
             .input("level_eu", level_eu !== "-" ? level_eu : null)
             .input("b_status",  "1")
             .query(`
-            INSERT INTO RMMixBatch (mat, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu, b_status)
+            INSERT INTO RMMixBatch (mat, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu, b_status,hu)
             OUTPUT INSERTED.rmfbatch_id
-            VALUES (@mat, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @b_status)
+            VALUES (@mat, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @b_status,@hu)
           `);
 
           if (rmmbatchResult.recordset.length === 0) {
@@ -283,7 +285,8 @@ module.exports = (io) => {
       Receiver,
       userID,
       Dest,
-      level_eu
+      level_eu,
+      hu
     } = req.body;
 
     if (!Array.isArray(groupId) || groupId.length === 0) {
@@ -339,11 +342,12 @@ module.exports = (io) => {
             .input("rmfp_line_name", line_name)
             .input("stay_place", stayPlace)
             .input("dest", Dest)
+            .input("hu", hu)
             .input("level_eu", level_eu !== "-" ? level_eu : null)
             .query(`
-            INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu)
+            INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu,hu)
             OUTPUT INSERTED.rmfp_id
-            VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu)
+            VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @hu)
           `);
 
           if (rmfpResult.recordset.length === 0) {
@@ -1150,11 +1154,12 @@ module.exports = (io) => {
           .input("rmfp_line_name", line_name)
           .input("stay_place", "จุดเตรียมรับเข้า")
           .input("dest", Dest)
+          .input("hu", hu)
           .input("level_eu", level_eu !== "-" ? level_eu : null)
           .query(`
-          INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu)
+          INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu,hu)
           OUTPUT INSERTED.rmfp_id
-          VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu)
+          VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @hu)
         `);
 
         const RMFP_ID = rmfpResult.recordset[0].rmfp_id;
@@ -1562,7 +1567,8 @@ module.exports = (io) => {
       level_eu,
       sap_re_id,
       status,
-      emu_status
+      emu_status,
+      hu
     } = req.body;
 
     let transaction;
@@ -1596,11 +1602,12 @@ module.exports = (io) => {
           .input("dest", Dest)
           .input("level_eu", level_eu !== "-" ? level_eu : null) // "-" ให้เก็บ NULL
           .input("emu_status", emu_status || "1")
+          .input("hu", hu)
           .query(`
           INSERT INTO RMForEmu 
-            (mat, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu, emu_status)
+            (mat, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu, emu_status,hu)
           OUTPUT INSERTED.rmfemu_id
-          VALUES (@mat, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @emu_status)
+          VALUES (@mat, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @emu_status, @hu)
         `);
 
         const RMFEMU_ID = rmfemuResult.recordset[0].rmfemu_id;
@@ -1958,6 +1965,7 @@ module.exports = (io) => {
       SELECT 
         r.rmfemu_id,
         r.batch,
+        r.hu,
         r.mat,
         rm.mat_name,
         r.weight,

@@ -28,9 +28,10 @@ import {
 import PrintModal from "./PrintModal";
 import CancelIcon from "@mui/icons-material/CancelOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
+import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import { FaCheck } from "react-icons/fa";
 import axios from "axios";
-axios.defaults.withCredentials = true; 
+axios.defaults.withCredentials = true;
 import ModalAlert from "../../../../Popup/AlertSuccess";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -38,7 +39,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standard_ptc, heck, cold, rm_cold_status, rm_status, ComeColdDateTime, slot_id,
   tro_id, batch, rmfp_id, onSuccess, Location, ColdOut, operator, level_eu, formattedDelayTime, latestComeColdDate, cooked_date, rmit_date, materials,
   qccheck, sq_remark, mdcheck, md_remark, defect_remark, defectcheck, machine_MD, sq_acceptance, defect_acceptance, dest, weight_RM, tray_count
-  , rmm_line_name, withdraw_date, name_edit_prod_two,name_edit_prod_three, first_prod, two_prod, three_prod, qccheck_cold, receiver_qc_cold,approver,production, remark_rework,remark_rework_cold, edit_rework, prepare_mor_night
+  , rmm_line_name, withdraw_date, name_edit_prod_two, name_edit_prod_three, first_prod, two_prod, three_prod, qccheck_cold, receiver_qc_cold, approver, production, remark_rework, remark_rework_cold, edit_rework, prepare_mor_night
 }) => {
 
   const [showAlert, setShowAlert] = useState(false);
@@ -441,16 +442,16 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
 
                     {item.remark_rework && (
 
-                        <Typography color="rgba(0, 0, 0, 0.6)">หมายเหตุแก้ไข-บรรจุ  : {item.remark_rework}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">หมายเหตุแก้ไข-บรรจุ  : {item.remark_rework}</Typography>
                     )}
 
                     {item.edit_rework && item.edit_rework !== "-" && (
-                          <>
+                      <>
                         <Typography color="black">วิธีการที่เคยใช้ในการแก้ไขวัตถุดิบ</Typography>
                         <Typography color="rgba(0, 0, 0, 0.6)">ประวัติการแก้ไข : {item.edit_rework}</Typography>
-                          </>
-                      )}
-      
+                      </>
+                    )}
+
                     {(item.first_prod || item.two_prod || item.name_edit_prod_two) && (
                       <>
                         <Typography color="black">วัตถุดิบเคยเปลี่ยนแผนการผลิต</Typography>
@@ -474,7 +475,7 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
                           <Typography color="rgba(0, 0, 0, 0.6)">ผู้อนุมัติแก้ไข ครั้งที่ 3 : {item.name_edit_prod_three}</Typography>
                         )}
 
-                        
+
                       </>
                     )}
                     {/* {item.name_edit_prod && ( */}
@@ -945,7 +946,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                     <TableCell>หมายเหตุ MD</TableCell>
                     <TableCell>Defect Check</TableCell>
                     <TableCell>หมายเหตุ Defect</TableCell>
-                    <TableCell>หมายเลขเครื่อง</TableCell>        
+                    <TableCell>หมายเลขเครื่อง</TableCell>
                     <TableCell>แผนผลิตครั้งที่ 1</TableCell>
                     <TableCell>แผนผลิตครั้งที่ 2</TableCell>
                     <TableCell>ผู้อนุมัติแก้ไข 2</TableCell>
@@ -955,7 +956,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                     <TableCell>หมายเหตุที่ไม่ผ่าน</TableCell>
                     <TableCell>หมายเหตุแก้ไข-บรรจุ</TableCell>
                     <TableCell>ประวัติการแก้ไข</TableCell>
-                    
+
 
 
                   </TableRow>
@@ -981,17 +982,17 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                         <TableCell>{item.defectcheck || "-"}</TableCell>
                         <TableCell>{item.defect_remark || "-"}</TableCell>
                         <TableCell>{formatSpecialChars(item.machine_MD) || "-"}</TableCell>
-                        
-                        <TableCell>{item.first_prod|| "-"}</TableCell>
-                        <TableCell>{item.two_prod|| "-"}</TableCell>
-                        <TableCell>{item.name_edit_prod_two|| "-"}</TableCell>
-                        <TableCell>{item.three_prod|| "-"}</TableCell>
-                        <TableCell>{item.name_edit_prod_three|| "-"}</TableCell>
+
+                        <TableCell>{item.first_prod || "-"}</TableCell>
+                        <TableCell>{item.two_prod || "-"}</TableCell>
+                        <TableCell>{item.name_edit_prod_two || "-"}</TableCell>
+                        <TableCell>{item.three_prod || "-"}</TableCell>
+                        <TableCell>{item.name_edit_prod_three || "-"}</TableCell>
                         <TableCell>{item.qccheck_cold || "-"}</TableCell>
                         <TableCell>{item.remark_rework_cold || "-"}</TableCell>
                         <TableCell>{item.remark_rework || "-"}</TableCell>
                         <TableCell>{item.edit_rework || "-"}</TableCell>
-                        
+
 
 
                       </TableRow>
@@ -1045,32 +1046,139 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                 setShowLocationError(false); // Remove error when user selects something
               }}>
                 {["เหลือจากไลน์ผลิต", "QcCheck"].includes(rm_status) && (
-                  <FormControlLabel value="บรรจุ" control={<Radio />} style={{ color: "#666" }} label="บรรจุ" />
+                  <>
+                    {/* <FormControlLabel value="บรรจุ" control={<Radio />} style={{ color: "#666" }} label="บรรจุ" /> */}
+                   <Box sx={{backgroundColor: '#09af00ff', borderRadius: '4px', padding: '4px 8px',marginRight: '20px'}}>
+                      <FormControlLabel
+                      value="บรรจุ"
+                      control={
+                        <Radio
+                          sx={{
+                            color: "#2196f3",         // สีปกติ
+                            '&.Mui-checked': { color: "#1976d2" }, // สีเมื่อถูกเลือก
+                          }}
+                        />
+                      }
+                      label={
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Typography sx={{ color: "#333", fontWeight: 500 }}>บรรจุ</Typography>
+                        </Box>
+                      }
+                    />
+                    </Box>
+                    {/* <FormControlLabel value="จุดเตรียม" control={<Radio />} style={{ color: "#666" }} label="จุดเตรียม" /> */}
+                  <Box sx={{backgroundColor: '#ff0000ff', borderRadius: '4px', padding: '4px 8px'}}>
+                      <FormControlLabel
+                      value="จุดเตรียม"
+                      control={
+                        <Radio
+                          sx={{
+                            color: "#2196f3",         // สีปกติ
+                            '&.Mui-checked': { color: "#1976d2" }, // สีเมื่อถูกเลือก
+                          }}
+                        />
+                      }
+                      label={
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Typography sx={{ color: "#333", fontWeight: 500 }}>จุดเตรียม</Typography>
+                        </Box>
+                      }
+                    />
+                    </Box>
+                 </>
                 )}
 
                 {["QcCheck รอกลับมาเตรียม", "รอ Qc", "QcCheck รอ MD", "รอกลับมาเตรียม"].includes(rm_status) && (
                   <>
-                    <FormControlLabel value="จุดเตรียม" control={<Radio />} style={{ color: "#666" }} label="จุดเตรียม" />
+                    {/* <FormControlLabel value="จุดเตรียม" control={<Radio />} style={{ color: "#666" }} label="จุดเตรียม" /> */}
+                  <Box sx={{backgroundColor: '#ff0000ff', borderRadius: '4px', padding: '4px 8px'}}>
+                      <FormControlLabel
+                      value="จุดเตรียม"
+                      control={
+                        <Radio
+                          sx={{
+                            color: "#2196f3",         // สีปกติ
+                            '&.Mui-checked': { color: "#1976d2" }, // สีเมื่อถูกเลือก
+                          }}
+                        />
+                      }
+                      label={
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Typography sx={{ color: "#333", fontWeight: 500 }}>จุดเตรียม</Typography>
+                        </Box>
+                      }
+                    />
+                    </Box>
                   </>
                 )}
 
-                {["รอแก้ไข"].includes(rm_status) && ["เหลือจากไลน์ผลิต", "วัตถุดิบตรง"].includes(rm_cold_status) && remark_rework_cold === null  && (
+                {["รอแก้ไข"].includes(rm_status) && ["เหลือจากไลน์ผลิต", "วัตถุดิบตรง"].includes(rm_cold_status) && remark_rework_cold === null && (
                   <>
                     {/* <FormControlLabel value="จุดเตรียม" control={<Radio />} style={{ color: "#ff2020" }} label="จุดเตรียม (กรณีส่งวัตถุดิบไปแก้ไข)" /> */}
-                    <FormControlLabel value="บรรจุ" control={<Radio />} style={{ color: "#666" }} label="บรรจุ" />
-                  </>
-                )}
-                
-                {["รอแก้ไข"].includes(rm_status) && ["เหลือจากไลน์ผลิต", "วัตถุดิบตรง"].includes(rm_cold_status) && remark_rework_cold !== null  && (
-                  <>
-                    <FormControlLabel value="จุดเตรียม" control={<Radio />} style={{ color: "#666" }} label="จุดเตรียม" />
+                    <Box sx={{backgroundColor: '#09af00ff', borderRadius: '4px', padding: '4px 8px',marginRight: '20px'}}>
+                      <FormControlLabel
+                      value="บรรจุ"
+                      control={
+                        <Radio
+                          sx={{
+                            color: "#2196f3",         // สีปกติ
+                            '&.Mui-checked': { color: "#1976d2" }, // สีเมื่อถูกเลือก
+                          }}
+                        />
+                      }
+                      label={
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Typography sx={{ color: "#333", fontWeight: 500 }}>บรรจุ</Typography>
+                        </Box>
+                      }
+                    />
+                    </Box>
+                    {/* <FormControlLabel value="จุดเตรียม" control={<Radio />} style={{ color: "#666" }} label="จุดเตรียม" /> */}
+                    <Box sx={{backgroundColor: '#ff0000ff', borderRadius: '4px', padding: '4px 8px'}}>
+                      <FormControlLabel
+                      value="จุดเตรียม"
+                      control={
+                        <Radio
+                          sx={{
+                            color: "#2196f3",         // สีปกติ
+                            '&.Mui-checked': { color: "#1976d2" }, // สีเมื่อถูกเลือก
+                          }}
+                        />
+                      }
+                      label={
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Typography sx={{ color: "#333", fontWeight: 500 }}>จุดเตรียม</Typography>
+                        </Box>
+                      }
+                    />
+                    </Box>
                   </>
                 )}
 
                 {["รอแก้ไข"].includes(rm_status) && ["วัตถุดิบรอแก้ไข", "วัตถุดิบรับฝาก"].includes(rm_cold_status) && (
                   <>
-                    <FormControlLabel value="จุดเตรียม" control={<Radio />} style={{ color: "#666" }} label="จุดเตรียม" />
+                    {/* <FormControlLabel value="จุดเตรียม" control={<Radio />} style={{ color: "#666" }} label="จุดเตรียม" /> */}
+                  <Box sx={{backgroundColor: '#ff0000ff', borderRadius: '4px', padding: '4px 8px'}}>
+                      <FormControlLabel
+                      value="จุดเตรียม"
+                      control={
+                        <Radio
+                          sx={{
+                            color: "#2196f3",         // สีปกติ
+                            '&.Mui-checked': { color: "#1976d2" }, // สีเมื่อถูกเลือก
+                          }}
+                        />
+                      }
+                      label={
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Typography sx={{ color: "#333", fontWeight: 500 }}>จุดเตรียม</Typography>
+                        </Box>
+                      }
+                    />
+                    </Box>
+                 
                   </>
+
                 )}
               </RadioGroup>
             </Box>
@@ -1156,7 +1264,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
         two_prod={two_prod}
         three_prod={three_prod}
         remark_rework={remark_rework}
-        remark_rework_cold ={remark_rework_cold}
+        remark_rework_cold={remark_rework_cold}
         edit_rework={edit_rework}
         receiver_qc_cold={receiver_qc_cold}
         approver={approver}

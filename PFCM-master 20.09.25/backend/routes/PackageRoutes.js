@@ -1557,7 +1557,7 @@ module.exports = (io) => {
       JOIN
           QC q ON rmm.qc_id = q.qc_id
       WHERE 
-          rmm.stay_place IN ('จุดเตรียม','ออกห้องเย็น') 
+          rmm.stay_place IN ('จุดเตรียม','ออกห้องเย็น','บรรจุรับเข้า') 
           AND rmm.dest IN ('ไปบรรจุ', 'บรรจุ')
           AND rmf.rm_group_id = rmg.rm_group_id
           ${lineFilter}
@@ -2519,8 +2519,8 @@ module.exports = (io) => {
       // อัปเดต tro_id ในตาราง History สำหรับแต่ละ mapping_id ในรถเข็นนี้
       await transaction.request()
         .input("tro_id", sql.NVarChar, tro_id)
-        .input("dest", sql.VarChar, "เข้าห้องเย็น")
-        .input("rm_status", sql.VarChar, "เหลือจากไลน์ผลิต")
+        .input("dest", sql.VarChar, "จุดเตรียม")
+        .input("rm_status", sql.VarChar, "รอแก้ไข")
         .input("stay_place", sql.VarChar, "บรรจุ")
         .query(`
                 UPDATE History
@@ -2538,8 +2538,8 @@ module.exports = (io) => {
       // อัปเดตสถานะของวัตถุดิบในรถเข็น
       await transaction.request()
         .input("tro_id", sql.NVarChar, tro_id)
-        .input("dest", sql.VarChar, "เข้าห้องเย็น")
-        .input("rm_status", sql.VarChar, "เหลือจากไลน์ผลิต")
+        .input("dest", sql.VarChar, "จุดเตรียม")
+        .input("rm_status", sql.VarChar, "รอแก้ไข")
         .input("stay_place", sql.VarChar, "บรรจุ")
         .query(`
                 UPDATE TrolleyRMMapping
@@ -2574,6 +2574,155 @@ module.exports = (io) => {
       });
     }
   });
+
+  // router.post("/pack/export/to/rework/Trolley", async (req, res) => {
+  //   const { tro_id } = req.body;
+  //   const pool = await connectToDatabase();
+  //   const transaction = new sql.Transaction(pool);
+
+  //   try {
+  //     await transaction.begin();
+
+  //     // ตรวจสอบว่ามี trolley นี้ในระบบหรือไม่
+  //     const rmTrolleyResult = await transaction.request()
+  //       .input("tro_id", sql.NVarChar, tro_id)
+  //       .query(`SELECT tro_id FROM TrolleyRMMapping WHERE tro_id = @tro_id`);
+
+  //     if (rmTrolleyResult.recordset.length === 0) {
+  //       throw new Error("ไม่พบข้อมูล TrolleyRMMapping สำหรับ tro_id นี้");
+  //     }
+
+  //     console.log("tro_id:", tro_id);
+
+  //     // ดึงข้อมูลวัตถุดิบในรถเข็นเพื่อคำนวณเวลา delay
+  //     const rawMaterialsResult = await transaction.request()
+  //       .input("tro_id", sql.NVarChar, tro_id)
+  //       .query(`
+  //               SELECT
+  //                   rmm.mapping_id,
+  //                   rmm.mix_code,
+  //                   FORMAT(rmm.cold_to_pack_time, 'N2') AS remaining_ctp_time,
+  //                   FORMAT(rmg.cold_to_pack, 'N2') AS standard_ctp_time,
+  //                   FORMAT(rmm.prep_to_pack_time, 'N2') AS remaining_ptp_time,
+  //                   FORMAT(rmg.prep_to_pack, 'N2') AS standard_ptp_time,
+  //                   FORMAT(rmm.rework_time, 'N2') AS remaining_rework_time,
+  //                   FORMAT(rmg.rework, 'N2') AS standard_rework_time,
+  //                   CONVERT(VARCHAR, h.out_cold_date, 120) AS out_cold_date,
+  //                   CONVERT(VARCHAR, h.out_cold_date_two, 120) AS out_cold_date_two,
+  //                   CONVERT(VARCHAR, h.out_cold_date_three, 120) AS out_cold_date_three,
+  //                   CONVERT(VARCHAR, h.rmit_date, 120) AS rmit_date,
+  //                   CONVERT(VARCHAR, h.qc_date, 120) AS qc_date
+  //               FROM
+  //                   TrolleyRMMapping rmm
+  //               JOIN  
+  //                   RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id  
+  //               JOIN
+  //                   RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
+  //               JOIN
+  //                   History h ON rmm.mapping_id = h.mapping_id
+  //               WHERE 
+  //                   rmm.tro_id = @tro_id
+  //           `);
+
+  //     // ประมวลผลแต่ละวัตถุดิบในรถเข็น
+  //     for (const item of rawMaterialsResult.recordset) {
+  //       // คำนวณเวลา delay
+  //       const delayTimeResult = calculateDelayTime(item);
+
+  //       // กำหนดฟิลด์ที่จะอัปเดตตามการคำนวณ
+  //       let fieldToUpdate = '';
+
+  //       if (delayTimeResult.usedField === 'remaining_ctp_time') {
+  //         fieldToUpdate = 'cold_to_pack_time';
+  //       } else if (delayTimeResult.usedField === 'remaining_ptp_time') {
+  //         fieldToUpdate = 'prep_to_pack_time';
+  //       } else if (delayTimeResult.usedField === 'remaining_rework_time') {
+  //         fieldToUpdate = 'rework_time';
+  //       }
+
+  //       // อัปเดตฟิลด์ที่เหมาะสมในฐานข้อมูล
+  //       if (fieldToUpdate) {
+  //         await transaction.request()
+  //           .input("mapping_id", sql.Int, item.mapping_id)
+  //           .input("delayTime", sql.VarChar, delayTimeResult.formattedDelayTime)
+  //           .query(`
+  //                       UPDATE TrolleyRMMapping
+  //                       SET ${fieldToUpdate} = @delayTime
+  //                       WHERE mapping_id = @mapping_id
+  //                   `);
+  //       }
+  //     }
+
+  //     // อัปเดต tro_id ในตาราง History สำหรับแต่ละ mapping_id ในรถเข็นนี้
+  //     await transaction.request()
+  //       .input("tro_id", sql.NVarChar, tro_id)
+  //       .input("dest", sql.VarChar, "จุดเตรียม")
+  //       .input("rm_status", sql.VarChar, "รอแก้ไข")
+  //       .input("stay_place", sql.VarChar, "บรรจุ")
+  //       .query(`
+  //               UPDATE History
+  //               SET tro_id = @tro_id, 
+  //               dest = @dest,
+  //               stay_place = @stay_place,
+  //               rm_status = @rm_status
+  //               WHERE mapping_id IN (
+  //                   SELECT mapping_id 
+  //                   FROM TrolleyRMMapping 
+  //                   WHERE tro_id = @tro_id
+  //               )
+  //           `);
+
+  //     // อัปเดตสถานะของวัตถุดิบในรถเข็น
+  //     await transaction.request()
+  //       .input("tro_id", sql.NVarChar, tro_id)
+  //       .input("dest", sql.VarChar, "จุดเตรียม")
+  //       .input("rm_status", sql.VarChar, "รอแก้ไข")
+  //       .input("stay_place", sql.VarChar, "บรรจุ")
+  //       .query(`
+  //               UPDATE TrolleyRMMapping
+  //               SET 
+  //                   dest = @dest,
+  //                   stay_place = @stay_place,
+  //                   rm_status = @rm_status
+  //                   tro_id  = NULL
+  //               WHERE tro_id = @tro_id
+  //           `);
+
+
+
+  //     // ลบรถเข็นออกจากตาราง PackTrolley
+  //     await transaction.request()
+  //       .input("tro_id", sql.NVarChar, tro_id)
+  //       .query(`
+  //              UPDATE Trolley
+  //               SET 
+  //                   tro_status = "1",
+  //               WHERE tro_id = @tro_id
+  //           `);
+
+  //     await transaction.request()
+  //       .input("tro_id", sql.NVarChar, tro_id)
+  //       .query(`
+  //               DELETE PackTrolley
+  //               WHERE tro_id = @tro_id
+  //           `);
+
+  //     await transaction.commit();
+
+  //     return res.status(200).json({
+  //       success: true,
+  //       message: "บันทึกข้อมูลเสร็จสิ้น"
+  //     });
+
+  //   } catch (err) {
+  //     await transaction.rollback();
+  //     console.error("SQL error", err);
+  //     return res.status(500).json({
+  //       success: false,
+  //       error: err.message
+  //     });
+  //   }
+  // });
 
 
   router.post("/pack/mixed/delay-time", async (req, res) => {
@@ -3748,7 +3897,7 @@ module.exports = (io) => {
   });
 
 
-  router.put("/pack/rework/trolley", async (req, res) => {
+  router.put("/pack/export/to/rework/Trolley", async (req, res) => {
     try {
       const { dest, tro_id, receiver_pack_edit, remark_pack_edit, mapping_id } = req.body;
       const io = req.app.get("io"); // ✅ ดึง io object จาก express app
@@ -3827,20 +3976,43 @@ module.exports = (io) => {
 
       // อัปเดตสถานะและปลายทางของ trolley
       const updateTrolleyQuery = `
-        UPDATE 
-          TrolleyRMMapping 
-        SET
-          rm_status = 'รอแก้ไข',
-          stay_place = 'บรรจุ',
-          dest = @dest
-        WHERE 
-          tro_id = @tro_id
-      `;
+  UPDATE 
+    TrolleyRMMapping 
+  SET
+    rm_status = 'รอแก้ไข',
+    stay_place = 'บรรจุ',
+    dest = @dest,
+    tro_id = CASE 
+               WHEN @dest = N'จุดเตรียม' THEN NULL 
+               ELSE @tro_id 
+             END
+  WHERE 
+    tro_id = @tro_id
+`;
 
+      const updateTroQuery = `
+  UPDATE Trolley
+SET
+  tro_status = CASE
+                 WHEN @dest = N'จุดเตรียม' THEN '1'
+                 ELSE tro_status
+               END
+WHERE
+  tro_id = @tro_id
+
+`;
+
+      // --- เรียกใช้งานทั้งสอง query ---
       const result = await pool.request()
         .input("dest", sql.NVarChar, dest)
         .input("tro_id", sql.NVarChar, tro_id)
         .query(updateTrolleyQuery);
+
+
+      await pool.request()
+        .input("dest", sql.NVarChar, dest)
+        .input("tro_id", sql.NVarChar, tro_id)
+        .query(updateTroQuery);
 
       // อัปเดต tro_id ในตาราง History สำหรับทุก mapping_id ที่เกี่ยวข้อง
       await pool.request()

@@ -155,10 +155,12 @@ const ConfirmProdModal = ({
   materialName,
   batch,
   withdraw_date,
+  hu,
   sap_re_id,
   selectedPlanSets,
   deliveryLocation,
   emulsion,
+  batchmix,
   operator,
   weighttotal,
   isLoading,
@@ -172,72 +174,77 @@ const ConfirmProdModal = ({
   const [error, setError] = useState(null);
 
   const handleConfirm = async () => {
-  try {
-    setIsLoading(true);
-    setError(null);
+    try {
+      setIsLoading(true);
+      setError(null);
 
-    // เวลา +7 ชั่วโมง
-    const currentDateTime = new Date();
-    currentDateTime.setHours(currentDateTime.getHours() + 7);
-    const formattedDateTime = currentDateTime.toISOString();
+      // เวลา +7 ชั่วโมง
+      const currentDateTime = new Date();
+      currentDateTime.setHours(currentDateTime.getHours() + 7);
+      const formattedDateTime = currentDateTime.toISOString();
+      const formattedWithdraw = formatCookedDateTime(withdraw_date, false);
+      const weightPerPlan = parseFloat(weighttotal) / (selectedPlanSets.length || 1);
+      const formattedEuLevel = level_eu !== "-" ? `Eu ${level_eu}` : "-";
+      const BatchStatus = status;
 
-    const weightPerPlan = parseFloat(weighttotal) / (selectedPlanSets.length || 1);
-    const formattedEuLevel = level_eu !== "-" ? `Eu ${level_eu}` : "-";
-    const BatchStatus = status;
+      const url =
+        batchmix === "true"
+          ? `${API_URL}/api/prep/saveRMMixBatch/for/BatchMIX`
+          : emulsion === "true"
+            ? `${API_URL}/api/prep/saveRMForEmu/for/emulsion`
+            : `${API_URL}/api/prep/saveRMForProd`;
 
-    const url = emulsion === "true"
-      ? `${API_URL}/api/prep/saveRMForEmu/for/emulsion/saprecievepage`
-      : `${API_URL}/api/prep/saveRMForProd/saprecieve`;
+      const requests = (
+        batchmix === "true"
+          ? [{}] // BatchMix จะไม่ใช้ plan sets
+          : emulsion === "true"
+            ? [{}] // Emulsion ไม่มี plan sets
+            : selectedPlanSets
+      ).map(set => {
+        const isEmulsion = emulsion === "true";
+        const isBatchMix = batchmix === "true";
 
-    const setsToSend = emulsion === "true" ? [{}] : selectedPlanSets;
+        const payload = {
+          mat: material,
+          batch: batch,
+          productId: isEmulsion || isBatchMix ? null : set.plan?.prod_id,
+          line_name: isEmulsion || isBatchMix ? "" : set.line?.line_name || "",
+          groupId:
+            isEmulsion || isBatchMix
+              ? set.group?.rm_group_id || null
+              : set.group?.rm_group_id
+                ? [set.group.rm_group_id]
+                : [],
+          Dest: deliveryLocation,
+          Emulsion: emulsion,
+          BatchMix: batchmix,
+          receiver: operator,
+          withdraw: formattedWithdraw,
+          hu: hu,
+          userID: userId,
+          operator: operator,
+          datetime: formattedDateTime,
+          weight: weightPerPlan,
+          level_eu: formattedEuLevel,
+          emu_status: status,
+        };
 
-    for (const set of setsToSend) {
-      const isEmulsion = emulsion === "true";
+        return axios.post(url, payload);
+      });
+      const responses = await Promise.all(requests);
 
-      const payload = {
-        mat: material,
-        batch: batch,
-        sap_re_id: sap_re_id,
-        productId: isEmulsion ? null : set.plan?.prod_id,
-        line_name: isEmulsion ? "" : set.line?.line_name || "",
-        groupId: isEmulsion
-          ? set.group?.rm_group_id || null
-          : set.group?.rm_group_id
-            ? [set.group.rm_group_id]
-            : [],
-        Dest: deliveryLocation,
-        Emulsion: emulsion,
-        receiver: operator,
-        withdraw_date: withdraw_date,
-        userID: userId,
-        operator: operator,
-        datetime: formattedDateTime,
-        weight: weightPerPlan,
-        level_eu: formattedEuLevel,
-        status: BatchStatus,
-      };
-
-      console.log("Payload to send:", payload);
-
-      try {
-        const response = await axios.post(url, payload);
-        console.log("Response from API:", response.data);
-      } catch (apiError) {
-        console.error("API call failed for this plan:", apiError);
+      if (responses.every(res => res.status === 200)) {
+        if (onSuccess) onSuccess();
+        setShowAlert(true);
+        onClose();
       }
+    } catch (error) {
+      console.error("Error during API call:", error);
+      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูลบางส่วน");
+    } finally {
+      setIsLoading(false);
     }
-
-    if (onSuccess) onSuccess();
-    setShowAlert(true);
-    onClose();
-
-  } catch (error) {
-    console.error("Error during handleConfirm:", error);
-    setError("เกิดข้อผิดพลาดในการบันทึกข้อมูลบางส่วน");
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
 
   //   try {
@@ -339,7 +346,7 @@ const ConfirmProdModal = ({
 
           <Typography>ผู้ดำเนินการ: {operator}</Typography>
           <Typography>สถานที่จัดส่ง: {deliveryLocation}</Typography>
-          <Typography>ผสมวัตถุดิบ ( Loaf ): {emulsion}</Typography>
+
 
           {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
@@ -360,12 +367,13 @@ const ConfirmProdModal = ({
   );
 };
 
-const ModalEditPD = ({ open, onClose, material, batch, sap_re_id, withdraw_date }) => {
+const ModalEditPD = ({ open, onClose, material, batch, sap_re_id, withdraw_date, hu }) => {
   const [selectedPlanSets, setSelectedPlanSets] = useState([]);
   const [materialName, setMaterialName] = useState("");
   const [production, setProduction] = useState([]);
-  const [deliveryLocation, setDeliveryLocation] = useState("");
   const [emulsion, setemulsion] = useState("false");
+  const [batchmix, setbatchmix] = useState("false");
+  const [deliveryLocation, setDeliveryLocation] = useState("");
   const [weighttotal, setWeighttotal] = useState("");
   const [group, setGroup] = useState([]);
   const [operator, setOperator] = useState("");
@@ -530,7 +538,7 @@ const ModalEditPD = ({ open, onClose, material, batch, sap_re_id, withdraw_date 
       return false;
     }
 
-    if (!operator || !deliveryLocation || !emulsion) {
+    if (!operator || !deliveryLocation || !emulsion || !batchmix) {
       return false;
     }
 
@@ -541,7 +549,9 @@ const ModalEditPD = ({ open, onClose, material, batch, sap_re_id, withdraw_date 
   const resetForm = () => {
     setSelectedPlanSets([]);
     setDeliveryLocation("");
+    setbatchmix("");
     setOperator("");
+    setemulsion("");
     setWeighttotal("");
     setEuLevel("-");
     setShowDropdowns(true);
@@ -625,6 +635,7 @@ const ModalEditPD = ({ open, onClose, material, batch, sap_re_id, withdraw_date 
               <Typography>Material: {material}</Typography>
               <Typography>Material Name: {materialName}</Typography>
               <Typography>Batch: {batch}</Typography>
+              <Typography>HU: {hu}</Typography>
             </Box>
 
             <Box>
@@ -689,7 +700,7 @@ const ModalEditPD = ({ open, onClose, material, batch, sap_re_id, withdraw_date 
 
           {/* เลือกประเภทงาน */}
           <Box sx={{ mb: 2 }}>
-            <Typography sx={{ mb: 1 }}>วัตถุดิบ Loaf / Chunk</Typography>
+            <Typography sx={{ mb: 1 }}>กรณีพิเศษ</Typography>
             <FormControlLabel
               control={
                 <Checkbox
@@ -699,12 +710,22 @@ const ModalEditPD = ({ open, onClose, material, batch, sap_re_id, withdraw_date 
               }
               label="ผสมวัตถุดิบ"
             />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={batchmix === "true"}
+                  onChange={(e) => setbatchmix(e.target.checked ? "true" : "false")}
+                />
+              }
+              label="ผสม Batch"
+            />
           </Box>
+
 
 
           <Divider sx={{ my: 2 }} />
 
-          {emulsion === "false" && (
+          {emulsion === "false" && batchmix === "false" && (
             <>
               {/* แผนการผลิต */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -878,10 +899,12 @@ const ModalEditPD = ({ open, onClose, material, batch, sap_re_id, withdraw_date 
         materialName={materialName}
         batch={batch}
         withdraw_date={withdraw_date}
+        hu={hu}
         sap_re_id={sap_re_id}
         selectedPlanSets={selectedPlanSets.filter(set => set.plan && set.line && set.group)}
         deliveryLocation={deliveryLocation}
         emulsion={emulsion}
+        batchmix={batchmix}
         operator={operator}
         weighttotal={weighttotal}
         level_eu={level_eu}  // Pass EU level to confirm modal
