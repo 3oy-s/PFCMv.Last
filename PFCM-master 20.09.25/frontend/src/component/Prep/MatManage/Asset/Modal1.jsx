@@ -20,8 +20,8 @@ axios.defaults.withCredentials = true;
 
 // Mock QR Scanner for demo
 const QrScanner = {
-  start: () => {},
-  stop: () => {},
+  start: () => { },
+  stop: () => { },
 };
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -74,7 +74,7 @@ const Modal1 = ({
   const [scannedValue, setScannedValue] = useState("");
   const [inputError, setInputError] = useState(false);
   const [apiError, setApiError] = useState("");
-  
+
   // เปลี่ยนจาก single batch input เป็น array ของ batch inputs
   const [batchInputs, setBatchInputs] = useState({});
   const [batchErrors, setBatchErrors] = useState({});
@@ -91,7 +91,7 @@ const Modal1 = ({
   // ตรวจสอบว่าฟอร์มถูกต้องหรือไม่
   const isFormValid = () => {
     const isTrolleyValid = inputValue.trim() !== "" && inputValue.trim().length <= 4;
-    
+
     // ถ้าเป็น rm_type ที่ต้องการ batch
     if ([3, 6, 7, 8].includes(rm_type_id)) {
       // ต้องกรอก batch ครบทุก batch ใน batchArray
@@ -101,7 +101,7 @@ const Modal1 = ({
       });
       return isTrolleyValid && allBatchesFilled;
     }
-    
+
     return isTrolleyValid;
   };
 
@@ -112,18 +112,18 @@ const Modal1 = ({
       setScannedValue("");
       setApiError("");
       setInputError(false);
-      
+
       // สร้าง initial batch inputs
       const initialBatchInputs = {};
       const initialBatchErrors = {};
-      
+
       if (batchArray && batchArray.length > 0) {
         batchArray.forEach((b) => {
           initialBatchInputs[b] = "";
           initialBatchErrors[b] = false;
         });
       }
-      
+
       setBatchInputs(initialBatchInputs);
       setBatchErrors(initialBatchErrors);
     }
@@ -169,7 +169,7 @@ const Modal1 = ({
       const response = await axios.get(`${API_URL}/api/checkTrolley`, {
         params: { tro: value },
       });
-      
+
       // Simulated response
       // const response = { data: { success: true, message: "รถเข็นพร้อมใช้งาน" } };
 
@@ -197,7 +197,7 @@ const Modal1 = ({
       const response = await axios.post(`${API_URL}/api/reserveTrolley`, {
         tro_id: tro_id,
       });
-      
+
       // Simulated response
       // const response = { data: { success: true } };
       return response.data.success;
@@ -246,8 +246,9 @@ const Modal1 = ({
     // สร้าง array ของ batch_after สำหรับแต่ละ batch
     const batchAfterArray = batchArray.map((b) => ({
       batch_before: b,
-      batch_after: batchInputs[b] || "",
+      batch_after: batchInputs[b] ? batchInputs[b] : b, // ถ้าไม่มีค่า ใช้ b
     }));
+
 
     onNext({
       inputValues: [inputValue],

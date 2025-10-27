@@ -165,6 +165,7 @@ const ConfirmProdModal = ({
   onSuccess,
   level_eu,
   emulsionweightTotal,
+  hu,
   selectedMaterials
 }) => {
   const [showAlert, setShowAlert] = useState(false);
@@ -205,6 +206,7 @@ const ConfirmProdModal = ({
           weight: weightPerPlan,
           level_eu: formattedEuLevel,
           emulsionweightTotal,
+          hu,
           selectedMaterials
         };
 
@@ -309,6 +311,7 @@ const ConfirmProdModal = ({
                     <Typography variant="body2">
                       <strong>Material:</strong> {matObj.mat || "-"} |
                       <strong> Batch:</strong> {matObj.batch || "-"} |
+                      <strong> Batch:</strong> {matObj.hu || "-"} |
                       <strong> Weight:</strong> {matObj.weight || "-"} กก. |
                       <strong> Level:</strong> {matObj.level_eu || "-"}
                     </Typography>
@@ -337,7 +340,7 @@ const ConfirmProdModal = ({
   );
 };
 
-const DataReviewSAP = ({ open, onClose, material, batch, emulsionweightTotal, selectedMaterials }) => {
+const DataReviewSAP = ({ open, onClose, material, batch, emulsionweightTotal, hu,selectedMaterials }) => {
   const [selectedPlanSets, setSelectedPlanSets] = useState([]);
   const [materialName, setMaterialName] = useState("");
   const [production, setProduction] = useState([]);

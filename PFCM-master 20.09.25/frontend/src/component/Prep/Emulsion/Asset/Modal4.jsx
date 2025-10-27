@@ -139,6 +139,7 @@ const Modal4 = ({ open, onClose, onSuccess }) => {
           rmfemu_id: material.rmfemu_id,
           mat: material.mat,
           batch: material.batch,
+          hu: material.hu,
           weight: selectedWeights[material.rmfemu_id],
           level_eu: material.level_eu
         }))
@@ -175,6 +176,7 @@ const handleClose = () => {
     rmfemu_id: material.rmfemu_id,
     mat: material.mat,
     batch: material.batch,
+    hu: material.hu,
     weight: selectedWeights[material.rmfemu_id],
     level_eu: material.level_eu
   }));
@@ -230,6 +232,7 @@ const handleClose = () => {
                     <TableCell align="center">ลำดับ</TableCell>
                     <TableCell>รหัสวัตถุดิบ</TableCell>
                     <TableCell>batch</TableCell>
+                    <TableCell>HU</TableCell>
                     <TableCell align="right">น้ำหนักคงเหลือ (กก.)</TableCell>
                     <TableCell>ระดับ EU</TableCell>
                     <TableCell>วันที่เบิก</TableCell>
@@ -242,6 +245,7 @@ const handleClose = () => {
                       <TableCell align="center">{index + 1}</TableCell>
                       <TableCell>{item.mat}</TableCell>
                       <TableCell>{item.batch}</TableCell>
+                      <TableCell>{item.hu}</TableCell>
                       <TableCell align="right">{item.weight.toFixed(2)}</TableCell>
                       <TableCell>{item.level_eu}</TableCell>
                       <TableCell>

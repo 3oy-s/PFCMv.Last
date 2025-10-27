@@ -159,7 +159,9 @@ const ModalSuccess = ({ open, onClose, tro_id, tableData, onSuccess, delayTime, 
       let url = '';
       if (selectedAction === 'cold') {
         url = `${API_URL}/api/pack/export/Trolley`;
-      } else if (selectedAction === 'line') {
+      } else if (selectedAction === 'rework') {
+        url = `${API_URL}/api/pack/export/to/rework/Trolley`;
+       } else if (selectedAction === 'line') {
         url = `${API_URL}/api/pack/export/topack/Trolley`;
       } else {
         console.error("Invalid action:", selectedAction);

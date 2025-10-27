@@ -293,7 +293,7 @@ const TableMainPrep = ({ handleOpenModal, data, handleRowClick, handleOpenEditMo
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>Material</Box> {/* mat_name */}
               </TableCell>
               <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "200px" }}>
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>Mu</Box> {/* mat_name */}
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>HU</Box> {/* mat_name */}
               </TableCell>
               <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTopRightRadius: "8px", borderBottomRightRadius: "8px", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #e0e0e0", fontSize: '12px', color: '#787878', padding: '5px', width: "150px" }}>
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>เวลาส่งจากห้องเย็นใหญ่</Box>

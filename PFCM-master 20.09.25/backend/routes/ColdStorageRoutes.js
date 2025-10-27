@@ -2022,7 +2022,8 @@ module.exports = (io) => {
                     let updateQuery = `
           UPDATE TrolleyRMMapping
           SET dest = CASE
-              WHEN rm_status = 'QcCheck' AND @rm_cold_status IN ('เหลือจากไลน์ผลิต', 'วัตถุดิบตรง') THEN 'บรรจุ'
+              WHEN rm_status = 'QcCheck' AND @rm_cold_status IN ('เหลือจากไลน์ผลิต', 'วัตถุดิบตรง')  AND @dest = 'บรรจุ' THEN 'บรรจุ'
+              WHEN rm_status = 'QcCheck' AND @rm_cold_status IN ('เหลือจากไลน์ผลิต', 'วัตถุดิบตรง')  AND @dest = 'จุดเตรียม' THEN 'จุดเตรียม'
               WHEN rm_status = 'QcCheck รอ MD' AND @rm_cold_status = 'วัตถุดิบรับฝาก' THEN 'จุดเตรียม'
               WHEN rm_status = 'QcCheck รอกลับมาเตรียม' AND @rm_cold_status = 'วัตถุดิบรับฝาก' THEN 'จุดเตรียม'
               WHEN rm_status = 'รอกลับมาเตรียม' AND @rm_cold_status = 'วัตถุดิบรับฝาก' THEN 'จุดเตรียม'
@@ -2058,6 +2059,10 @@ module.exports = (io) => {
                         updateQuery += `, tro_id = NULL`;
                     }
 
+                       if (dest === 'จุดเตรียม') {
+                        updateQuery += `, tro_id = NULL`;
+                    }
+
                     // Execute TrolleyRMMapping update
                     const updateRmResult = await new sql.Request(transaction)
                         .input("mapping_id", mapping_id)
@@ -2076,7 +2081,7 @@ module.exports = (io) => {
                     }
 
                     // ถ้า dest = 'บรรจุ' อัปเดต Trolley.tro_status = 1
-                    if (dest === 'บรรจุ') {
+                    if (dest === 'บรรจุ' || dest === 'จุดเตรียม') {
                         await new sql.Request(transaction)
                             .input("tro_id", tro_id)
                             .query(`
