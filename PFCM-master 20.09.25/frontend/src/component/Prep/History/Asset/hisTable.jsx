@@ -91,7 +91,7 @@ const Row = ({
             backgroundColor: backgroundColor
           }}
         >
-          {row.batch || '-'}
+          {row.batch_after || '-'}
         </TableCell>
         <TableCell
           align="center"

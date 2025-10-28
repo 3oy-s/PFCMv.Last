@@ -695,7 +695,7 @@ router.get("/qc/History/All", async (req, res) => {
      SELECT
     rmm.mapping_id,
     rmf.rmfp_id,
-    STRING_AGG(CAST(b.batch_after AS VARCHAR(50)), ',') AS batch_after,
+    STRING_AGG(CAST(b.batch_after AS VARCHAR(50)), CHAR(10)) AS batch_after,
     rm.mat,
     rm.mat_name,
     CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,

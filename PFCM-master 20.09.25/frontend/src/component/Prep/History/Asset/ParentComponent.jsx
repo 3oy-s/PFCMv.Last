@@ -63,7 +63,7 @@ const ParentComponent = () => {
 
     const handleOpenEditModal = (data) => {
         setDataForEditModal({
-            batch: data.batch,
+            batch_after: data.batch_after,
             mat: data.mat,
             mat_name: data.mat_name,
             production: data.production,
@@ -105,7 +105,7 @@ const ParentComponent = () => {
         // Create a comprehensive data object for printing
         const printData = {
             // Basic info
-            batch_after: data.batch,
+            batch_after: data.batch_after,
             mat: data.mat,
             mat_name: data.mat_name,
             production: data.production,
@@ -163,7 +163,7 @@ const ParentComponent = () => {
 
     const handleOpenSuccess = (data) => {
         setDataForSuccessModal({
-            batch: data.batch,
+            batch_after: data.batch_after,
             mat: data.mat,
             mat_name: data.mat_name,
             production: data.production,
