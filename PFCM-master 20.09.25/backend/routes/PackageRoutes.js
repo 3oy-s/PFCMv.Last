@@ -3456,7 +3456,7 @@ module.exports = (io) => {
       const query = `
       SELECT 
         rmm.mapping_id,
-        ba.batch_after,
+        STRING_AGG(ba.batch_after, ', ') AS batch_after,
         rmm.weight_RM,
         rmm.tray_count,
         rg.rm_group_name,
@@ -3468,7 +3468,7 @@ module.exports = (io) => {
       LEFT JOIN RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
       LEFT JOIN RawMatGroup rg ON rmf.rm_group_id = rg.rm_group_id
       LEFT JOIN ProdRawMat prm ON rmm.tro_production_id = prm.prod_rm_id
-      LEFT JOIN Batch ba ON rmm.batch_id = ba.batch_id
+      LEFT JOIN Batch ba ON rmm.mapping_id = ba.mapping_id
       LEFT JOIN Production prod ON prm.prod_id = prod.prod_id
       JOIN Line li ON rmm.rmm_line_name = li.line_name
       JOIN RawMat rm ON prm.mat = rm.mat
@@ -3477,6 +3477,17 @@ module.exports = (io) => {
         AND rmm.stay_place IN ('จุดเตรียม','ออกห้องเย็น')
         AND rmm.mix_code IS NULL
         AND li.line_id = @line_id
+      GROUP BY
+        rmm.mapping_id,
+        rmm.weight_RM,
+        rmm.tray_count,
+        rg.rm_group_name,
+        prm.prod_id,
+        rm.mat,
+        rm.mat_name,
+        prod.doc_no
+      ORDER BY 
+        rmm.mapping_id DESC
     `;
 
 
@@ -3607,7 +3618,7 @@ module.exports = (io) => {
         JOIN
           Production p ON p.prod_id = rmm.prod_mix
         LEFT JOIN
-          Batch b ON b.batch_id = rmx.batch_id
+          Batch b ON b.mapping_id = rmx.mapping_id
         JOIN 
           ProdRawMat prm ON prm.prod_rm_id = rmx.tro_production_id
         JOIN
@@ -3661,7 +3672,7 @@ module.exports = (io) => {
             prm.mat,
             h.*
           FROM RM_Mixed rmx
-            JOIN Batch b ON b.batch_id = rmx.batch_id
+            JOIN Batch b ON b.mapping_id = rmx.mapping_id
             JOIN RMForProd rmf ON rmf.rmfp_id = rmx.rmfp_id
             JOIN History h ON h.mapping_id = rmx.mapping_id
             JOIN Line l ON l.line_name = rmf.rmfp_line_name

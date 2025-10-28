@@ -3567,7 +3567,6 @@ module.exports = (io) => {
 
   router.get("/prep/matimport/fetchRMForProd", async (req, res) => {
     try {
-
       const { rm_type_ids } = req.query;
 
       if (!rm_type_ids) {
@@ -3577,12 +3576,11 @@ module.exports = (io) => {
       const rmTypeIdsArray = rm_type_ids.split(',');
       const pool = await connectToDatabase();
 
-
-      // 2. ดึงข้อมูลตามสิทธิ์ผู้ใช้
+      // ✅ Query ที่เพิ่มการ JOIN ตาราง Batch เพื่อดึง batch_after
       const query = `
       SELECT
         rmf.rmfp_id,
-        rmf.batch,
+        STRING_AGG(b.batch_after, ', ') AS batch_after,
         rm.mat,
         rm.mat_name,
         rmm.dest,
@@ -3610,12 +3608,29 @@ module.exports = (io) => {
         RawMatGroup rmg ON rmcg.rm_group_id = rmg.rm_group_id
       JOIN
         History htr ON rmm.mapping_id = htr.mapping_id
+      LEFT JOIN
+        Batch b ON rmm.mapping_id = b.mapping_id  -- ✅ เพิ่ม join batch
       WHERE 
-        rmm.stay_place IN ('ออกห้องเย็น' ,'หม้ออบ','จุดเตรียม')
+        rmm.stay_place IN ('ออกห้องเย็น', 'หม้ออบ', 'จุดเตรียม')
         AND rmm.dest = 'จุดเตรียม'
-        AND rmm.rm_status IN ('QcCheck รอกลับมาเตรียม','QcCheck รอ MD','รอกลับมาเตรียม','รอ Qc')
+        AND rmm.rm_status IN ('QcCheck รอกลับมาเตรียม', 'QcCheck รอ MD', 'รอกลับมาเตรียม', 'รอ Qc')
         AND rmf.rm_group_id = rmg.rm_group_id
         AND rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')})
+      GROUP BY
+        rmf.rmfp_id,
+        rmf.batch,
+        rm.mat,
+        rm.mat_name,
+        rmm.dest,
+        rmm.stay_place,
+        p.doc_no,
+        rmm.rmm_line_name,
+        rmg.rm_type_id,
+        rmm.tro_id,
+        rmm.mapping_id,
+        rmm.level_eu,
+        htr.cooked_date,
+        htr.edit_rework
       ORDER BY
         htr.cooked_date DESC
     `;
@@ -3629,11 +3644,8 @@ module.exports = (io) => {
         const day = String(date.getUTCDate()).padStart(2, '0');
         const hours = String(date.getUTCHours()).padStart(2, '0');
         const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-        const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-        const milliseconds = String(date.getUTCMilliseconds()).padStart(3, '0');
 
         item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
-
         delete item.cooked_date;
 
         return item;
@@ -3645,6 +3657,7 @@ module.exports = (io) => {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
 
   // router.post("/mapping/successTrolley", async (req, res) => {
   //   const { mapping_id } = req.body;
@@ -4008,7 +4021,7 @@ module.exports = (io) => {
         .query(`
                   SELECT
                       rmf.rmfp_id,
-                      b.batch_after,
+                      STRING_AGG(b.batch_after, ', ') AS batch_after,
                       rm.mat,
                       rm.mat_name,
                       rmm.dest,
@@ -4030,8 +4043,8 @@ module.exports = (io) => {
                       RMForProd rmf
                   JOIN
                       TrolleyRMMapping rmm ON rmf.rmfp_id = rmm.rmfp_id
-                  JOIN
-                       Batch b ON rmm.batch_id = b.batch_id
+                  LEFT JOIN
+                       Batch b ON rmm.mapping_id = b.mapping_id
                   JOIN
                       ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
                   JOIN
@@ -4053,6 +4066,28 @@ module.exports = (io) => {
                         AND rmm.rm_status IN ('รอแก้ไข','QcCheck รอแก้ไข')
                         AND rmf.rm_group_id = rmg.rm_group_id
                         AND rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')})
+                      GROUP BY
+                        rmf.rmfp_id,
+                        rm.mat,
+                        rm.mat_name,
+                        rmm.dest,
+                        rmm.stay_place,
+                        p.doc_no,
+                        rmm.rmm_line_name,
+                        rmg.rm_type_id,
+                        rmm.tro_id,
+                        rmm.mapping_id,
+                        rmm.weight_RM,
+                        rmm.level_eu,
+                        rmm.tray_count,
+                        rmm.rm_status,
+                        qc.sq_remark,
+                        qc.md_remark,
+                        qc.defect_remark,
+                        htr.qccheck_cold,
+                        htr.remark_rework,
+                        htr.remark_rework_cold,
+                        htr.cooked_date
                         ORDER BY htr.cooked_date DESC
               `);
 

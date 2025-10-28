@@ -38,7 +38,7 @@ module.exports = (io) => {
           rmm.mapping_id, 
           rmf.rmfp_id, 
           rmm.tro_id,
-          STRING_AGG(b.batch_after, ', ') AS batch_after,  -- ✅ รวม batch_after ที่ mapping_id เดียวกัน
+          STRING_AGG(b.batch_after, ', ') AS batch_after,  -- รวม batch_after ที่ mapping_id เดียวกัน
           rm.mat,
           rm.mat_name,
           CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,
@@ -62,7 +62,7 @@ module.exports = (io) => {
       JOIN  
           RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id  
       LEFT JOIN
-          Batch b ON rmm.mapping_id = b.mapping_id   -- ✅ join ด้วย mapping_id
+          Batch b ON rmm.mapping_id = b.mapping_id   -- join ด้วย mapping_id
       JOIN
           ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
       JOIN
@@ -99,9 +99,9 @@ module.exports = (io) => {
           rmm.prep_to_cold_time,
           rmg.prep_to_cold,
           rmm.rework_time,
-          rmg.re_status,
-          rmm.dework,
-          rmm.rmst,
+          rmg.rework,
+          rmm.rm_status,
+          rmm.dest,
           rmm.weight_RM,
           rmm.tray_count,
           htr.cooked_date,
@@ -114,10 +114,7 @@ module.exports = (io) => {
           rmm.mapping_id DESC
     `);
 
-            const formattedData = result.recordset.map(item => {
-                console.log("item :", item);
-                return item;
-            });
+            const formattedData = result.recordset.map(item => item);
 
             res.json({ success: true, data: formattedData });
         } catch (err) {
@@ -125,6 +122,7 @@ module.exports = (io) => {
             res.status(500).json({ success: false, error: err.message });
         }
     });
+
 
 
     router.get("/coldstorage/main/mix/fetchSlotRawMat", async (req, res) => {
@@ -2059,7 +2057,7 @@ module.exports = (io) => {
                         updateQuery += `, tro_id = NULL`;
                     }
 
-                       if (dest === 'จุดเตรียม') {
+                    if (dest === 'จุดเตรียม') {
                         updateQuery += `, tro_id = NULL`;
                     }
 
