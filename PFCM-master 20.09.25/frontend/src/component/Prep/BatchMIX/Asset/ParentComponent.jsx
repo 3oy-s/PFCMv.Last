@@ -290,7 +290,7 @@ const handleOpenDeleteModal = (data) => {
     mat: data.mat,
     mat_name: data.mat_name,
     production: data.production,
-    rmfemu_id: data.rmfemu_id,
+    rmfbatch_id: data.rmfbatch_id,
     withdraw_date: data.withdraw_date,
     level_eu: data.level_eu
   };
@@ -551,7 +551,7 @@ const handleConfirmCameraModal = ({ primaryBatch, secondaryBatch, weightTotal, s
           mat_name={dataForDeleteModal.mat_name}
           batch={dataForDeleteModal.batch}
           production={dataForDeleteModal.production}
-          rmfemu_id={dataForDeleteModal.rmfemu_id}
+         rmfbatch_id={dataForDeleteModal.rmfbatch_id}
           selectedPlans={dataForDeleteModal.selectedPlans}
           withdraw_date={dataForDeleteModal.withdraw_date}
           onSuccess={fetchData}

@@ -140,7 +140,8 @@ const Modal4 = ({ open, onClose, onSuccess }) => {
           mat: material.mat,
           batch: material.batch,
           weight: selectedWeights[material.rmfbatch_id],
-          level_eu: material.level_eu
+          level_eu: material.level_eu,
+          hu: material.hu
         }))
       };
 
@@ -176,7 +177,8 @@ const handleClose = () => {
     mat: material.mat,
     batch: material.batch,
     weight: selectedWeights[material.rmfbatch_id],
-    level_eu: material.level_eu
+    level_eu: material.level_eu,
+    hu: material.hu
   }));
 
   const totalWeight = getTotalWeight();
@@ -230,6 +232,7 @@ const handleClose = () => {
                     <TableCell align="center">ลำดับ</TableCell>
                     <TableCell>รหัสวัตถุดิบ</TableCell>
                     <TableCell>batch</TableCell>
+                    <TableCell>HU</TableCell>
                     <TableCell align="right">น้ำหนักคงเหลือ (กก.)</TableCell>
                     <TableCell>ระดับ EU</TableCell>
                     <TableCell>วันที่เบิก</TableCell>
@@ -242,8 +245,10 @@ const handleClose = () => {
                       <TableCell align="center">{index + 1}</TableCell>
                       <TableCell>{item.mat}</TableCell>
                       <TableCell>{item.batch}</TableCell>
+                      <TableCell>{item.hu}</TableCell>
                       <TableCell align="right">{item.weight.toFixed(2)}</TableCell>
                       <TableCell>{item.level_eu}</TableCell>
+                      <TableCell>{item.hu}</TableCell>
                       <TableCell>
                         {new Date(item.withdraw_date).toLocaleString('th-TH')}
                       </TableCell>
@@ -349,6 +354,7 @@ const handleClose = () => {
                         <TableCell>{material.mat}</TableCell>
                         <TableCell>{material.batch}</TableCell>
                         <TableCell>{material.level_eu}</TableCell>
+                        <TableCell>{material.hu}</TableCell>
                         <TableCell align="right">
                           {selectedWeights[material.rmfbatch_id].toFixed(2)}
                         </TableCell>

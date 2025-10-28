@@ -378,6 +378,10 @@ const TableMainPrep = ({ handleOpenModal, data, handleRowClick, handleOpenEditMo
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>Batch</Box> {/* mat_name */}
               </TableCell>
                <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "200px" }}>
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>HU</Box> {/* mat_name */}
+              </TableCell>
+           
+               <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "200px" }}>
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>Material</Box> {/* mat_name */}
               </TableCell>
            
