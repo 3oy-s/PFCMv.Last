@@ -29,7 +29,7 @@ const Row = ({
 
 
   const isOpen = openRowId === row.rmfp_id;
-  const { rmfp_id, dest, stay_place, cooked_date, CookedDateTime, oven_to_cold, rm_type_id, mapping_id,sap_re_id, rm_status, ...displayRow } = row;
+  const { rmfp_id, dest, stay_place, cooked_date, CookedDateTime, oven_to_cold, rm_type_id, mapping_id, sap_re_id, rm_status, ...displayRow } = row;
   const backgroundColor = index % 2 === 0 ? '#ffffff' : "hsl(210, 100.00%, 88%)"; // เปลี่ยนสีจาราง ขาว เทา
 
   return (
@@ -70,6 +70,17 @@ const Row = ({
             {value || '-'}
           </TableCell>
         ))}
+
+        <CompleteActionCell
+          // width={CUSTOM_COLUMN_WIDTHS.complete}
+           
+          onClick={(e) => {
+            e.stopPropagation(); // ป้องกันไม่ให้ trigger การเปิด row
+            handleOpenSuccess(row);
+          }}
+          icon={<SlClose style={{ color: "#c20000ff", fontSize: "18px" }} />}
+          backgroundColor={backgroundColor} // Add this
+        />
 
       </TableRow>
 
@@ -121,7 +132,7 @@ const CartActionCell = ({ width, onClick, icon }) => {
   );
 };
 
-const CompleteActionCell = ({ width, onClick, icon }) => {
+const CompleteActionCell = ({ width, onClick, icon, backgroundColor }) => {
   return (
     <TableCell
       style={{
@@ -130,35 +141,39 @@ const CompleteActionCell = ({ width, onClick, icon }) => {
         borderTop: '1px solid #e0e0e0',
         borderBottom: '1px solid #e0e0e0',
         borderLeft: '1px solid #f2f2f2',
+        borderRight: '1px solid #e0e0e0',
+        borderTopRightRadius: "8px",
+        borderBottomRightRadius: "8px",
         height: '40px',
         padding: '0px',
         cursor: 'pointer',
-        transition: 'background-color 0.2s ease-in-out'
+        transition: 'background-color 0.2s ease-in-out',
+        backgroundColor: backgroundColor
       }}
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = '#54e032';
-        e.currentTarget.querySelector('svg').style.color = '#fff';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = '';
-        e.currentTarget.querySelector('svg').style.color = '#26c200';
-      }}
-      onTouchStart={(e) => {
-        e.currentTarget.style.backgroundColor = '#54e032';
-        e.currentTarget.querySelector('svg').style.color = '#fff';
-      }}
-      onTouchEnd={(e) => {
-        e.currentTarget.style.backgroundColor = '';
-        e.currentTarget.querySelector('svg').style.color = '#26c200';
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        {icon}
-      </div>
-    </TableCell>
-  );
-};
+         onClick={onClick}
+         onMouseEnter={(e) => {
+           e.currentTarget.style.backgroundColor = '#c20000ff';
+           e.currentTarget.querySelector('svg').style.color = '#fff';
+         }}
+         onMouseLeave={(e) => {
+           e.currentTarget.style.backgroundColor = backgroundColor;
+           e.currentTarget.querySelector('svg').style.color = '#c20000ff';
+         }}
+         onTouchStart={(e) => {
+           e.currentTarget.style.backgroundColor = '#c20000ff';
+           e.currentTarget.querySelector('svg').style.color = '#fff';
+         }}
+         onTouchEnd={(e) => {
+           e.currentTarget.style.backgroundColor = backgroundColor;
+           e.currentTarget.querySelector('svg').style.color = '#c20000ff';
+         }}
+       >
+         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+           {icon}
+         </div>
+       </TableCell>
+     );
+   };
 
 const EditActionCell = ({ width, onClick, icon }) => {
   return (
@@ -179,20 +194,20 @@ const EditActionCell = ({ width, onClick, icon }) => {
       }}
       onClick={onClick}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = '#edc026';
+        e.currentTarget.style.backgroundColor = '#c20000ff';
         e.currentTarget.querySelector('svg').style.color = '#fff';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.backgroundColor = '';
-        e.currentTarget.querySelector('svg').style.color = '#edc026';
+        e.currentTarget.querySelector('svg').style.color = '#c20000ff';
       }}
       onTouchStart={(e) => {
-        e.currentTarget.style.backgroundColor = '#edc026';
+        e.currentTarget.style.backgroundColor = '#c20000ff';
         e.currentTarget.querySelector('svg').style.color = '#fff';
       }}
       onTouchEnd={(e) => {
         e.currentTarget.style.backgroundColor = '';
-        e.currentTarget.querySelector('svg').style.color = '#edc026';
+        e.currentTarget.querySelector('svg').style.color = '#c20000ff';
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -295,8 +310,12 @@ const TableMainPrep = ({ handleOpenModal, data, handleRowClick, handleOpenEditMo
               <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "200px" }}>
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>HU</Box> {/* mat_name */}
               </TableCell>
+              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "200px" }}>
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>เวลาส่งจากห้องเย็นใหญ่</Box> {/* mat_name */}
+              </TableCell>
+
               <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTopRightRadius: "8px", borderBottomRightRadius: "8px", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #e0e0e0", fontSize: '12px', color: '#787878', padding: '5px', width: "150px" }}>
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>เวลาส่งจากห้องเย็นใหญ่</Box>
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>ลบ</Box>
               </TableCell>
             </TableRow>
           </TableHead>

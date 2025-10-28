@@ -29,26 +29,27 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 
 
-const ModalSuccess = ({ open, onClose, mat, mat_name, batch, production, rmfp_id }) => {
+const ModalSuccess = ({ open, onClose, mat, mat_name, batch,hu, production, sap_re_id }) => {
   
-  const handleConfirm = async () => {
-    try {
-      const response = await axios.post(`${API_URL}/api/SuccessTrolley`, {
-        rmfpID: rmfp_id, // ส่ง rmfp_id ไปยัง API
-      });
-  
-      if (response.data.success) {
-        console.log("Successfully updated production status:", response.data.message);
-      } else {
-        console.error("Error:", response.data.message);
-      }
-  
-      onClose(); // ปิด modal หลังจากกดยืนยัน
-    } catch (error) {
-      console.error("API request failed:", error);
-      onClose(); // ปิด modal หลังจากกดยืนยัน
+ const handleConfirm = async () => {
+  try {
+    const response = await axios.delete(`${API_URL}/api/delete/batch/cold/storage`, {
+      data: { sap_re_id }, // ✅ ชื่อ key ตรงกับ backend แล้ว
+    });
+
+    if (response.data.success) {
+      console.log("Successfully deleted:", response.data.message);
+    } else {
+      console.error("Error:", response.data.error);
     }
-  };
+
+    onClose();
+  } catch (error) {
+    console.error("API request failed:", error);
+    onClose();
+  }
+};
+
   
 
   
@@ -63,10 +64,9 @@ const ModalSuccess = ({ open, onClose, mat, mat_name, batch, production, rmfp_id
         
         <Stack spacing={1}>
           <Typography color="rgba(0, 0, 0, 0.6)">Mat: {mat}</Typography>
-          <Typography color="rgba(0, 0, 0, 0.6)">Material Name: {mat_name}</Typography>
           <Typography color="rgba(0, 0, 0, 0.6)">Batch: {batch}</Typography>
-          <Typography color="rgba(0, 0, 0, 0.6)">Production: {production}</Typography>
-          <Typography color="rgba(0, 0, 0, 0.6)">rmfp_id: {rmfp_id}</Typography>
+          <Typography color="rgba(0, 0, 0, 0.6)">Batch: {hu}</Typography>
+          <Typography color="rgba(0, 0, 0, 0.6)">sap_re_id: {sap_re_id}</Typography>
          
         </Stack>
 

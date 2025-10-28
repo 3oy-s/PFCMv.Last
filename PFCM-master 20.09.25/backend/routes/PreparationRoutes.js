@@ -578,7 +578,8 @@ module.exports = (io) => {
       withdraw,
       datetime: receiveDT,
       Dest,
-      level_eu
+      level_eu,
+      hu
     } = req.body;
 
     if (!Array.isArray(groupId) || groupId.length === 0) {
@@ -619,11 +620,12 @@ module.exports = (io) => {
             .input("rmfp_line_name", line_name)
             .input("stay_place", stayPlace)
             .input("dest", Dest)
+            .input("hu", hu)
             .input("level_eu", level_eu !== "-" ? level_eu : null)
             .query(`
-            INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu)
+            INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu,hu)
             OUTPUT INSERTED.rmfp_id
-            VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu)
+            VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @hu)
           `);
 
           if (rmfpResult.recordset.length === 0) {
@@ -838,7 +840,8 @@ module.exports = (io) => {
       userID,
       Dest,
       level_eu,
-      emu_status
+      emu_status,
+      hu
     } = req.body;
 
     let transaction;
@@ -865,12 +868,13 @@ module.exports = (io) => {
             .input("rmfp_line_name", line_name)
             .input("stay_place", stayPlace)
             .input("dest", Dest)
+            .input("hu", hu)
             .input("level_eu", level_eu !== "-" ? level_eu : null) // ถ้า "-" ให้เก็บ NULL
             .input("emu_status", emu_status || "1")
             .query(`
-            INSERT INTO RMForEmu (mat, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu, emu_status)
+            INSERT INTO RMForEmu (mat, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu, emu_status,hu)
             OUTPUT INSERTED.rmfemu_id
-            VALUES (@mat, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @emu_status)
+            VALUES (@mat, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @emu_status,@hu)
           `);
 
           if (rmfemuResult.recordset.length === 0) {
@@ -1154,12 +1158,11 @@ module.exports = (io) => {
           .input("rmfp_line_name", line_name)
           .input("stay_place", "จุดเตรียมรับเข้า")
           .input("dest", Dest)
-          .input("hu", hu)
           .input("level_eu", level_eu !== "-" ? level_eu : null)
           .query(`
-          INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu,hu)
+          INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu)
           OUTPUT INSERTED.rmfp_id
-          VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @hu)
+          VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu)
         `);
 
         const RMFP_ID = rmfpResult.recordset[0].rmfp_id;
@@ -1939,6 +1942,7 @@ module.exports = (io) => {
       SELECT 
         r.rmfbatch_id,
         r.batch,
+        r.hu,
         r.mat,
         rm.mat_name,
         r.weight,
@@ -6740,6 +6744,102 @@ ORDER BY
   //     res.status(500).json({ success: false, error: err.message });
   //   }
   // });
+
+router.post('/delete/batchmix', async (req, res) => {
+    const { rmfbatch_id } = req.body;
+    const sql = require("mssql");
+
+    if (!rmfbatch_id) {
+      return res.status(400).json({ success: false, error: "Missing rmfbatch_id" });
+    }
+
+    let transaction;
+    try {
+      const pool = await connectToDatabase();
+      transaction = new sql.Transaction(pool);
+      await transaction.begin();
+
+      // ตรวจสอบว่า rmfbatch_id มีอยู่
+      const checkResult = await transaction.request()
+        .input('rmfbatch_id', rmfbatch_id)
+        .query(`SELECT rmfbatch_id FROM RMMixBatch WHERE rmfbatch_id = @rmfbatch_id`);
+
+      if (checkResult.recordset.length === 0) {
+        await transaction.rollback();
+        return res.status(404).json({ success: false, error: "ไม่พบ rmfbatch_id ใน RMMixBatch" });
+      }
+
+      // อัปเดตสถานะ
+      const updateResult = await transaction.request()
+        .input('rmfbatch_id', rmfbatch_id)
+        .query(`
+        UPDATE RMMixBatch
+        SET b_status = '0'
+        WHERE rmfbatch_id = @rmfbatch_id
+      `);
+
+      if (updateResult.rowsAffected[0] === 0) {
+        await transaction.rollback();
+        return res.status(400).json({ success: false, error: "ไม่สามารถอัปเดตข้อมูลได้" });
+      }
+
+      await transaction.commit();
+
+      res.json({ success: true, message: 'บันทึกข้อมูลสำเร็จ' });
+
+    } catch (err) {
+      if (transaction) await transaction.rollback();
+      console.error('Error:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+router.delete('/delete/batch/cold/storage', async (req, res) => {
+  const { sap_re_id } = req.body; // หรือ req.query ถ้าส่งใน URL
+  const sql = require("mssql");
+
+  if (!sap_re_id) {
+    return res.status(400).json({ success: false, error: "Missing sap_re_id" });
+  }
+
+  let transaction;
+  try {
+    const pool = await connectToDatabase();
+    transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    // ตรวจสอบว่า sap_re_id มีอยู่จริง
+    const checkResult = await transaction.request()
+      .input('sap_re_id', sql.Int, sap_re_id)
+      .query(`SELECT sap_re_id FROM SAP_Receive WHERE sap_re_id = @sap_re_id`);
+
+    if (checkResult.recordset.length === 0) {
+      await transaction.rollback();
+      return res.status(404).json({ success: false, error: "ไม่พบ sap_re_id ใน SAP_Receive" });
+    }
+
+    // ลบข้อมูล
+    const deleteResult = await transaction.request()
+      .input('sap_re_id', sql.Int, sap_re_id)
+      .query(`DELETE FROM SAP_Receive WHERE sap_re_id = @sap_re_id`);
+
+    if (deleteResult.rowsAffected[0] === 0) {
+      await transaction.rollback();
+      return res.status(400).json({ success: false, error: "ไม่สามารถลบข้อมูลได้" });
+    }
+
+    await transaction.commit();
+    res.json({ success: true, message: 'ลบข้อมูลสำเร็จ' });
+
+  } catch (err) {
+    if (transaction) await transaction.rollback();
+    console.error('Error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
+
   router.post('/delete/rmforemu', async (req, res) => {
     const { rmfemu_id } = req.body;
     const sql = require("mssql");
@@ -6788,6 +6888,57 @@ ORDER BY
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
+  router.post('/delete/rmforemu', async (req, res) => {
+    const { rmfemu_id } = req.body;
+    const sql = require("mssql");
+
+    if (!rmfemu_id) {
+      return res.status(400).json({ success: false, error: "Missing rmfemu_id" });
+    }
+
+    let transaction;
+    try {
+      const pool = await connectToDatabase();
+      transaction = new sql.Transaction(pool);
+      await transaction.begin();
+
+      // ตรวจสอบว่า rmfemu_id มีอยู่
+      const checkResult = await transaction.request()
+        .input('rmfemu_id', rmfemu_id)
+        .query(`SELECT rmfemu_id FROM RMForEmu WHERE rmfemu_id = @rmfemu_id`);
+
+      if (checkResult.recordset.length === 0) {
+        await transaction.rollback();
+        return res.status(404).json({ success: false, error: "ไม่พบ rmfemu_id ใน RMForEmu" });
+      }
+
+      // อัปเดตสถานะ
+      const updateResult = await transaction.request()
+        .input('rmfemu_id', rmfemu_id)
+        .query(`
+        UPDATE RMForEmu
+        SET emu_status = '0'
+        WHERE rmfemu_id = @rmfemu_id
+      `);
+
+      if (updateResult.rowsAffected[0] === 0) {
+        await transaction.rollback();
+        return res.status(400).json({ success: false, error: "ไม่สามารถอัปเดตข้อมูลได้" });
+      }
+
+      await transaction.commit();
+
+      res.json({ success: true, message: 'บันทึกข้อมูลสำเร็จ' });
+
+    } catch (err) {
+      if (transaction) await transaction.rollback();
+      console.error('Error:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  
 
 
   return router;
