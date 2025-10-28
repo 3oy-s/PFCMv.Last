@@ -1504,7 +1504,7 @@ module.exports = (io) => {
       const result = await request.query(`
       SELECT
           rmf.rmfp_id,
-          b.batch_after,
+          STRING_AGG(b.batch_after, ', ') AS batch_after,
           rm.mat,
           rm.mat_name,
           rmm.mapping_id,
@@ -1535,13 +1535,13 @@ module.exports = (io) => {
           CONVERT(VARCHAR, h.receiver_qc, 120) AS receiver_qc,
           l.line_name,
           CONCAT(p.doc_no, ' (',rmm.rmm_line_name, ')') AS code,
-          q.*
+          q.qc_id
       FROM
           RMForProd rmf
       JOIN
           TrolleyRMMapping rmm ON rmf.rmfp_id = rmm.rmfp_id
       LEFT JOIN
-          Batch b ON rmm.batch_id = b.batch_id
+          Batch b ON rmm.mapping_id = b.mapping_id
       JOIN
           ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
       JOIN
@@ -1554,13 +1554,47 @@ module.exports = (io) => {
           RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
       JOIN  
           History h ON rmm.mapping_id = h.mapping_id
-      JOIN
+      LEFT JOIN
           QC q ON rmm.qc_id = q.qc_id
       WHERE 
           rmm.stay_place IN ('จุดเตรียม','ออกห้องเย็น','บรรจุรับเข้า') 
           AND rmm.dest IN ('ไปบรรจุ', 'บรรจุ')
           AND rmf.rm_group_id = rmg.rm_group_id
           ${lineFilter}
+      GROUP BY
+          rmf.rmfp_id,
+          rm.mat,
+          rm.mat_name,
+          rmm.mapping_id,
+          rmm.dest,
+          rmm.stay_place,
+          rmg.rm_type_id,
+          rmm.rm_status,
+          rmm.tray_count,
+          rmm.weight_RM,
+          rmm.level_eu,
+          rmm.tro_id,
+          rmm.cold_to_pack_time,
+          rmg.cold_to_pack,
+          rmm.prep_to_pack_time,
+          rmg.prep_to_pack,
+          rmm.rework_time,
+          rmg.rework,
+          h.cooked_date,
+          h.rmit_date,
+          h.come_cold_date,
+          h.out_cold_date,
+          h.come_cold_date_two,
+          h.out_cold_date_two,
+          h.come_cold_date_three,
+          h.out_cold_date_three,
+          h.qc_date,
+          h.receiver,
+          h.receiver_qc,
+          l.line_name,
+          p.doc_no,
+          rmm.rmm_line_name,
+          q.qc_id
     `);
 
       const formattedData = result.recordset.map(item => {
@@ -1573,7 +1607,6 @@ module.exports = (io) => {
 
         item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
         delete item.cooked_date;
-
         return item;
       });
 
@@ -1583,6 +1616,8 @@ module.exports = (io) => {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
+
 
   //name
   router.get("/pack/select/Trolley", async (req, res) => {
@@ -3421,7 +3456,7 @@ module.exports = (io) => {
       const query = `
       SELECT 
         rmm.mapping_id,
-        ba.batch_after,
+        STRING_AGG(ba.batch_after, ', ') AS batch_after,
         rmm.weight_RM,
         rmm.tray_count,
         rg.rm_group_name,
@@ -3433,7 +3468,7 @@ module.exports = (io) => {
       LEFT JOIN RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
       LEFT JOIN RawMatGroup rg ON rmf.rm_group_id = rg.rm_group_id
       LEFT JOIN ProdRawMat prm ON rmm.tro_production_id = prm.prod_rm_id
-      LEFT JOIN Batch ba ON rmm.batch_id = ba.batch_id
+      LEFT JOIN Batch ba ON rmm.mapping_id = ba.mapping_id
       LEFT JOIN Production prod ON prm.prod_id = prod.prod_id
       JOIN Line li ON rmm.rmm_line_name = li.line_name
       JOIN RawMat rm ON prm.mat = rm.mat
@@ -3442,6 +3477,17 @@ module.exports = (io) => {
         AND rmm.stay_place IN ('จุดเตรียม','ออกห้องเย็น')
         AND rmm.mix_code IS NULL
         AND li.line_id = @line_id
+      GROUP BY
+        rmm.mapping_id,
+        rmm.weight_RM,
+        rmm.tray_count,
+        rg.rm_group_name,
+        prm.prod_id,
+        rm.mat,
+        rm.mat_name,
+        prod.doc_no
+      ORDER BY 
+        rmm.mapping_id DESC
     `;
 
 
@@ -3572,7 +3618,7 @@ module.exports = (io) => {
         JOIN
           Production p ON p.prod_id = rmm.prod_mix
         LEFT JOIN
-          Batch b ON b.batch_id = rmx.batch_id
+          Batch b ON b.mapping_id = rmx.mapping_id
         JOIN 
           ProdRawMat prm ON prm.prod_rm_id = rmx.tro_production_id
         JOIN
@@ -3626,7 +3672,7 @@ module.exports = (io) => {
             prm.mat,
             h.*
           FROM RM_Mixed rmx
-            JOIN Batch b ON b.batch_id = rmx.batch_id
+            JOIN Batch b ON b.mapping_id = rmx.mapping_id
             JOIN RMForProd rmf ON rmf.rmfp_id = rmx.rmfp_id
             JOIN History h ON h.mapping_id = rmx.mapping_id
             JOIN Line l ON l.line_name = rmf.rmfp_line_name

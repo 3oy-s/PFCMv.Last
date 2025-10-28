@@ -170,6 +170,7 @@ const ParentComponent = () => {
       console.error("Error fetching data:", error);
     }
   };
+  
   useEffect(() => {
     const fetchData = async () => {
       try {
