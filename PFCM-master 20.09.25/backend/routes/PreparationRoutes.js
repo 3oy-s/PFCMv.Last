@@ -4678,7 +4678,7 @@ module.exports = (io) => {
         .query(`
                  SELECT
                       rmf.rmfp_id,
-                      rmf.batch,
+                      STRING_AGG(b.batch_after, ', ') AS batch_after,
                       rm.mat,
                       rm.mat_name,
                       his.dest,
@@ -4710,10 +4710,30 @@ module.exports = (io) => {
                       RawMatGroup rmg ON rmcg.rm_group_id = rmg.rm_group_id
                   JOIN
                     History his ON his.mapping_id = rmm.mapping_id
+                  LEFT JOIN
+                    Batch b ON rmm.mapping_id = b.mapping_id
                   WHERE 
                       his.stay_place = 'จุดเตรียม' 
 					            AND his.rm_status = 'รอกลับมาเตรียม'
                       AND rmf.rm_group_id = rmg.rm_group_id
+                  GROUP BY
+                      rmm.mapping_id,
+                      rmf.rmfp_id,
+                      rm.mat,
+                      rm.mat_name,
+                      his.dest,
+                      rmm.stay_place,
+                      p.doc_no,
+                      his.rmm_line_name,
+                      rmg.rm_type_id,
+                      his.tro_id,
+                      rmm.level_eu,
+                      his.rm_status,
+                      his.weight_RM,
+                      his.tray_count,
+                      his.cooked_date,
+                      his.withdraw_date,
+                      his.receiver
                   ORDER BY his.withdraw_date DESC
               `);
 

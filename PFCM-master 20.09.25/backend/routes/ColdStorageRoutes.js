@@ -5640,7 +5640,15 @@ module.exports = (io) => {
             SELECT
                 rm.mat_name AS rawMaterialName,
                 rm.mat AS mat,
-                COALESCE(b.batch_after, rmf.batch) AS batch,
+                ISNULL(
+    (
+        SELECT STRING_AGG(b2.batch_after, CHAR(13) + CHAR(10))
+        FROM Batch b2
+        WHERE b2.mapping_id = rmm.mapping_id
+              AND b2.batch_after IS NOT NULL
+    ),
+    rmf.batch
+) AS batch
                 CONCAT(p.doc_no, ' (', h.rmm_line_name, ')') AS code,
                 h.tro_id AS trolleyId,
                 s.slot_id,
@@ -5706,8 +5714,6 @@ module.exports = (io) => {
                 RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
             LEFT JOIN
                 Slot s ON rmm.tro_id = s.tro_id
-            LEFT JOIN
-                Batch b ON rmm.batch_id = b.batch_id
             ${additionalWhereConditions}
             ORDER BY
                 COALESCE(
