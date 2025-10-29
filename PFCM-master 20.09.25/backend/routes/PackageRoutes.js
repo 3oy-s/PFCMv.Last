@@ -3136,7 +3136,7 @@ module.exports = (io) => {
       const pool = await connectToDatabase();
 
       const query = `
-        SELECT  
+        SELECT DISTINCT
             rmm.mapping_id,
             rmm.rmfp_id,
             rmm.batch_id,
@@ -3163,6 +3163,7 @@ module.exports = (io) => {
             rmm.weight_RM,
             rmm.tray_count,
             rmm.tro_id,
+            b.batch_after,
             htr.hist_id,
             htr.withdraw_date,
             htr.cooked_date,
@@ -3191,10 +3192,14 @@ module.exports = (io) => {
             htr.location
         FROM TrolleyRMMapping AS rmm
         JOIN History AS htr ON htr.mapping_id = rmm.mapping_id
+        LEFT JOIN batch AS b ON b.mapping_id = rmm.mapping_id
         WHERE rmm.mapping_id IN (${mapping_id.map(id => `'${id}'`).join(',')})
         `;
 
       const result = await pool.request().query(query);
+
+      console.log('Query result count:', result.recordset.length);
+      console.log('First record:', result.recordset[0]);
 
       if (result.recordset.length === 0) {
         return res.status(404).json({ message: "ไม่พบวัตถุดิบในรถเข็นที่เลือก" });
@@ -3211,6 +3216,14 @@ module.exports = (io) => {
       for (let i = 0; i < result.recordset.length; i++) {
         const record = result.recordset[i];
         const weightToMove = weights[i];
+
+        // Log เพื่อ debug
+        console.log(`Record ${i}:`, {
+          mapping_id: record.mapping_id,
+          weight_RM: record.weight_RM,
+          tray_count: record.tray_count,
+          weightToMove: weightToMove
+        });
 
         // คำนวณน้ำหนักต่อถาด
         const weightPerTray = record.weight_RM / record.tray_count;
@@ -3339,11 +3352,25 @@ module.exports = (io) => {
                 @weight_ntray${i}, @ntray${i}, @process_id${i}, @qc_id${i}, @weight_RM${i}, @level_eu${i})
                 `);
 
-        // อัปเดตรายการวัตถุดิบในรถเข็นเดิม
-        if (remainingWeight > 0) {
-          const remainingTrays = record.tray_count - roundedTraysUsed;
+        // *** เพิ่มส่วนนี้: สร้างข้อมูลในตาราง batch สำหรับ mapping_id ใหม่ ***
+        if (record.batch_after !== null && record.batch_after !== undefined && record.batch_after !== '') {
           await transaction.request()
-            .input('remainingWeight', sql.Float, remainingWeight)
+            .input(`new_mapping_id${i}`, sql.Int, newMappingId)
+            .input(`batch_after${i}`, sql.VarChar, record.batch_after)
+            .query(`
+                  INSERT INTO batch (mapping_id, batch_after)
+                  VALUES (@new_mapping_id${i}, @batch_after${i})
+                  `);
+        }
+
+        // อัปเดตรายการวัตถุดิบในรถเข็นเดิม
+        // ปัดเศษเพื่อป้องกันความผิดพลาดจากทศนิยม
+        const roundedRemainingWeight = Math.round(remainingWeight * 100) / 100;
+        
+        if (roundedRemainingWeight > 0.01) {
+          const remainingTrays = Math.round((record.tray_count - roundedTraysUsed) * 100) / 100;
+          await transaction.request()
+            .input('remainingWeight', sql.Float, roundedRemainingWeight)
             .input('remainingTrays', sql.Float, remainingTrays)
             .input('mapping_id', sql.Int, record.mapping_id)
             .query(`
@@ -3352,7 +3379,8 @@ module.exports = (io) => {
                         tray_count = @remainingTrays
                     WHERE mapping_id = @mapping_id
                     `);
-        } else if (remainingWeight === 0) {  // เปลี่ยนจาก <= 0 เป็น === 0
+        } else if (roundedRemainingWeight >= -0.01 && roundedRemainingWeight <= 0.01) {
+          // ถือว่าเป็น 0 ถ้าอยู่ในช่วง -0.01 ถึง 0.01
           await transaction.request()
             .input('mapping_id', sql.Int, record.mapping_id)
             .query(`
@@ -3360,13 +3388,22 @@ module.exports = (io) => {
                     SET stay_place = 'บรรจุเสร็จสิ้น', 
                         dest = 'บรรจุเสร็จสิ้น', 
                         rm_status = NULL,
-                        tray_count = 0
+                        tray_count = 0,
+                        weight_RM = 0
                     WHERE mapping_id = @mapping_id
                     `);
         } else {
-          // กรณีที่น้ำหนักติดลบ (ซึ่งไม่ควรเกิดขึ้น)
+          // กรณีที่น้ำหนักติดลบมากกว่า tolerance
           await transaction.rollback();
-          return res.status(400).json({ message: "น้ำหนักที่ต้องการย้ายมากกว่าน้ำหนักที่มีอยู่ในรถเข็น" });
+          return res.status(400).json({ 
+            message: "น้ำหนักที่ต้องการย้ายมากกว่าน้ำหนักที่มีอยู่ในรถเข็น",
+            detail: {
+              mapping_id: record.mapping_id,
+              weight_RM: record.weight_RM,
+              weightToMove: weightToMove,
+              remainingWeight: roundedRemainingWeight
+            }
+          });
         }
       }
 

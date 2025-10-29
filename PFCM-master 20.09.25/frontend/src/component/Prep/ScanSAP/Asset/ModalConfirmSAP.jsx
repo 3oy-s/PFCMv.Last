@@ -183,69 +183,69 @@ const ConfirmProdModal = ({
     const formattedEuLevel = level_eu !== "-" ? `Eu ${level_eu}` : "-";
     const status = emu_status;
 
-   try {
-  setIsLoading(true);
+    try {
+      setIsLoading(true);
 
-  // ✅ เลือก URL ตามเงื่อนไข
-  const url =
-    batchmix === "true"
-      ? `${API_URL}/api/prep/saveRMMixBatch/for/BatchMIX`
-      : emulsion === "true"
-      ? `${API_URL}/api/prep/saveRMForEmu/for/emulsion`
-      : `${API_URL}/api/prep/saveRMForProd`;
+      // ✅ เลือก URL ตามเงื่อนไข
+      const url =
+        batchmix === "true"
+          ? `${API_URL}/api/prep/saveRMMixBatch/for/BatchMIX`
+          : emulsion === "true"
+            ? `${API_URL}/api/prep/saveRMForEmu/for/emulsion`
+            : `${API_URL}/api/prep/saveRMForProd`;
 
-  // ✅ กำหนด request data ตามกรณี
-  const requests = (
-    batchmix === "true"
-      ? [{}] // BatchMix จะไม่ใช้ plan sets
-      : emulsion === "true"
-      ? [{}] // Emulsion ไม่มี plan sets
-      : selectedPlanSets
-  ).map(set => {
-    const isEmulsion = emulsion === "true";
-    const isBatchMix = batchmix === "true";
+      // ✅ กำหนด request data ตามกรณี
+      const requests = (
+        batchmix === "true"
+          ? [{}] // BatchMix จะไม่ใช้ plan sets
+          : emulsion === "true"
+            ? [{}] // Emulsion ไม่มี plan sets
+            : selectedPlanSets
+      ).map(set => {
+        const isEmulsion = emulsion === "true";
+        const isBatchMix = batchmix === "true";
 
-    const payload = {
-      mat: material,
-      batch: batch,
-      productId: isEmulsion || isBatchMix ? null : set.plan?.prod_id,
-      line_name: isEmulsion || isBatchMix ? "" : set.line?.line_name || "",
-      groupId:
-        isEmulsion || isBatchMix
-          ? set.group?.rm_group_id || null
-          : set.group?.rm_group_id
-          ? [set.group.rm_group_id]
-          : [],
-      Dest: deliveryLocation,
-      Emulsion: emulsion,
-      BatchMix: batchmix,
-      receiver: operator,
-      withdraw: formattedWithdraw,
-      hu: hu,
-      userID: userId,
-      operator: operator,
-      datetime: formattedDateTime,
-      weight: weightPerPlan,
-      level_eu: formattedEuLevel,
-      emu_status: status,
-    };
+        const payload = {
+          mat: material,
+          batch: batch,
+          productId: isEmulsion || isBatchMix ? null : set.plan?.prod_id,
+          line_name: isEmulsion || isBatchMix ? "" : set.line?.line_name || "",
+          groupId:
+            isEmulsion || isBatchMix
+              ? set.group?.rm_group_id || null
+              : set.group?.rm_group_id
+                ? [set.group.rm_group_id]
+                : [],
+          Dest: deliveryLocation,
+          Emulsion: emulsion,
+          BatchMix: batchmix,
+          receiver: operator,
+          withdraw: formattedWithdraw,
+          hu: hu,
+          userID: userId,
+          operator: operator,
+          datetime: formattedDateTime,
+          weight: weightPerPlan,
+          level_eu: formattedEuLevel,
+          emu_status: status,
+        };
 
-    return axios.post(url, payload);
-  });
+        return axios.post(url, payload);
+      });
 
-  const responses = await Promise.all(requests);
+      const responses = await Promise.all(requests);
 
-  if (responses.every(res => res.status === 200)) {
-    if (onSuccess) onSuccess();
-    setShowAlert(true);
-    onClose();
-  }
-} catch (error) {
-  console.error("Error during API call:", error);
-  setError("เกิดข้อผิดพลาดในการบันทึกข้อมูลบางส่วน");
-} finally {
-  setIsLoading(false);
-}
+      if (responses.every(res => res.status === 200)) {
+        if (onSuccess) onSuccess();
+        setShowAlert(true);
+        onClose();
+      }
+    } catch (error) {
+      console.error("Error during API call:", error);
+      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูลบางส่วน");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
 
@@ -503,29 +503,38 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
       return false;
     }
 
-    if (!operator || !withdraw || !deliveryLocation || !emulsion || !batchmix) {
+    if (!operator || !withdraw || !deliveryLocation) {
       return false;
     }
 
+    // ถ้าเป็น Emulsion หรือ BatchMix ไม่ต้องเช็ค Plan Sets
+    if (emulsion === "true" || batchmix === "true") {
+      return true;
+    }
 
-    return selectedPlanSets.every(set =>
+    // กรณีปกติต้องมี Plan Sets ครบ
+    return selectedPlanSets.length > 0 && selectedPlanSets.every(set =>
       set.plan && set.line && set.group
     );
   };
   const resetForm = () => {
     setSelectedPlanSets([]);
     setDeliveryLocation("");
-    setemulsion("");
-    setbatchmix("");
+    setemulsion("false");
+    setbatchmix("false");
     setOperator("");
     setWithdraw("");
     setWeighttotal("");
     setEuLevel("-");
     setShowDropdowns(true);
+    setWeightError(false);
+    setErrorMessage("");
+    setSnackbarOpen(false);
   };
 
   const handleSaveSuccess = () => {
     resetForm();
+    setIsConfirmProdOpen(false);
     onClose();
   };
 
@@ -537,13 +546,20 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
       return;
     }
 
-    // ถ้าเป็น Emulsion หรือ BatchMix = true ไม่ต้องเช็ค Plan Sets
-    if ((!emulsion || emulsion !== "true") && (!batchmix || batchmix !== "true") && !isFormComplete()) {
-      setErrorMessage("กรุณากรอกข้อมูลให้ครบทุกชุดแผน");
+    if (!operator || !withdraw || !deliveryLocation) {
+      setErrorMessage("กรุณากรอกข้อมูลให้ครบถ้วน");
       setSnackbarOpen(true);
       return;
     }
 
+    // ถ้าไม่ใช่ Emulsion และไม่ใช่ BatchMix ต้องมี Plan Sets
+    if (emulsion !== "true" && batchmix !== "true") {
+      if (selectedPlanSets.length === 0 || !selectedPlanSets.every(set => set.plan && set.line && set.group)) {
+        setErrorMessage("กรุณากรอกข้อมูลให้ครบทุกชุดแผน");
+        setSnackbarOpen(true);
+        return;
+      }
+    }
 
     setIsConfirmProdOpen(true);
   };
@@ -614,6 +630,7 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
         open={open}
         onClose={(e, reason) => {
           if (reason === 'backdropClick') return;
+          resetForm();
           onClose();
         }}
         maxWidth="md"
@@ -919,7 +936,10 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
             <Button
               variant="outlined"
-              onClick={onClose}
+              onClick={() => {
+                resetForm(); // เพิ่มบรรทัดนี้
+                onClose();
+              }}
               startIcon={<CancelIcon />}
             >
               ยกเลิก
