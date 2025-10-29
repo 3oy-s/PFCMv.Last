@@ -3566,7 +3566,7 @@ module.exports = (io) => {
                 FROM [PFCMv2].[dbo].[RMInTrolley]
                 
             `);
-
+//.
       res.json(result.recordset);
     } catch (err) {
       console.error("SQL error", err);
