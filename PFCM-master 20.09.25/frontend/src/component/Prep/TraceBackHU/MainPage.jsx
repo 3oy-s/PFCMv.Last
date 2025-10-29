@@ -3,7 +3,7 @@ import Buttom from "../../Layout/Buttom";
 import ParentComponent from "./Asset/ParentComponent";
 const API_URL = import.meta.env.VITE_API_URL;
 
-const RM_EMU = () => {
+const TraceBack_HU = () => {
 
   return (
     <div style={{ backgroundColor: "#fff" }} className="flex-1 overflow-auto relative z-10">
@@ -23,4 +23,4 @@ const RM_EMU = () => {
   );
 };
 
-export default RM_EMU;
+export default TraceBack_HU;

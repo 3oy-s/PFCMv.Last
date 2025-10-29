@@ -223,7 +223,8 @@ const Sidebar = () => {
     { name: "จัดการวัตถุดิบ", icon: PiFishSimple, href: "/prep/MatManage/MatManagePage" },
     { name: "วัตถุดิบรอแก้ไข", icon: PiFishLight, href: "/prep/MatRework/MatReworkPage" },
     { name: "กลับมาเตรียม", icon: PiFishFill, href: "/prep/MatImport/MatImportPage" },
-    { name: "รายการผสมวัตถุดิบ", icon: PiFishFill, href: "/prep/RM_EMU" },
+    // { name: "รายการผสมวัตถุดิบ", icon: PiFishFill, href: "/prep/RM_EMU" },
+    { name: "ตรวจสอบ HU", icon: PiFishFill, href: "/prep/TraceBack_HU" },
     { name: "ประวัติ", icon: PiFishFill, href: "/prep/history" },
     ...(showWorkplaceSelector
       ? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/prep/WorkplaceSelector" }]
