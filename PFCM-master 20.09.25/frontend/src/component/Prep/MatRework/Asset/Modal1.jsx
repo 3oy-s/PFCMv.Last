@@ -41,6 +41,7 @@ const Modal1 = ({ open, onClose, onNext, mat, mat_name, batch, production, rmfp_
   const [scannedValue, setScannedValue] = useState('');
   const [inputError, setInputError] = useState(false);
   const [apiError, setApiError] = useState("");
+  const [isEditableUser, setIsEditableUser] = useState(false);
 
   // รีเซ็ตค่า state เมื่อ modal ถูกเปิด
   useEffect(() => {
@@ -51,6 +52,13 @@ const Modal1 = ({ open, onClose, onNext, mat, mat_name, batch, production, rmfp_
       setInputError(false);
     }
   }, [open]);
+
+  useEffect(() => {
+        const storedUser = localStorage.getItem("user_id");
+        const userId = storedUser ? parseInt(storedUser, 10) : null;
+        const allowedUsers = [6590019, 4590390, 6760051];
+        setIsEditableUser(allowedUsers.includes(userId));
+      }, []);
 
   const startCamera = async () => {
     try {
@@ -195,14 +203,38 @@ const Modal1 = ({ open, onClose, onNext, mat, mat_name, batch, production, rmfp_
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <TextField
               fullWidth
-              label="เลขทะเบียนรถเข็น"
+              label={
+                isEditableUser
+                  ? "เลขทะเบียนรถเข็น (สามารถพิมพ์หรือสแกนได้)"
+                  : "เลขทะเบียนรถเข็น (สแกน QR Code หรือ Barcode Scanner)"
+              }
               value={inputValue}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/\D/g, "");
+                const formatted = raw.padStart(4, "0").slice(-4);
+                setInputValue(formatted);
+                setInputError(false);
+              }}
+              onKeyDown={(e) => {
+                if (!isEditableUser && e.key.length === 1) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                if (!isEditableUser) e.preventDefault();
+              }}
               margin="normal"
               size="small"
-              style={{ padding: "0" }}
               error={inputError}
-              InputProps={{
-                readOnly: true, // ทำให้กรอกค่าไม่ได้
+              placeholder={
+                isEditableUser
+                  ? "พิมพ์หรือสแกนหมายเลขรถเข็น"
+                  : "กรุณาสแกน QR Code หรือ Barcode Scanner"
+              }
+              sx={{
+                "& .MuiInputBase-input": {
+                  cursor: isEditableUser ? "text" : "not-allowed",
+                },
               }}
             />
           </Box>

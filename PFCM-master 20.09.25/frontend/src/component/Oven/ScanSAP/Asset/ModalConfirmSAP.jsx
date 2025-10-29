@@ -697,7 +697,7 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
           <Divider sx={{ my: 2 }} />
 
           {/* เลือกประเภทงาน */}
-          <Box sx={{ mb: 2 }}>
+          {/* <Box sx={{ mb: 2 }}>
             <Typography sx={{ mb: 1 }}>กรณีพิเศษ</Typography>
             <FormControlLabel
               control={
@@ -729,7 +729,7 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
               }
               label="ผสม Batch"
             />
-          </Box>
+          </Box> */}
 
           <Divider sx={{ my: 2 }} />
 

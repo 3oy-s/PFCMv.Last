@@ -38,7 +38,7 @@ const Row = ({
   index
 }) => {
   const isOpen = openRowId === row.rmfp_id;
-  const { rmfp_id, stay_place, dest, rm_type_id, oven_to_cold, mapping_id, edit_rework, ...displayRow } = row;
+  const { rmfp_id, stay_place, dest, rm_type_id,tro_id, oven_to_cold, mapping_id, edit_rework, ...displayRow } = row;
   const backgroundColor = index % 2 === 0 ? '#ffffff' : "hsl(210, 100.00%, 88%)";
   
   return (
@@ -76,7 +76,7 @@ const Row = ({
         ))}
         
         {/* Clear Trolley Button */}
-        <CartActionCellclear
+        {/* <CartActionCellclear
           width={CUSTOM_COLUMN_WIDTHS.cart}
           onClick={(e) => {
             e.stopPropagation();
@@ -84,7 +84,7 @@ const Row = ({
           }}
           icon={<LiaShoppingCartSolid style={{ color: '#ff0000ff', fontSize: '25px' }} />}
           backgroundColor={backgroundColor} 
-        />
+        /> */}
         
         {/* Normal Cart Button */}
         <CartActionCell
@@ -97,7 +97,7 @@ const Row = ({
           backgroundColor={backgroundColor}
         />
         
-        <CompleteActionCell
+        {/* <CompleteActionCell
           width={CUSTOM_COLUMN_WIDTHS.complete}
           onClick={(e) => {
             e.stopPropagation();
@@ -105,7 +105,7 @@ const Row = ({
           }}
           icon={<FaRegCheckCircle style={{ color: '#26c200', fontSize: '20px' }} />}
           backgroundColor={backgroundColor}
-        />
+        /> */}
         
         <EditActionCell
           width={CUSTOM_COLUMN_WIDTHS.edit}
@@ -408,24 +408,24 @@ const TableMainPrep = ({
                 <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "160px" }}>
                   <Box style={{ fontSize: '16px', color: '#ffffff' }}>แผนการผลิต</Box>
                 </TableCell>
-                <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "120px" }}>
+                {/* <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "120px" }}>
                   <Box style={{ fontSize: '16px', color: '#ffffff' }}>ป้ายทะเบียน</Box>
-                </TableCell>
+                </TableCell> */}
                 <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderLeft: "0px solid ", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
                   <Box style={{ fontSize: '16px', color: '#ffffff' }}>level Eu</Box>
                 </TableCell>
                 <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "200px" }}>
                   <Box style={{ fontSize: '16px', color: '#ffffff' }}>เวลาต้ม/อบเสร็จ</Box>
                 </TableCell>
-                <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderLeft: "0px solid ", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
+                {/* <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderLeft: "0px solid ", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
                   <Box style={{ fontSize: '16px', color: '#ffffff' }}>เคลียร์รถเข็น</Box>
-                </TableCell>
+                </TableCell> */}
                 <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderLeft: "0px solid ", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
                   <Box style={{ fontSize: '16px', color: '#ffffff' }}>รถเข็น</Box>
                 </TableCell>
-                <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderLeft: "0px solid ", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
+                {/* <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderLeft: "0px solid ", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
                   <Box style={{ fontSize: '16px', color: '#ffffff' }}>ยืนยัน</Box>
-                </TableCell>
+                </TableCell> */}
                 <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTopRightRadius: "8px", borderBottomRightRadius: "8px", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #e0e0e0", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
                   <Box style={{ fontSize: '16px', color: '#ffffff' }}>แก้ไข</Box>
                 </TableCell>

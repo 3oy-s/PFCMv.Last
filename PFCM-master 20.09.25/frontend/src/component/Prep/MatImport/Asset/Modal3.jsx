@@ -205,14 +205,14 @@ finally {
               </Typography>
             )}
 
-            <Typography>ป้ายทะเบียนคันใหม่: {inputValues[0] || "ไม่มีข้อมูล"}</Typography>
-            <Typography>ป้ายทะเบียนคันเก่า: {data?.tro_id || "ข้อมูลไม่พบ"}</Typography>
-            <Typography>Batch ก่อน: {batchBefore || "ยังไม่ได้กำหนด"}</Typography>
-            <Typography>Batch ใหม่: {batchAfter || "ยังไม่ได้กำหนด"}</Typography>
+            <Typography>ป้ายทะเบียน: {inputValues[0] || "ไม่มีข้อมูล"}</Typography>
+            {/* <Typography>ป้ายทะเบียนคันเก่า: {data?.tro_id || "ข้อมูลไม่พบ"}</Typography> */}
+            {/* <Typography>Batch ก่อน: {batchBefore || "ยังไม่ได้กำหนด"}</Typography> */}
+            {/* <Typography>Batch ใหม่: {batchAfter || "ยังไม่ได้กำหนด"}</Typography> */}
             <Typography>น้ำหนักวัตถุดิบ/รถเข็น: {input2?.weightPerCart || "ข้อมูลไม่พบ"}</Typography>
             <Typography>จำนวนถาด: {input2?.numberOfTrays || "ข้อมูลไม่พบ"}</Typography>
             <Typography>ผู้ดำเนินการ: {input2?.operator || "ข้อมูลไม่พบ"}</Typography>
-            <Typography color="rgba(0, 0, 0, 0.6)">User-ID: {userId || "ยังไม่มีข้อมูล"}</Typography>
+            {/* <Typography color="rgba(0, 0, 0, 0.6)">User-ID: {userId || "ยังไม่มีข้อมูล"}</Typography> */}
             <Typography color="rgba(0, 0, 0, 0.6)">เวลาต้ม/อบเสร็จ: {data?.cookedDateTimeNew}</Typography>
             <Typography color="rgba(0, 0, 0, 0.6)">เวลาเตรียมเสร็จ: {data?.preparedDateTimeNew || ""}</Typography>
             <Typography color="rgba(0, 0, 0, 0.6)">
