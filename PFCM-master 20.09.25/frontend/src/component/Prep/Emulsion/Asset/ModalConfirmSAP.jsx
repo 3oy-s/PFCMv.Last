@@ -291,13 +291,13 @@ const ConfirmProdModal = ({
           {level_eu !== "-" && <Typography>Level Eu: {level_eu}</Typography>}
           <Typography>ผู้ดำเนินการ: {operator}</Typography>
           <Typography>สถานที่จัดส่ง: {deliveryLocation}</Typography>
-          <Typography>ผสมวัตถุดิบ ( Loaf ): {emulsion}</Typography>
+        
           {/* <Typography>วันที่เบิก: {new Date(withdraw).toLocaleString()}</Typography> */}
 
           {/* แสดงข้อมูล Emulsion เมื่อมีข้อมูล */}
           {emulsionweightTotal && (
             <Typography sx={{ mt: 1 }}>
-              <strong>น้ำหนักรวม Emulsion: {emulsionweightTotal} กก.</strong>
+              <strong>น้ำหนักรวม: {emulsionweightTotal} กก.</strong>
             </Typography>
           )}
 
@@ -634,7 +634,7 @@ const DataReviewSAP = ({ open, onClose, material, batch, emulsionweightTotal, hu
               {/* แสดงข้อมูล Emulsion ในส่วนข้อมูลพื้นฐาน */}
               {currentEmulsionWeight && (
                 <Typography sx={{ mt: 1, color: 'primary.main', fontWeight: 'bold' }}>
-                  น้ำหนักรวม Emulsion: {currentEmulsionWeight} กก.
+                  น้ำหนักรวม: {currentEmulsionWeight} กก.
                 </Typography>
               )}
 

@@ -9,7 +9,7 @@ const EmulsionPage = () => {
       className="flex-1 overflow-auto relative z-10"
     >
       <main className="max-w-8xl mx-auto py-1 px-1 lg:px-8">
-        <Header title="จัดการวัตถุดิบ" />
+        <Header title="จัดการผสมวัตถุดิบ" />
       </main>
       <main className="max-w-8xl mx-auto py-1 px-1 lg:px-8">
         <ParentComponent />

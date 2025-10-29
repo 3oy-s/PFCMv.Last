@@ -621,11 +621,12 @@ module.exports = (io) => {
             .input("stay_place", stayPlace)
             .input("dest", Dest)
             .input("hu", hu)
+            .input("row_status", "NM")
             .input("level_eu", level_eu !== "-" ? level_eu : null)
             .query(`
-            INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu,hu)
+            INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu,hu,row_status)
             OUTPUT INSERTED.rmfp_id
-            VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @hu)
+            VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @hu,@row_status)
           `);
 
           if (rmfpResult.recordset.length === 0) {
@@ -1158,11 +1159,12 @@ module.exports = (io) => {
           .input("rmfp_line_name", line_name)
           .input("stay_place", "จุดเตรียมรับเข้า")
           .input("dest", Dest)
+          .input("row_status", "M_RM")
           .input("level_eu", level_eu !== "-" ? level_eu : null)
           .query(`
-          INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu)
+          INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu,row_status)
           OUTPUT INSERTED.rmfp_id
-          VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu)
+          VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu,@row_status)
         `);
 
         const RMFP_ID = rmfpResult.recordset[0].rmfp_id;
@@ -1324,11 +1326,12 @@ module.exports = (io) => {
           .input("rmfp_line_name", line_name)
           .input("stay_place", "จุดเตรียมรับเข้า")
           .input("dest", Dest)
+          .input("row_status", "M_B")
           .input("level_eu", level_eu !== "-" ? level_eu : null)
           .query(`
-          INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu)
+          INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu,row_status)
           OUTPUT INSERTED.rmfp_id
-          VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu)
+          VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu,@row_status)
         `);
 
         const RMFP_ID = rmfpResult.recordset[0].rmfp_id;
@@ -1745,6 +1748,8 @@ module.exports = (io) => {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
+
 
   // router.post("/prep/mix/emulsion", async (req, res) => {
   //   const {
@@ -3569,6 +3574,126 @@ module.exports = (io) => {
     }
   });
 
+  router.get("/prep/getRMTraceback", async (req, res) => {
+  try {
+    const pool = await connectToDatabase();
+
+    // 🧩 รวม 3 query เป็น UNION ALL
+    const result = await pool.request().query(`
+      SELECT 
+          tlmp.mapping_id,
+          h.tro_id,
+          rmmb.batch AS batch_begin,
+          rmmb.mat AS mat_begin,
+          rms.mat_name AS mat_name_begin,
+          rmmb.hu,
+          b.batch_before,
+          b.batch_after,
+          rm.mat,
+          rm.mat_name,
+          p.doc_no,
+          tlmp.rmm_line_name
+      FROM [PFCMv2].[dbo].[TrolleyRMMapping] tlmp 
+      JOIN [PFCMv2].[dbo].[RMForProd] rmfp ON tlmp.rmfp_id = rmfp.rmfp_id
+      JOIN [PFCMv2].[dbo].[ProdRawMat] pdrm ON tlmp.tro_production_id = pdrm.prod_rm_id
+      JOIN [PFCMv2].[dbo].[Production] p ON pdrm.prod_id = p.prod_id
+      JOIN [PFCMv2].[dbo].[RawMat] rm ON pdrm.mat = rm.mat
+      JOIN [PFCMv2].[dbo].[Mix_Batch_Prod] mbpd ON rmfp.rmfp_id = mbpd.rmfp_id
+      JOIN [PFCMv2].[dbo].[RMMixBatch] rmmb ON mbpd.rmfbatch_id = rmmb.rmfbatch_id
+      JOIN [PFCMv2].[dbo].[RawMat] rms ON rmmb.mat = rms.mat
+      JOIN [PFCMv2].[dbo].[History] h ON tlmp.mapping_id = h.mapping_id
+      LEFT JOIN [PFCMv2].[dbo].[Batch] b ON tlmp.mapping_id = b.mapping_id
+        AND (rmmb.batch = b.batch_before OR rmmb.batch = b.batch_after)
+      WHERE rmfp.row_status = 'M_B'
+
+      UNION ALL
+
+      SELECT 
+          tlmp.mapping_id,
+          h.tro_id,
+          rmmb.batch AS batch_begin,
+          rmmb.mat AS mat_begin,
+          rms.mat_name AS mat_name_begin,
+          rmmb.hu,
+          b.batch_before,
+          b.batch_after,
+          rm.mat,
+          rm.mat_name,
+          p.doc_no,
+          tlmp.rmm_line_name
+      FROM [PFCMv2].[dbo].[TrolleyRMMapping] tlmp
+      JOIN [PFCMv2].[dbo].[RMForProd] rmfp ON tlmp.rmfp_id = rmfp.rmfp_id
+      JOIN [PFCMv2].[dbo].[ProdRawMat] pdrm ON tlmp.tro_production_id = pdrm.prod_rm_id
+      JOIN [PFCMv2].[dbo].[Production] p ON pdrm.prod_id = p.prod_id
+      JOIN [PFCMv2].[dbo].[RawMat] rm ON pdrm.mat = rm.mat
+      JOIN [PFCMv2].[dbo].[RM_EmuMixed] mbpd ON rmfp.rmfp_id = mbpd.rmfp_id
+      JOIN [PFCMv2].[dbo].[RMForEmu] rmmb ON mbpd.rmfemu_id = rmmb.rmfemu_id
+      JOIN [PFCMv2].[dbo].[RawMat] rms ON rmmb.mat = rms.mat
+      JOIN [PFCMv2].[dbo].[History] h ON tlmp.mapping_id = h.mapping_id
+      LEFT JOIN [PFCMv2].[dbo].[Batch] b ON tlmp.mapping_id = b.mapping_id
+      WHERE rmfp.row_status = 'M_RM'
+
+      UNION ALL
+
+      SELECT 
+          tlmp.mapping_id,
+          h.tro_id,
+          rmfp.batch AS batch_begin,
+          rm.mat AS mat_begin,
+          rm.mat_name AS mat_name_begin,
+          rmfp.hu,
+          b.batch_before,
+          b.batch_after,
+          rm.mat,
+          rm.mat_name,
+          p.doc_no,
+          tlmp.rmm_line_name
+      FROM [PFCMv2].[dbo].[TrolleyRMMapping] tlmp
+      JOIN [PFCMv2].[dbo].[RMForProd] rmfp ON tlmp.rmfp_id = rmfp.rmfp_id
+      JOIN [PFCMv2].[dbo].[ProdRawMat] pdrm ON tlmp.tro_production_id = pdrm.prod_rm_id
+      JOIN [PFCMv2].[dbo].[Production] p ON pdrm.prod_id = p.prod_id
+      JOIN [PFCMv2].[dbo].[RawMat] rm ON pdrm.mat = rm.mat
+      JOIN [PFCMv2].[dbo].[History] h ON tlmp.mapping_id = h.mapping_id
+      LEFT JOIN [PFCMv2].[dbo].[Batch] b ON tlmp.mapping_id = b.mapping_id
+      WHERE rmfp.row_status = 'NM'
+    `);
+
+    const rows = result.recordset;
+
+    // 🧩 จัดกลุ่มข้อมูลตาม mapping_id
+    const grouped = Object.values(
+      rows.reduce((acc, row) => {
+        if (!acc[row.mapping_id]) {
+          acc[row.mapping_id] = {
+            mapping_id: row.mapping_id,
+            tro_id: row.tro_id,
+            mat: row.mat,
+            mat_name: row.mat_name,
+            doc_no: row.doc_no,
+            rmm_line_name: row.rmm_line_name,
+            traceback: [],
+          };
+        }
+        acc[row.mapping_id].traceback.push({
+          batch_begin: row.batch_begin,
+          hu: row.hu,
+          mat_begin: row.mat_begin,
+          mat_name_begin: row.mat_name_begin,
+          batch_before: row.batch_before,
+          batch_after: row.batch_after,
+        });
+        return acc;
+      }, {})
+    );
+
+    res.json(grouped);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
   router.get("/prep/matimport/fetchRMForProd", async (req, res) => {
     try {
       const { rm_type_ids } = req.query;
@@ -3613,11 +3738,11 @@ module.exports = (io) => {
       JOIN
         History htr ON rmm.mapping_id = htr.mapping_id
       LEFT JOIN
-        Batch b ON rmm.mapping_id = b.mapping_id  -- ✅ เพิ่ม join batch
+        Batch b ON rmm.mapping_id = b.mapping_id  
       WHERE 
         rmm.stay_place IN ('ออกห้องเย็น', 'หม้ออบ', 'จุดเตรียม')
         AND rmm.dest = 'จุดเตรียม'
-        AND rmm.rm_status IN ('QcCheck รอกลับมาเตรียม', 'QcCheck รอ MD', 'รอกลับมาเตรียม', 'รอ Qc')
+        AND rmm.rm_status IN ('QcCheck รอกลับมาเตรียม', 'QcCheck รอ MD', 'รอกลับมาเตรียม', 'รอ Qc','QcCheck')
         AND rmf.rm_group_id = rmg.rm_group_id
         AND rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')})
       GROUP BY
@@ -4860,7 +4985,7 @@ module.exports = (io) => {
       WHERE 
         rmm.stay_place IN ('ออกห้องเย็น' ,'หม้ออบ','จุดเตรียม')
         AND rmm.dest = 'จุดเตรียม'
-        AND rmm.rm_status IN ('QcCheck รอกลับมาเตรียม','QcCheck รอ MD','รอกลับมาเตรียม','รอ Qc')
+        AND rmm.rm_status IN ('QcCheck รอกลับมาเตรียม','QcCheck รอ MD','รอกลับมาเตรียม','รอ Qc','QcCheck')
         AND rmf.rm_group_id = rmg.rm_group_id
         AND rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')})
       GROUP BY
