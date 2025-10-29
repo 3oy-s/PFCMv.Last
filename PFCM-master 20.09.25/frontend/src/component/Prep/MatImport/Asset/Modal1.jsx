@@ -33,7 +33,7 @@ const CloseButton = styled(IconButton)(({ theme }) => ({
   color: theme.palette.grey[600],
 }));
 
-const Modal1 = ({ open, onClose, onNext, mat, mat_name, batch, production, rmfp_id, dest, rm_type_id, mapping_id, tro_id }) => {
+const Modal1 = ({ open, onClose, onNext, mat, mat_name, batch, batch_after, production, rmfp_id, dest, rm_type_id, mapping_id, tro_id }) => {
   const [rmTypeId, setRmTypeId] = useState(rm_type_id ?? 3);
   const theme = useTheme();
   const videoRef = useRef(null);
@@ -41,9 +41,11 @@ const Modal1 = ({ open, onClose, onNext, mat, mat_name, batch, production, rmfp_
   const [inputValue, setInputValue] = useState('');
   const [scannedValue, setScannedValue] = useState('');
   const [inputError, setInputError] = useState(false);
+  const [canManualInput, setCanManualInput] = useState(false);
   const [apiError, setApiError] = useState("");
   const [batchInput, setBatchInput] = useState(batch || "");
   const [batchError, setBatchError] = useState(false);
+  const [displayBatch, setDisplayBatch] = useState('');
 
   // Define which rm_type_ids require batch input
   const requiresBatchInput = [3, 6, 7, 8].includes(rm_type_id);
@@ -108,14 +110,43 @@ const Modal1 = ({ open, onClose, onNext, mat, mat_name, batch, production, rmfp_
   };
 
   useEffect(() => {
+    const userId = localStorage.getItem('user_id');
+    console.log('user_id from localStorage:', userId);
+    console.log('Type:', typeof userId);
+
+    if (userId) {
+      const isAllowed = userId === '6760051' || userId === 6760051;
+      console.log('canManualInput:', isAllowed);
+      setCanManualInput(isAllowed);
+    } else {
+      console.log('No user_id in localStorage');
+      setCanManualInput(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      // ตรวจสอบว่า batch_after เป็น array หรือไม่
+      const batchValue = Array.isArray(batch_after)
+        ? (batch_after.length > 0 ? batch_after[0] : 'ไม่มีข้อมูล')
+        : (batch_after || 'ไม่มีข้อมูล');
+
+      setDisplayBatch(batchValue);
+    }
+  }, [open, batch_after]);
+
+  useEffect(() => {
     if (open) {
       if (requiresBatchInput) {
         setBatchInput('');
       } else {
-        setBatchInput(batch || 'ไม่มีข้อมูล');
+        const batchValue = Array.isArray(batch_after)
+          ? (batch_after.length > 0 ? batch_after[0] : 'ไม่มีข้อมูล')
+          : (batch_after || 'ไม่มีข้อมูล');
+        setBatchInput(batchValue);
       }
     }
-  }, [open, batch, rm_type_id, requiresBatchInput]);
+  }, [open, batch_after, rm_type_id, requiresBatchInput]);
 
   useEffect(() => {
     if (open) startCamera();
@@ -207,7 +238,7 @@ const Modal1 = ({ open, onClose, onNext, mat, mat_name, batch, production, rmfp_
             กรุณากรอกข้อมูลหรือสแกนป้ายทะเบียน
           </Typography>
           <Typography sx={{ fontSize: "18px", fontWeight: 500, color: "#545454", marginBottom: "10px" }}>
-            Old Batch: {batch || "ไม่มีข้อมูล"}
+            Old Batch: {displayBatch || "ไม่มีข้อมูล"}
           </Typography>
           {inputError && <Alert severity="error" sx={{ mb: 2 }}>กรุณากรอกข้อมูลหรือสแกนป้ายทะเบียน</Alert>}
           {batchError && <Alert severity="error" sx={{ mb: 2 }}>กรุณากรอก Batch ใหม่ให้ครบ 10 ตัวอักษร</Alert>}
@@ -258,8 +289,10 @@ const Modal1 = ({ open, onClose, onNext, mat, mat_name, batch, production, rmfp_
               <Button
                 variant="contained"
                 onClick={() => {
-                  // Also convert existing batch to uppercase when resetting
-                  setBatchInput(batch ? batch.toUpperCase() : '');
+                  const batchValue = Array.isArray(batch_after)
+                    ? (batch_after.length > 0 ? batch_after[0].toUpperCase() : '')
+                    : (batch_after ? batch_after.toUpperCase() : '');
+                  setBatchInput(batchValue);
                   setBatchError(false);
                 }}
                 sx={{
@@ -301,12 +334,21 @@ const Modal1 = ({ open, onClose, onNext, mat, mat_name, batch, production, rmfp_
               fullWidth
               label="เลขทะเบียนรถเข็น"
               value={inputValue}
+              onChange={(e) => {
+                if (canManualInput) {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  const formatted = raw.padStart(4, "0").slice(-4);
+                  setInputValue(formatted);
+                  setInputError(false);
+                  setApiError('');
+                }
+              }}
               margin="normal"
               size="small"
               style={{ padding: "0" }}
               error={inputError}
               InputProps={{
-                readOnly: true, // ทำให้กรอกค่าไม่ได้
+                readOnly: !canManualInput,
               }}
             />
           </Box>

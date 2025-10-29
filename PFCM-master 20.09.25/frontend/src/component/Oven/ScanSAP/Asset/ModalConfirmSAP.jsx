@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import {
   Modal,
@@ -9,6 +8,7 @@ import {
   Stack,
   TextField,
   RadioGroup,
+  Checkbox,
   FormControlLabel,
   Radio,
   Dialog,
@@ -156,6 +156,8 @@ const ConfirmProdModal = ({
   batch,
   selectedPlanSets,
   deliveryLocation,
+  emulsion,
+  batchmix,
   operator,
   weighttotal,
   level_eu,
@@ -172,31 +174,56 @@ const ConfirmProdModal = ({
     currentDateTime.setHours(currentDateTime.getHours() + 7);
     const formattedDateTime = currentDateTime.toISOString();
 
-    // ไม่ต้องบวก 7 ชั่วโมงสำหรับ withdraw เพราะระบบส่งค่าเป็นเวลาไทยอยู่แล้ว
     const formattedWithdraw = formatCookedDateTime(withdraw, false);
 
-    const weightPerPlan = parseFloat(weighttotal) / selectedPlanSets.length;
+    const weightPerPlan = parseFloat(weighttotal) / (selectedPlanSets.length || 1);
 
     const formattedEuLevel = level_eu === "NULL" ? null : level_eu !== "" ? `Eu ${level_eu}` : "-";
+
     try {
       setIsLoading(true);
-      const requests = selectedPlanSets.map(set => {
+
+      // เลือก URL ตามเงื่อนไข
+      const url =
+        batchmix === "true"
+          ? `${API_URL}/api/oven/saveRMMixBatch/for/BatchMIX`
+          : emulsion === "true"
+            ? `${API_URL}/api/oven/saveRMForEmu/for/emulsion`
+            : `${API_URL}/api/oven/saveRMForProd`;
+
+      // กำหนด request data ตามกรณี
+      const requests = (
+        batchmix === "true"
+          ? [{}] // BatchMix จะไม่ใช้ plan sets
+          : emulsion === "true"
+            ? [{}] // Emulsion ไม่มี plan sets
+            : selectedPlanSets
+      ).map(set => {
+        const isEmulsion = emulsion === "true";
+        const isBatchMix = batchmix === "true";
+
         const payload = {
           mat: material,
           batch: batch,
-          productId: set.plan.prod_id,
-          line_name: set.line.line_name,
-          groupId: [set.group.rm_group_id],
+          productId: isEmulsion || isBatchMix ? null : set.plan?.prod_id,
+          line_name: isEmulsion || isBatchMix ? "" : set.line?.line_name || "",
+          groupId: isEmulsion || isBatchMix
+            ? (set.group?.rm_group_id ? [set.group.rm_group_id] : [])
+            : set.group?.rm_group_id
+              ? [set.group.rm_group_id]
+              : [],
           Dest: deliveryLocation,
+          Emulsion: emulsion,
+          BatchMix: batchmix,
           receiver: operator,
           withdraw: formattedWithdraw,
           userID: userId,
           operator: operator,
           datetime: formattedDateTime,
           weight: weightPerPlan,
-          level_eu: formattedEuLevel, // ใช้ค่าที่เพิ่ม "Eu" แล้ว
+          level_eu: formattedEuLevel,
         };
-        return axios.post(`${API_URL}/api/oven/saveRMForProd`, payload);
+        return axios.post(url, payload);
       });
 
       const responses = await Promise.all(requests);
@@ -216,12 +243,10 @@ const ConfirmProdModal = ({
   const formatCookedDateTime = (dateTimeString, shouldAddHours = true) => {
     const date = new Date(dateTimeString);
 
-    // บวก 7 ชั่วโมงเฉพาะเมื่อจำเป็น (สำหรับ cooked datetime)
     if (shouldAddHours) {
       date.setHours(date.getHours() + 7);
     }
 
-    // สร้างรูปแบบ "YYYY-MM-DD HH:MM:SS" สำหรับ SQL
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -325,6 +350,8 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
   const [materialName, setMaterialName] = useState("");
   const [production, setProduction] = useState([]);
   const [deliveryLocation, setDeliveryLocation] = useState("");
+  const [emulsion, setemulsion] = useState("false");
+  const [batchmix, setbatchmix] = useState("false");
   const [weighttotal, setWeighttotal] = useState("");
   const [withdraw, setWithdraw] = useState("");
   const [group, setGroup] = useState([]);
@@ -338,8 +365,8 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
   const [showDropdowns, setShowDropdowns] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState(null);
-  const [level_eu, setEuLevel] = useState("");  // Changed from "-" to empty string
-  const [canSelectEu, setCanSelectEu] = useState(false);  // Added state to track if EU level can be selected
+  const [level_eu, setEuLevel] = useState("");
+  const [canSelectEu, setCanSelectEu] = useState(false);
 
 
   useEffect(() => {
@@ -378,7 +405,6 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
         const allowedTypes = [3, 6, 7, 8];
         setCanSelectEu(allowedTypes.includes(rmTypeId));
 
-        // Reset EU level to default if not selectable
         if (!allowedTypes.includes(rmTypeId)) {
           setEuLevel("");
         }
@@ -478,7 +504,7 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
 
   const euOptions = [
     { value: "", label: "" },
-    { value: "NULL", label: "-" }, // เพิ่มตัวเลือกเครื่องหมาย "-"
+    { value: "NULL", label: "-" },
     ...Array.from({ length: 10 }, (_, i) => ({
       value: (i + 1).toString(),
       label: (i + 1).toString()
@@ -494,9 +520,13 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
       return false;
     }
 
-    // กรณีที่ต้องเลือก EU แต่ยังไม่ได้เลือก
     if (canSelectEu && !level_eu) {
       return false;
+    }
+
+    // ถ้าเป็น Emulsion หรือ BatchMix ไม่ต้องเช็ค Plan Sets
+    if (emulsion === "true" || batchmix === "true") {
+      return true;
     }
 
     return selectedPlanSets.every(set =>
@@ -507,10 +537,12 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
   const resetForm = () => {
     setSelectedPlanSets([]);
     setDeliveryLocation("");
+    setemulsion("false");
+    setbatchmix("false");
     setOperator("");
     setWithdraw("");
     setWeighttotal("");
-    setEuLevel("");  // Reset to empty string
+    setEuLevel("");
     setShowDropdowns(true);
   };
 
@@ -533,10 +565,19 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
       return;
     }
 
-    if (!isFormComplete()) {
-      setErrorMessage("กรุณากรอกข้อมูลให้ครบทุกชุดแผน");
+    if (!operator || !withdraw || !deliveryLocation) {
+      setErrorMessage("กรุณากรอกข้อมูลให้ครบถ้วน");
       setSnackbarOpen(true);
       return;
+    }
+
+    // ถ้าไม่ใช่ Emulsion และไม่ใช่ BatchMix ต้องมี Plan Sets
+    if (emulsion !== "true" && batchmix !== "true") {
+      if (!isFormComplete()) {
+        setErrorMessage("กรุณากรอกข้อมูลให้ครบทุกชุดแผน");
+        setSnackbarOpen(true);
+        return;
+      }
     }
 
     setIsConfirmProdOpen(true);
@@ -638,124 +679,153 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
 
           <Divider sx={{ my: 2 }} />
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="subtitle1">แผนการผลิต</Typography>
-            <Box>
-              <IconButton onClick={toggleDropdowns} size="small" sx={{ mr: 1 }}>
-                <VisibilityIcon color={showDropdowns ? "primary" : "action"} />
-              </IconButton>
-              <Button
-                onClick={addNewPlanSet}
-                startIcon={<AddIcon />}
-                variant="outlined"
-                size="small"
-              >
-                เพิ่มแผน
-              </Button>
-            </Box>
-          </Box>
-
-          <Box sx={{
-            maxHeight: '400px',
-            overflow: 'auto',
-            mb: 2,
-            '&::-webkit-scrollbar': {
-              width: '10px',
-            },
-            '&::-webkit-scrollbar-track': {
-              backgroundColor: '#f1f1f1',
-            },
-            '&::-webkit-scrollbar-thumb': {
-              backgroundColor: '#888',
-              borderRadius: '5px',
-            },
-          }}>
-            {selectedPlanSets.map((set, index) => (
-              <Box
-                key={index}
-                sx={{
-                  mb: 2,
-                  p: 2,
-                  border: '1px solid #eee',
-                  borderRadius: 1,
-                  backgroundColor: '#f9f9f9'
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography><strong>ชุดที่ {index + 1}</strong></Typography>
-                  <Button
-                    onClick={() => handleRequestDelete(index)}
-                    startIcon={<DeleteIcon />}
-                    color="error"
-                    size="small"
-                  >
-                    ลบ
-                  </Button>
-                </Box>
-
-                {showDropdowns && (
-                  <>
-                    <Box sx={{ display: 'flex', gap: 2, mb: 2, flexDirection: { xs: 'column', md: 'row' } }}>
-                      <Autocomplete
-                        sx={{ flex: 2 }}
-                        options={production}
-                        getOptionLabel={(option) => `${option.code} (${option.doc_no})`}
-                        value={set.plan}
-                        onChange={(e, newValue) => updatePlanSet(index, 'plan', newValue)}
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            label="แผนการผลิต"
-                            size="small"
-                            fullWidth
-                            required
-                          />
-                        )}
-                      />
-
-                      <Autocomplete
-                        sx={{ flex: 1 }}
-                        options={set.plan?.line_type_id ? (allLinesByType[set.plan.line_type_id] || []) : []}
-                        getOptionLabel={(option) => option.line_name}
-                        value={set.line}
-                        onChange={(e, newValue) => updatePlanSet(index, 'line', newValue)}
-                        renderInput={(params) => (
-                          <TextField {...params} label="เลือกไลน์ผลิต" size="small" fullWidth required />
-                        )}
-                        disabled={!set.plan}
-                      />
-                    </Box>
-
-                    <Autocomplete
-                      options={group}
-                      getOptionLabel={(option) => option.rm_group_name}
-                      value={set.group}
-                      onChange={(e, newValue) => updatePlanSet(index, 'group', newValue)}
-                      renderInput={(params) => (
-                        <TextField {...params} label="กลุ่มเวลาการผลิต" size="small" fullWidth required />
-                      )}
-                      disabled={!set.plan}
-                    />
-                  </>
-                )}
-
-                {!showDropdowns && set.plan && (
-                  <Box>
-                    <Typography>
-                      {set.plan.code} ({set.plan.doc_no}) - {set.line?.line_name || 'ยังไม่ได้เลือกไลน์'}
-                    </Typography>
-                    {set.group && (
-                      <Typography sx={{ color: 'text.secondary' }}>
-                        - {set.group.rm_group_name}
-                      </Typography>
-                    )}
-                  </Box>
-                )}
-              </Box>
-            ))}
+          {/* เลือกประเภทงาน */}
+          <Box sx={{ mb: 2 }}>
+            <Typography sx={{ mb: 1 }}>กรณีพิเศษ</Typography>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={emulsion === "true"}
+                  onChange={(e) => setemulsion(e.target.checked ? "true" : "false")}
+                />
+              }
+              label="ผสมวัตถุดิบ"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={batchmix === "true"}
+                  onChange={(e) => setbatchmix(e.target.checked ? "true" : "false")}
+                />
+              }
+              label="ผสม Batch"
+            />
           </Box>
 
           <Divider sx={{ my: 2 }} />
+
+          {emulsion === "false" && batchmix === "false" && (
+            <>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1">แผนการผลิต</Typography>
+                <Box>
+                  <IconButton onClick={toggleDropdowns} size="small" sx={{ mr: 1 }}>
+                    <VisibilityIcon color={showDropdowns ? "primary" : "action"} />
+                  </IconButton>
+                  <Button
+                    onClick={addNewPlanSet}
+                    startIcon={<AddIcon />}
+                    variant="outlined"
+                    size="small"
+                  >
+                    เพิ่มแผน
+                  </Button>
+                </Box>
+              </Box>
+
+              <Box sx={{
+                maxHeight: '400px',
+                overflow: 'auto',
+                mb: 2,
+                '&::-webkit-scrollbar': {
+                  width: '10px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  backgroundColor: '#f1f1f1',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: '#888',
+                  borderRadius: '5px',
+                },
+              }}>
+                {selectedPlanSets.map((set, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      mb: 2,
+                      p: 2,
+                      border: '1px solid #eee',
+                      borderRadius: 1,
+                      backgroundColor: '#f9f9f9'
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography><strong>ชุดที่ {index + 1}</strong></Typography>
+                      <Button
+                        onClick={() => handleRequestDelete(index)}
+                        startIcon={<DeleteIcon />}
+                        color="error"
+                        size="small"
+                      >
+                        ลบ
+                      </Button>
+                    </Box>
+
+                    {showDropdowns && (
+                      <>
+                        <Box sx={{ display: 'flex', gap: 2, mb: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+                          <Autocomplete
+                            sx={{ flex: 2 }}
+                            options={production}
+                            getOptionLabel={(option) => `${option.code} (${option.doc_no})`}
+                            value={set.plan}
+                            onChange={(e, newValue) => updatePlanSet(index, 'plan', newValue)}
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                label="แผนการผลิต"
+                                size="small"
+                                fullWidth
+                                required
+                              />
+                            )}
+                          />
+
+                          <Autocomplete
+                            sx={{ flex: 1 }}
+                            options={set.plan?.line_type_id ? (allLinesByType[set.plan.line_type_id] || []) : []}
+                            getOptionLabel={(option) => option.line_name}
+                            value={set.line}
+                            onChange={(e, newValue) => updatePlanSet(index, 'line', newValue)}
+                            renderInput={(params) => (
+                              <TextField {...params} label="เลือกไลน์ผลิต" size="small" fullWidth required />
+                            )}
+                            disabled={!set.plan}
+                          />
+                        </Box>
+
+                        <Autocomplete
+                          options={group}
+                          getOptionLabel={(option) => option.rm_group_name}
+                          value={set.group}
+                          onChange={(e, newValue) => updatePlanSet(index, 'group', newValue)}
+                          renderInput={(params) => (
+                            <TextField {...params} label="กลุ่มเวลาการผลิต" size="small" fullWidth required />
+                          )}
+                          disabled={!set.plan}
+                        />
+                      </>
+                    )}
+
+                    {!showDropdowns && set.plan && (
+                      <Box>
+                        <Typography>
+                          {set.plan.code} ({set.plan.doc_no}) - {set.line?.line_name || 'ยังไม่ได้เลือกไลน์'}
+                        </Typography>
+                        {set.group && (
+                          <Typography sx={{ color: 'text.secondary' }}>
+                            - {set.group.rm_group_name}
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+
+              <Divider sx={{ my: 2 }} />
+            </>
+          )}
 
           <Box sx={{ mb: 2 }}>
             <Typography sx={{ mb: 1 }}>วันที่เบิกวัตถุดิบจากห้องเย็นใหญ่</Typography>
@@ -771,8 +841,8 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
                     }
                     setWithdraw(newValue?.toISOString() || "");
                   }}
-                  maxDateTime={dayjs()} // ห้ามเลือกเวลาในอนาคต
-                  ampm={false} // ใช้รูปแบบ 24 ชั่วโมง (ไม่มี AM/PM)
+                  maxDateTime={dayjs()}
+                  ampm={false}
                   timeSteps={{ minutes: 1 }}
                   slotProps={{
                     textField: {
@@ -787,7 +857,7 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
                 variant="outlined"
                 onClick={() => {
                   const now = new Date();
-                  now.setHours(now.getHours() + 7); // เวลาไทย
+                  now.setHours(now.getHours() + 7);
                   const formattedDateTime = now.toISOString().slice(0, 16);
                   setWithdraw(formattedDateTime);
                 }}
@@ -854,10 +924,12 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
         batch={batch}
         selectedPlanSets={selectedPlanSets.filter(set => set.plan && set.line && set.group)}
         deliveryLocation={deliveryLocation}
+        emulsion={emulsion}
+        batchmix={batchmix}
         operator={operator}
         withdraw={withdraw}
         weighttotal={weighttotal}
-        level_eu={level_eu}  // Pass EU level to confirm modal
+        level_eu={level_eu}
         isLoading={isLoading}
         setIsLoading={setIsLoading}
         onSuccess={handleSaveSuccess}
