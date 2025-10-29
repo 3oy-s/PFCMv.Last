@@ -186,32 +186,27 @@ const ConfirmProdModal = ({
       // เลือก URL ตามเงื่อนไข
       const url =
         batchmix === "true"
-          ? `${API_URL}/api/oven/saveRMMixBatch/for/BatchMIX`
+          ? `${API_URL}/api/prep/saveRMMixBatch/for/BatchMIX`
           : emulsion === "true"
-            ? `${API_URL}/api/oven/saveRMForEmu/for/emulsion`
+            ? `${API_URL}/api/prep/saveRMForEmu/for/emulsion`
             : `${API_URL}/api/oven/saveRMForProd`;
 
       // กำหนด request data ตามกรณี
-      const requests = (
-        batchmix === "true"
-          ? [{}] // BatchMix จะไม่ใช้ plan sets
-          : emulsion === "true"
-            ? [{}] // Emulsion ไม่มี plan sets
-            : selectedPlanSets
-      ).map(set => {
-        const isEmulsion = emulsion === "true";
-        const isBatchMix = batchmix === "true";
+      const isEmulsion = emulsion === "true";
+      const isBatchMix = batchmix === "true";
 
+      // สำหรับ Emulsion/BatchMix ถ้าไม่มี plans ให้สร้าง dummy set
+      const planSetsToProcess = (isEmulsion || isBatchMix) && selectedPlanSets.length === 0
+        ? [{ group: null }]
+        : selectedPlanSets;
+
+      const requests = planSetsToProcess.map(set => {
         const payload = {
           mat: material,
           batch: batch,
           productId: isEmulsion || isBatchMix ? null : set.plan?.prod_id,
           line_name: isEmulsion || isBatchMix ? "" : set.line?.line_name || "",
-          groupId: isEmulsion || isBatchMix
-            ? (set.group?.rm_group_id ? [set.group.rm_group_id] : [])
-            : set.group?.rm_group_id
-              ? [set.group.rm_group_id]
-              : [],
+          groupId: set.group?.rm_group_id || null,
           Dest: deliveryLocation,
           Emulsion: emulsion,
           BatchMix: batchmix,
@@ -234,7 +229,7 @@ const ConfirmProdModal = ({
       }
     } catch (error) {
       console.error("Error during API call:", error);
-      setError("เกิดข้อผิดพลาดในการบันทึกข้อมูลบางส่วน");
+      setError(error.response?.data?.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
     } finally {
       setIsLoading(false);
     }
@@ -294,7 +289,7 @@ const ConfirmProdModal = ({
             <Typography>Material Name: {materialName}</Typography>
             <Typography>Batch: {batch}</Typography>
             <Typography>น้ำหนักรวม: {weighttotal} กก.</Typography>
-            {level_eu !== "" && <Typography>Level Eu : {level_eu}</Typography>}
+            {level_eu !== "" && <Typography>Level Eu: {level_eu}</Typography>}
 
             <Typography>วันที่เวลาเบิก: {new Date(withdraw).toLocaleString('th-TH')}</Typography>
             <Typography>ผู้ดำเนินการ: {operator}</Typography>
@@ -302,14 +297,30 @@ const ConfirmProdModal = ({
           </Box>
 
           <Box sx={{ maxHeight: '400px', overflow: 'auto', mb: 2 }}>
-            {selectedPlanSets.map((set, index) => (
-              <Box key={index} sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 1 }}>
-                <Typography><strong>ชุดที่ {index + 1}:</strong></Typography>
-                <Typography>แผน: {set.plan.code} ({set.plan.doc_no})</Typography>
-                <Typography>ไลน์ผลิต: {set.line.line_name}</Typography>
-                <Typography>กลุ่มเวลา: {set.group.rm_group_name}</Typography>
+            {emulsion === "true" || batchmix === "true" ? (
+              <Box sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 1, backgroundColor: '#f0f8ff' }}>
+                <Typography><strong>ประเภทงาน:</strong></Typography>
+                <Typography>
+                  {emulsion === "true" ? "ผสมวัตถุดิบ (Emulsion)" : "ผสม Batch (BatchMix)"}
+                </Typography>
+                {selectedPlanSets.length > 0 && selectedPlanSets.map((set, index) => (
+                  set.group && (
+                    <Typography key={index} sx={{ mt: 1 }}>
+                      กลุ่มเวลา {index + 1}: {set.group.rm_group_name}
+                    </Typography>
+                  )
+                ))}
               </Box>
-            ))}
+            ) : (
+              selectedPlanSets.map((set, index) => (
+                <Box key={index} sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 1 }}>
+                  <Typography><strong>ชุดที่ {index + 1}:</strong></Typography>
+                  <Typography>แผน: {set.plan.code} ({set.plan.doc_no})</Typography>
+                  <Typography>ไลน์ผลิต: {set.line.line_name}</Typography>
+                  <Typography>กลุ่มเวลา: {set.group.rm_group_name}</Typography>
+                </Box>
+              ))
+            )}
           </Box>
 
           {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
@@ -367,7 +378,6 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
   const [planToDelete, setPlanToDelete] = useState(null);
   const [level_eu, setEuLevel] = useState("");
   const [canSelectEu, setCanSelectEu] = useState(false);
-
 
   useEffect(() => {
     if (material) {
@@ -468,7 +478,7 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
   const handleRequestDelete = (index) => {
     const planName = selectedPlanSets[index].plan
       ? `${selectedPlanSets[index].plan.code} (${selectedPlanSets[index].plan.doc_no})`
-      : null;
+      : `กลุ่มที่ ${index + 1}`;
     setPlanToDelete({ index, planName });
     setDeleteDialogOpen(true);
   };
@@ -524,15 +534,18 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
       return false;
     }
 
-    // ถ้าเป็น Emulsion หรือ BatchMix ไม่ต้องเช็ค Plan Sets
+    // ถ้าเป็น Emulsion หรือ BatchMix ไม่ต้องมี plan set ก็ผ่านได้
     if (emulsion === "true" || batchmix === "true") {
       return true;
     }
 
-    return selectedPlanSets.every(set =>
-      set.plan && set.line && set.group
+    // ถ้าเป็นการผลิตปกติ ต้องมี plan, line, และ group ครบ
+    return (
+      selectedPlanSets.length > 0 &&
+      selectedPlanSets.every(set => set.plan && set.line && set.group)
     );
   };
+
 
   const resetForm = () => {
     setSelectedPlanSets([]);
@@ -550,7 +563,6 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
     resetForm();
     onClose();
   };
-
 
   const handleConfirm = () => {
     if (!weighttotal || isNaN(parseFloat(weighttotal)) || parseFloat(weighttotal) <= 0) {
@@ -571,17 +583,22 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
       return;
     }
 
-    // ถ้าไม่ใช่ Emulsion และไม่ใช่ BatchMix ต้องมี Plan Sets
-    if (emulsion !== "true" && batchmix !== "true") {
-      if (!isFormComplete()) {
-        setErrorMessage("กรุณากรอกข้อมูลให้ครบทุกชุดแผน");
-        setSnackbarOpen(true);
-        return;
-      }
+    // ถ้าเป็น Emulsion หรือ BatchMix ไม่ต้องเช็ก plan set หรือ group
+    if (emulsion === "true" || batchmix === "true") {
+      setIsConfirmProdOpen(true);
+      return;
+    }
+
+    // ถ้าเป็นการผลิตปกติ ต้องมี plan, line, group ครบ
+    if (!isFormComplete()) {
+      setErrorMessage("กรุณากรอกข้อมูลให้ครบทุกชุดแผน");
+      setSnackbarOpen(true);
+      return;
     }
 
     setIsConfirmProdOpen(true);
   };
+
 
   const toggleDropdowns = () => {
     setShowDropdowns(!showDropdowns);
@@ -686,7 +703,13 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
               control={
                 <Checkbox
                   checked={emulsion === "true"}
-                  onChange={(e) => setemulsion(e.target.checked ? "true" : "false")}
+                  onChange={(e) => {
+                    setemulsion(e.target.checked ? "true" : "false");
+                    if (e.target.checked) {
+                      setbatchmix("false");
+                      setSelectedPlanSets([]);
+                    }
+                  }}
                 />
               }
               label="ผสมวัตถุดิบ"
@@ -695,7 +718,13 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
               control={
                 <Checkbox
                   checked={batchmix === "true"}
-                  onChange={(e) => setbatchmix(e.target.checked ? "true" : "false")}
+                  onChange={(e) => {
+                    setbatchmix(e.target.checked ? "true" : "false");
+                    if (e.target.checked) {
+                      setemulsion("false");
+                      setSelectedPlanSets([]);
+                    }
+                  }}
                 />
               }
               label="ผสม Batch"
@@ -704,8 +733,10 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
 
           <Divider sx={{ my: 2 }} />
 
+          {/* แสดง UI ตามประเภทงาน */}
           {emulsion === "false" && batchmix === "false" && (
             <>
+              {/* แผนการผลิต */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="subtitle1">แผนการผลิต</Typography>
                 <Box>
@@ -728,14 +759,17 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
                 overflow: 'auto',
                 mb: 2,
                 '&::-webkit-scrollbar': {
-                  width: '10px',
+                  width: '17px',
                 },
                 '&::-webkit-scrollbar-track': {
                   backgroundColor: '#f1f1f1',
                 },
                 '&::-webkit-scrollbar-thumb': {
                   backgroundColor: '#888',
-                  borderRadius: '5px',
+                  borderRadius: '10px',
+                },
+                '&::-webkit-scrollbar-thumb:hover': {
+                  backgroundColor: '#555',
                 },
               }}>
                 {selectedPlanSets.map((set, index) => (
@@ -827,6 +861,8 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
             </>
           )}
 
+          <Divider sx={{ my: 2 }} />
+
           <Box sx={{ mb: 2 }}>
             <Typography sx={{ mb: 1 }}>วันที่เบิกวัตถุดิบจากห้องเย็นใหญ่</Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
@@ -867,7 +903,6 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
               </Button>
             </Box>
           </Box>
-
 
           <Box sx={{ mb: 2 }}>
             <Typography sx={{ mb: 1 }}>สถานที่จัดส่ง</Typography>
@@ -922,7 +957,9 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
         material={material}
         materialName={materialName}
         batch={batch}
-        selectedPlanSets={selectedPlanSets.filter(set => set.plan && set.line && set.group)}
+        selectedPlanSets={selectedPlanSets.filter(set =>
+          emulsion === "true" || batchmix === "true" ? set.group : (set.plan && set.line && set.group)
+        )}
         deliveryLocation={deliveryLocation}
         emulsion={emulsion}
         batchmix={batchmix}
