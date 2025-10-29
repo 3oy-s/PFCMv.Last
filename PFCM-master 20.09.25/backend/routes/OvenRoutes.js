@@ -122,136 +122,169 @@ WHERE
 
 
   router.post("/oven/saveRMForProd", async (req, res) => {
-    const { mat, batch, productId, line_name, groupId, weight, operator, withdraw, datetime: receiveDT, Receiver, userID, Dest, level_eu } = req.body;
+    const {
+      mat,
+      batch,
+      productId,
+      line_name,
+      groupId = [],   // default เป็น empty array
+      weight,
+      operator,
+      withdraw,
+      datetime: receiveDT,
+      receiver,
+      userID,
+      Dest,
+      level_eu,
+      emulsion = "false",
+      batchmix = "false"
+    } = req.body;
 
-    if (Array.isArray(groupId) && groupId.length > 0) {
-      let transaction;
-      let timeoutHandle;
+    // Validation field พื้นฐาน
+    if (!weight || isNaN(parseFloat(weight)) || parseFloat(weight) <= 0) {
+      return res.status(400).json({ success: false, message: "กรุณากรอกน้ำหนักที่ถูกต้อง" });
+    }
 
-      try {
-        const pool = await connectToDatabase();
-        transaction = await pool.transaction();
-        await transaction.begin();
+    if (!operator || !withdraw || !Dest || !receiver) {
+      return res.status(400).json({ success: false, message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
+    }
 
-        // กำหนด timeout rollback อัตโนมัติ (เช่น 10 วินาที)
-        const TIMEOUT_MS = 10000;
-        timeoutHandle = setTimeout(async () => {
-          if (transaction) {
-            console.log("Transaction timeout - ทำการ rollback อัตโนมัติ");
-            await transaction.rollback();
-          }
-        }, TIMEOUT_MS);
+    if (canSelectEu && (!level_eu || level_eu === "")) {
+      return res.status(400).json({ success: false, message: "กรุณาเลือกระดับ EU" });
+    }
 
-        // ดึงค่า prod_rm_id จากฐานข้อมูล
-        const result = await transaction.request()
-          .input("productId", productId)
-          .input("mat", mat)
-          .query(`
-          SELECT prod_rm_id
-          FROM ProdRawMat
-          WHERE prod_Id = @productId AND mat = @mat
-        `);
-
-        if (result.recordset.length === 0) {
-          throw new Error("ไม่พบข้อมูล prod_rm_id สำหรับ productId และ mat ที่ระบุ");
-        }
-
-        const ProdrmID = result.recordset[0].prod_rm_id;
-
-        const insertRMForProd = async (groupID, stayPlace) => {
-          for (let i = 0; i < groupID.length; i++) {
-            const rmfpResult = await transaction.request()
-              .input("prod_rm_id", ProdrmID)
-              .input("rm_group_id", groupID[i])
-              .input("batch", batch)
-              .input("weight", weight)
-              .input("stay_place", stayPlace)
-              .input("dest", Dest)
-              .input("rmfp_line_name", line_name)
-              .input("level_eu", level_eu !== "-" ? level_eu : null)
-              .query(`
-              INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu)
-              OUTPUT INSERTED.rmfp_id
-              VALUES (@prod_rm_id, @batch,  @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu)
-            `);
-
-            if (!rmfpResult.recordset || rmfpResult.recordset.length === 0) {
-              throw new Error(`ไม่สามารถ insert RMForProd สำหรับ groupId ${groupID[i]}`);
-            }
-
-            const RMFP_ID = rmfpResult.recordset[0].rmfp_id;
-
-            const SELECT_Production = await transaction.request()
-              .input("rmfp_id", RMFP_ID)
-              .query(`
-              SELECT CONCAT(p.doc_no, ' (', rmfp_line_name, ')') AS production
-              FROM RMForProd rmf
-              JOIN ProdRawMat pr ON rmf.prod_rm_id = pr.prod_rm_id
-              JOIN RawMat rm ON pr.mat = rm.mat
-              JOIN Production p ON pr.prod_id = p.prod_id
-              WHERE rmfp_id = @rmfp_id
-            `);
-
-            if (!SELECT_Production.recordset || SELECT_Production.recordset.length === 0) {
-              throw new Error(`ไม่พบ production สำหรับ rmfp_id ${RMFP_ID}`);
-            }
-
-            const production = SELECT_Production.recordset[0].production;
-
-            const historyResult = await transaction.request()
-              .input("receiver", Receiver)
-              .input("withdraw", withdraw)
-              .input("cooked_date", receiveDT)
-              .input("first_prod", production)
-              .query(`
-              INSERT INTO History (receiver, withdraw_date, cooked_date, first_prod)
-              OUTPUT INSERTED.hist_id
-              VALUES (@receiver, @withdraw, @cooked_date, @first_prod)
-            `);
-
-            if (!historyResult.recordset || historyResult.recordset.length === 0) {
-              throw new Error(`ไม่สามารถ insert History สำหรับ RMFP_ID ${RMFP_ID}`);
-            }
-
-            const histID = historyResult.recordset[0].hist_id;
-
-            const updateResult = await transaction.request()
-              .input("hist_id", histID)
-              .input("rmfp_id", RMFP_ID)
-              .query(`
-              UPDATE RMForProd 
-              SET hist_id_rmfp = @hist_id
-              WHERE rmfp_id = @rmfp_id
-            `);
-
-            if (updateResult.rowsAffected[0] !== 1) {
-              throw new Error(`ไม่สามารถอัปเดต RMForProd ด้วย hist_id สำหรับ rmfp_id ${RMFP_ID}`);
-            }
-          }
-        };
-
-        if (Dest === "เข้าห้องเย็น-รอรถเข็น" || Dest === "ไปจุดเตรียม") {
-          await insertRMForProd(groupId, "หม้ออบ");
-        } else if (Dest === "จุดเตรียม") {
-          await insertRMForProd(groupId, "จุดเตรียมรับเข้า");
-        }
-
-        await transaction.commit();
-        clearTimeout(timeoutHandle); // ยกเลิก timeout เมื่อ commit สำเร็จ
-        res.json({ success: true, message: "บันทึกข้อมูลการแสกนเสร็จสิ้น" });
-      } catch (err) {
-        if (transaction) {
-          await transaction.rollback();
-          console.log("Rollback transaction เนื่องจากเกิดข้อผิดพลาด");
-        }
-        if (timeoutHandle) clearTimeout(timeoutHandle);
-        console.error("SQL error", err);
-        res.status(500).json({ success: false, error: err.message });
+    // Validation groupId เฉพาะกรณี **ไม่ใช่ emulsion/batchmix**
+    if (!(emulsion === "true" || batchmix === "true")) {
+      if (!Array.isArray(groupId) || groupId.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "groupId ต้องเป็น array และมีข้อมูลอย่างน้อย 1 รายการ"
+        });
       }
-    } else {
-      res.status(400).json({ success: false, message: "groupId ไม่ถูกต้อง" });
+    }
+
+    let transaction;
+    let timeoutHandle;
+
+    try {
+      const pool = await connectToDatabase();
+      transaction = await pool.transaction();
+      await transaction.begin();
+
+      const TIMEOUT_MS = 10000;
+      timeoutHandle = setTimeout(async () => {
+        if (transaction) {
+          console.log("Transaction timeout - ทำการ rollback อัตโนมัติ");
+          try { await transaction.rollback(); } catch (err) { console.error(err); }
+        }
+      }, TIMEOUT_MS);
+
+      // ดึง prod_rm_id
+      const result = await transaction.request()
+        .input("productId", productId)
+        .input("mat", mat)
+        .query(`
+        SELECT prod_rm_id
+        FROM ProdRawMat
+        WHERE prod_Id = @productId AND mat = @mat
+      `);
+
+      if (result.recordset.length === 0) {
+        throw new Error("ไม่พบข้อมูล prod_rm_id สำหรับ productId และ mat ที่ระบุ");
+      }
+
+      const ProdrmID = result.recordset[0].prod_rm_id;
+
+      // ฟังก์ชัน insert RMForProd (เฉพาะกรณีมี groupId)
+      const insertRMForProd = async (groupID, stayPlace) => {
+        if (!groupID || groupID.length === 0) return; // skip ถ้า empty (emulsion/batchmix)
+
+        for (let i = 0; i < groupID.length; i++) {
+          if (!groupID[i]) throw new Error(`groupId ที่ตำแหน่ง ${i} ไม่ถูกต้อง`);
+
+          const rmfpResult = await transaction.request()
+            .input("prod_rm_id", ProdrmID)
+            .input("rm_group_id", groupID[i])
+            .input("batch", batch)
+            .input("weight", weight)
+            .input("stay_place", stayPlace)
+            .input("dest", Dest)
+            .input("rmfp_line_name", line_name)
+            .input("level_eu", level_eu !== "-" ? level_eu : null)
+            .query(`
+            INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu)
+            OUTPUT INSERTED.rmfp_id
+            VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu)
+          `);
+
+          const RMFP_ID = rmfpResult.recordset[0].rmfp_id;
+
+          const SELECT_Production = await transaction.request()
+            .input("rmfp_id", RMFP_ID)
+            .query(`
+            SELECT CONCAT(p.doc_no, ' (', rmfp_line_name, ')') AS production
+            FROM RMForProd rmf
+            JOIN ProdRawMat pr ON rmf.prod_rm_id = pr.prod_rm_id
+            JOIN RawMat rm ON pr.mat = rm.mat
+            JOIN Production p ON pr.prod_id = p.prod_id
+            WHERE rmfp_id = @rmfp_id
+          `);
+
+          const production = SELECT_Production.recordset[0].production;
+
+          const historyResult = await transaction.request()
+            .input("receiver", receiver)
+            .input("withdraw", withdraw)
+            .input("cooked_date", receiveDT)
+            .input("first_prod", production)
+            .query(`
+            INSERT INTO History (receiver, withdraw_date, cooked_date, first_prod)
+            OUTPUT INSERTED.hist_id
+            VALUES (@receiver, @withdraw, @cooked_date, @first_prod)
+          `);
+
+          const histID = historyResult.recordset[0].hist_id;
+
+          await transaction.request()
+            .input("hist_id", histID)
+            .input("rmfp_id", RMFP_ID)
+            .query(`
+            UPDATE RMForProd 
+            SET hist_id_rmfp = @hist_id
+            WHERE rmfp_id = @rmfp_id
+          `);
+        }
+      };
+
+      // เลือก stayPlace ตาม Dest
+      let stayPlace;
+      if (Dest === "เข้าห้องเย็น-รอรถเข็น" || Dest === "ไปจุดเตรียม") {
+        stayPlace = "หม้ออบ";
+      } else if (Dest === "จุดเตรียม") {
+        stayPlace = "จุดเตรียมรับเข้า";
+      } else {
+        throw new Error("สถานที่จัดส่ง (Dest) ไม่ถูกต้อง");
+      }
+
+      // เรียก insert RMForProd เฉพาะกรณีไม่ใช่ emulsion/batchmix หรือ groupId มีค่า
+      await insertRMForProd(groupId, stayPlace);
+
+      await transaction.commit();
+      clearTimeout(timeoutHandle);
+
+      res.json({ success: true, message: "บันทึกข้อมูลการแสกนเสร็จสิ้น" });
+
+    } catch (err) {
+      if (transaction) {
+        try { await transaction.rollback(); console.log("Rollback transaction เนื่องจากเกิดข้อผิดพลาด"); }
+        catch (rollbackErr) { console.error("Error during rollback:", rollbackErr); }
+      }
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+      console.error("SQL error", err);
+      res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดในการบันทึกข้อมูล", error: err.message });
     }
   });
+
 
   router.get("/oven/toCold/fetchRMForProd", async (req, res) => {
     try {
@@ -309,54 +342,68 @@ WHERE
       mat,
       batch,
       line_name,
-      Emulsion,
-      groupId,
+      Emulsion = "false",
+      groupId = [],
       weight,
       operator,
       withdraw,
       datetime: receiveDT,
-      Receiver,
+      receiver,
       userID,
       Dest,
-      level_eu,
+      level_eu = null, // ✅ ถ้าไม่ได้ส่งมาเป็น null
       emu_status
     } = req.body;
+
+    // Validation field พื้นฐาน
+    if (!weight || isNaN(parseFloat(weight)) || parseFloat(weight) <= 0) {
+      return res.status(400).json({ success: false, message: "กรุณากรอกน้ำหนักที่ถูกต้อง" });
+    }
+
+    if (!operator || !withdraw || !Dest || !receiver) {
+      return res.status(400).json({ success: false, message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
+    }
+
+    // Validation groupId เฉพาะกรณีไม่ใช่ emulsion
+    if (Emulsion !== "true") {
+      if (!Array.isArray(groupId) || groupId.length === 0) {
+        return res.status(400).json({ success: false, message: "groupId ไม่ถูกต้อง หรือไม่ได้ส่งมา" });
+      }
+    }
 
     let transaction;
     let timeoutHandle;
 
     try {
-      // ✅ เชื่อมต่อ DB และเริ่ม transaction
       const pool = await connectToDatabase();
       transaction = await pool.transaction();
       await transaction.begin();
 
-      // ✅ กำหนด timeout rollback อัตโนมัติ (10 วินาที)
       const TIMEOUT_MS = 10000;
       timeoutHandle = setTimeout(async () => {
         if (transaction) {
           console.log("Transaction timeout - ทำการ rollback อัตโนมัติ");
-          await transaction.rollback();
+          try { await transaction.rollback(); } catch (err) { console.error(err); }
         }
       }, TIMEOUT_MS);
 
-      // ✅ ฟังก์ชัน insert
       const insertRMForEmu = async (groupID, stayPlace) => {
-        // ถ้า groupID ไม่ใช่ array ให้ห่อเป็น array
         const groupArr = Array.isArray(groupID) ? groupID : [groupID];
 
+        if (!groupArr || groupArr.length === 0 || groupArr.every(v => !v)) return;
+
         for (let i = 0; i < groupArr.length; i++) {
-          // ✅ Insert RMForEmu
-          const rmfemuResult = await transaction
-            .request()
+          if (!groupArr[i]) continue; // skip null/undefined
+
+          const rmfemuResult = await transaction.request()
             .input("rm_group_id", groupArr[i])
             .input("batch", batch)
             .input("mat", mat)
             .input("weight", weight)
-            .input("rmfp_line_name", line_name)
+            .input("rmfp_line_name", line_name || "")
             .input("stay_place", stayPlace)
             .input("dest", Dest)
-            .input("level_eu", level_eu !== "-" ? level_eu : null)
+            .input("level_eu", level_eu !== "-" ? level_eu : null) // ✅ ส่ง null ถ้าไม่มีค่า
             .input("emu_status", emu_status || "1")
             .query(`
             INSERT INTO RMForEmu (mat, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu, emu_status)
@@ -364,16 +411,10 @@ WHERE
             VALUES (@mat, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @emu_status)
           `);
 
-          if (!rmfemuResult.recordset || rmfemuResult.recordset.length === 0) {
-            throw new Error(`ไม่สามารถ insert RMForEmu สำหรับ groupId ${groupArr[i]}`);
-          }
-
           const RMFEMU_ID = rmfemuResult.recordset[0].rmfemu_id;
 
-          // ✅ Insert History
-          const historyResult = await transaction
-            .request()
-            .input("receiver", Receiver)
+          const historyResult = await transaction.request()
+            .input("receiver", receiver)
             .input("withdraw", withdraw)
             .input("cooked_date", receiveDT)
             .input("first_prod", "Emulsion")
@@ -383,15 +424,9 @@ WHERE
             VALUES (@receiver, @withdraw, @cooked_date, @first_prod)
           `);
 
-          if (!historyResult.recordset || historyResult.recordset.length === 0) {
-            throw new Error(`ไม่สามารถ insert History สำหรับ RMFEMU_ID ${RMFEMU_ID}`);
-          }
-
           const histID = historyResult.recordset[0].hist_id;
 
-          // ✅ Update RMForEmu ด้วย hist_id
-          const updateResult = await transaction
-            .request()
+          await transaction.request()
             .input("hist_id", histID)
             .input("rmfemu_id", RMFEMU_ID)
             .query(`
@@ -399,88 +434,91 @@ WHERE
             SET hist_id_rmfemu = @hist_id
             WHERE rmfemu_id = @rmfemu_id
           `);
-
-          if (updateResult.rowsAffected[0] !== 1) {
-            throw new Error(`ไม่สามารถอัปเดต RMForEmu ด้วย hist_id สำหรับ rmfemu_id ${RMFEMU_ID}`);
-          }
         }
       };
 
-      // ✅ เรียกใช้ insertRMForEmu ตามเงื่อนไข Oven
-      if (Dest === "เข้าห้องเย็น-รอรถเข็น" || Dest === "ไปจุดเตรียม") {
-        await insertRMForEmu(groupId, "หม้ออบ");
-      } else if (Dest === "จุดเตรียม") {
-        await insertRMForEmu(groupId, "จุดเตรียมรับเข้า");
-      }
+      let stayPlace;
+      if (Dest === "เข้าห้องเย็น-รอรถเข็น" || Dest === "ไปจุดเตรียม") stayPlace = "หม้ออบ";
+      else if (Dest === "จุดเตรียม") stayPlace = "จุดเตรียมรับเข้า";
+      else throw new Error("สถานที่จัดส่ง (Dest) ไม่ถูกต้อง");
 
-      // ✅ commit transaction ถ้าทุกอย่างผ่าน
+      await insertRMForEmu(groupId, stayPlace);
+
       await transaction.commit();
-      clearTimeout(timeoutHandle); // ยกเลิก timeout เมื่อ commit สำเร็จ
+      clearTimeout(timeoutHandle);
 
-      // ✅ Response
       res.json({ success: true, message: "บันทึกข้อมูลการสแกนเสร็จสิ้น" });
 
     } catch (err) {
-      if (transaction) {
-        await transaction.rollback();
-        console.log("Rollback transaction เนื่องจากเกิดข้อผิดพลาด");
-      }
+      if (transaction) { try { await transaction.rollback(); console.log("Rollback transaction"); } catch (e) { console.error(e); } }
       if (timeoutHandle) clearTimeout(timeoutHandle);
-      console.error("SQL error", err);
-      res.status(500).json({ success: false, error: err.message });
+      console.error(err);
+      res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดในการบันทึกข้อมูล", error: err.message });
     }
   });
+
+
 
   router.post("/oven/saveRMMixBatch/for/BatchMIX", async (req, res) => {
     const {
       mat,
       batch,
       line_name,
-      groupId,
+      BatchMix = "false",
+      groupId = [],
       weight,
       operator,
       withdraw,
       datetime: receiveDT,
-      Receiver,
+      receiver,
       userID,
       Dest,
-      level_eu
+      level_eu = null // ✅ ถ้าไม่ได้ส่งมาเป็น null
     } = req.body;
+
+    if (!weight || isNaN(parseFloat(weight)) || parseFloat(weight) <= 0) {
+      return res.status(400).json({ success: false, message: "กรุณากรอกน้ำหนักที่ถูกต้อง" });
+    }
+
+    if (!operator || !withdraw || !Dest || !receiver) {
+      return res.status(400).json({ success: false, message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
+    }
+
+    if (BatchMix !== "true") {
+      if (!Array.isArray(groupId) || groupId.length === 0) {
+        return res.status(400).json({ success: false, message: "groupId ไม่ถูกต้อง หรือไม่ได้ส่งมา" });
+      }
+    }
 
     let transaction;
     let timeoutHandle;
 
     try {
-      // ✅ เริ่มการเชื่อมต่อและ transaction
       const pool = await connectToDatabase();
       transaction = await pool.transaction();
       await transaction.begin();
 
-      // ✅ กำหนด timeout rollback อัตโนมัติ (10 วินาที)
       const TIMEOUT_MS = 10000;
       timeoutHandle = setTimeout(async () => {
-        if (transaction) {
-          console.log("Transaction timeout - ทำการ rollback อัตโนมัติ");
-          await transaction.rollback();
-        }
+        if (transaction) { try { await transaction.rollback(); } catch (e) { console.error(e); } }
       }, TIMEOUT_MS);
 
-      // ✅ ฟังก์ชัน insert
       const insertRMMixBatch = async (groupID, stayPlace) => {
         const groupArr = Array.isArray(groupID) ? groupID : [groupID];
+        if (!groupArr || groupArr.length === 0 || groupArr.every(v => !v)) return;
 
         for (let i = 0; i < groupArr.length; i++) {
-          // ✅ Insert RMMixBatch
-          const rmmbatchResult = await transaction
-            .request()
+          if (!groupArr[i]) continue; // ✅ skip element ที่ null/undefined
+
+          const rmmbatchResult = await transaction.request()
             .input("rm_group_id", groupArr[i])
             .input("batch", batch)
             .input("mat", mat)
             .input("weight", weight)
-            .input("rmfp_line_name", line_name)
+            .input("rmfp_line_name", line_name || "")
             .input("stay_place", stayPlace)
             .input("dest", Dest)
-            .input("level_eu", level_eu !== "-" ? level_eu : null)
+            .input("level_eu", level_eu !== "-" ? level_eu : null) // ✅ ส่ง null ถ้าไม่มีค่า
             .input("b_status", "1")
             .query(`
             INSERT INTO RMMixBatch (mat, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu, b_status)
@@ -488,16 +526,10 @@ WHERE
             VALUES (@mat, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu, @b_status)
           `);
 
-          if (!rmmbatchResult.recordset || rmmbatchResult.recordset.length === 0) {
-            throw new Error(`ไม่สามารถ insert RMMixBatch สำหรับ groupId ${groupArr[i]}`);
-          }
-
           const RMFBATCH_ID = rmmbatchResult.recordset[0].rmfbatch_id;
 
-          // ✅ Insert History
-          const historyResult = await transaction
-            .request()
-            .input("receiver", Receiver)
+          const historyResult = await transaction.request()
+            .input("receiver", receiver)
             .input("withdraw", withdraw)
             .input("cooked_date", receiveDT)
             .input("first_prod", "BatchMix")
@@ -507,15 +539,9 @@ WHERE
             VALUES (@receiver, @withdraw, @cooked_date, @first_prod)
           `);
 
-          if (!historyResult.recordset || historyResult.recordset.length === 0) {
-            throw new Error(`ไม่สามารถ insert History สำหรับ RMFBATCH_ID ${RMFBATCH_ID}`);
-          }
-
           const histID = historyResult.recordset[0].hist_id;
 
-          // ✅ Update RMMixBatch ด้วย hist_id
-          const updateResult = await transaction
-            .request()
+          await transaction.request()
             .input("hist_id", histID)
             .input("rmfbatch_id", RMFBATCH_ID)
             .query(`
@@ -523,37 +549,30 @@ WHERE
             SET hist_id_rmfbatch = @hist_id
             WHERE rmfbatch_id = @rmfbatch_id
           `);
-
-          if (updateResult.rowsAffected[0] !== 1) {
-            throw new Error(`ไม่สามารถอัปเดต RMMixBatch ด้วย hist_id สำหรับ rmfbatch_id ${RMFBATCH_ID}`);
-          }
         }
       };
 
-      // ✅ เรียกใช้ insertRMMixBatch ตามเงื่อนไข Oven
-      if (Dest === "เข้าห้องเย็น-รอรถเข็น" || Dest === "ไปจุดเตรียม") {
-        await insertRMMixBatch(groupId, "หม้ออบ");
-      } else if (Dest === "จุดเตรียม") {
-        await insertRMMixBatch(groupId, "จุดเตรียมรับเข้า");
-      }
+      let stayPlace;
+      if (Dest === "เข้าห้องเย็น-รอรถเข็น" || Dest === "ไปจุดเตรียม") stayPlace = "หม้ออบ";
+      else if (Dest === "จุดเตรียม") stayPlace = "จุดเตรียมรับเข้า";
+      else throw new Error("สถานที่จัดส่ง (Dest) ไม่ถูกต้อง");
 
-      // ✅ commit transaction
+      await insertRMMixBatch(groupId, stayPlace);
+
       await transaction.commit();
-      clearTimeout(timeoutHandle); // ยกเลิก timeout เมื่อ commit สำเร็จ
+      clearTimeout(timeoutHandle);
 
-      // ✅ ส่ง response
       res.json({ success: true, message: "บันทึกข้อมูลการสแกน Batch เสร็จสิ้น" });
 
     } catch (err) {
-      if (transaction) {
-        await transaction.rollback();
-        console.log("Rollback transaction เนื่องจากเกิดข้อผิดพลาด");
-      }
+      if (transaction) { try { await transaction.rollback(); } catch (e) { console.error(e); } }
       if (timeoutHandle) clearTimeout(timeoutHandle);
-      console.error("SQL error", err);
-      res.status(500).json({ success: false, error: err.message });
+      console.error(err);
+      res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดในการบันทึกข้อมูล", error: err.message });
     }
   });
+
+
 
 
   router.post("/oven/toCold/saveTrolley", async (req, res) => {
