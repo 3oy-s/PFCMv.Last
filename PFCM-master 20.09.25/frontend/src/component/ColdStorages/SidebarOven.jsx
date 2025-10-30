@@ -96,9 +96,9 @@ const SIDEBAR_ITEMS = [
   { name: "หน้าหลัก", icon: GoHomeFill, href: "/ColdStorages" },
   { name: "Scan SAP", icon: LuScanBarcode, href: "/ColdStorages/products" },
 
- ...(showWorkplaceSelector
-    ? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/ColdStorages/WorkplaceSelector" }]
-    : []),
+//  ...(showWorkplaceSelector
+//     ? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/ColdStorages/WorkplaceSelector" }]
+//     : []),
 
   // { name: "ประวัติต้ม/อบเสร็จ", icon: VscHistory, href: "/oven/analytics" },
   // { 

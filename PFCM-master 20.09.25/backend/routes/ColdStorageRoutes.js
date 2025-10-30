@@ -981,61 +981,70 @@ module.exports = (io) => {
             }
 
             // ดึงข้อมูลวัตถุดิบปกติ
-            const normalRawMatQuery = `
-            SELECT 
-                rmm.mapping_id,
-                rmm.tro_id,
-                rmm.rmfp_id,
-                b.batch_after AS batch,
-                rm.mat_name,
-                rm.mat,
-                CONCAT(p.doc_no, '(', rmm.rmm_line_name, ')') AS production,
-                rmm.weight_RM,
-                rmm.tray_count,
-                rmm.rm_status,
-                rmm.dest,
-                s.slot_id,
-                cs.cs_id,
-                cs.cs_name,
-                h.cooked_date,
-                h.rmit_date,
-                CONVERT(VARCHAR, h.come_cold_date, 120) AS come_cold_date,
-                CONVERT(VARCHAR, h.come_cold_date_two, 120) AS come_cold_date_two,
-                CONVERT(VARCHAR, h.come_cold_date_three, 120) AS come_cold_date_three,
-                FORMAT(rmm.cold_time, 'N2') AS cold_time,
-                FORMAT(rmm.rework_time, 'N2') AS rework_time,
-                FORMAT(rmg.cold, 'N2') AS standard_cold,
-                FORMAT(rmg.rework, 'N2') AS standard_rework,
-                0 AS isMixed -- ระบุว่าไม่ใช่วัตถุดิบผสม
-            FROM 
-                TrolleyRMMapping rmm
-            JOIN 
-                RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
-            JOIN 
-                ProdRawMat prm ON prm.prod_rm_id = rmm.tro_production_id
-            JOIN 
-                RawMat rm ON rm.mat = prm.mat
-            JOIN
-                batch b ON rmm.batch_id = b.batch_id
-            JOIN
-                Qc q ON rmm.qc_id = q.qc_id
-            JOIN 
-                Production p ON p.prod_id = prm.prod_id
-            JOIN
-                RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
-            JOIN
-                History h ON rmm.mapping_id = h.mapping_id
-            JOIN
-                Slot s ON rmm.tro_id = s.tro_id
-            JOIN
-                ColdStorage cs ON s.cs_id = cs.cs_id
-            WHERE
-                rmm.tro_id != @current_tro_id
-                AND rmm.dest = 'ห้องเย็น'
-                AND rmm.stay_place = 'เข้าห้องเย็น'
-                AND rmm.weight_RM > 0
-                AND rmm.tro_id IS NOT NULL
-        `;
+            // แก้ไข JOIN กับ batch table ให้ใช้ subquery ที่รวม batch_after หลายค่าเข้าด้วยกัน
+const normalRawMatQuery = `
+SELECT 
+    rmm.mapping_id,
+    rmm.tro_id,
+    rmm.rmfp_id,
+    b.batch_combined AS batch,  -- เปลี่ยนจาก batch_after เป็น batch_combined
+    rm.mat_name,
+    rm.mat,
+    CONCAT(p.doc_no, '(', rmm.rmm_line_name, ')') AS production,
+    rmm.weight_RM,
+    rmm.tray_count,
+    rmm.rm_status,
+    rmm.dest,
+    s.slot_id,
+    cs.cs_id,
+    cs.cs_name,
+    h.cooked_date,
+    h.rmit_date,
+    CONVERT(VARCHAR, h.come_cold_date, 120) AS come_cold_date,
+    CONVERT(VARCHAR, h.come_cold_date_two, 120) AS come_cold_date_two,
+    CONVERT(VARCHAR, h.come_cold_date_three, 120) AS come_cold_date_three,
+    FORMAT(rmm.cold_time, 'N2') AS cold_time,
+    FORMAT(rmm.rework_time, 'N2') AS rework_time,
+    FORMAT(rmg.cold, 'N2') AS standard_cold,
+    FORMAT(rmg.rework, 'N2') AS standard_rework,
+    0 AS isMixed
+FROM 
+    TrolleyRMMapping rmm
+JOIN 
+    RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
+JOIN 
+    ProdRawMat prm ON prm.prod_rm_id = rmm.tro_production_id
+JOIN 
+    RawMat rm ON rm.mat = prm.mat
+JOIN (
+    -- Subquery ที่รวม batch_after หลายค่าเข้าด้วยกันด้วย STRING_AGG
+    SELECT 
+        mapping_id,
+        STRING_AGG(batch_after, ', ') AS batch_combined
+    FROM 
+        batch
+    GROUP BY 
+        mapping_id
+) b ON rmm.mapping_id = b.mapping_id
+JOIN
+    Qc q ON rmm.qc_id = q.qc_id
+JOIN 
+    Production p ON p.prod_id = prm.prod_id
+JOIN
+    RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
+JOIN
+    History h ON rmm.mapping_id = h.mapping_id
+JOIN
+    Slot s ON rmm.tro_id = s.tro_id
+JOIN
+    ColdStorage cs ON s.cs_id = cs.cs_id
+WHERE
+    rmm.tro_id != @current_tro_id
+    AND rmm.dest = 'ห้องเย็น'
+    AND rmm.stay_place = 'เข้าห้องเย็น'
+    AND rmm.weight_RM > 0
+    AND rmm.tro_id IS NOT NULL
+`;
 
             // ดึงข้อมูลวัตถุดิบผสม
             const mixedRawMatQuery = `
