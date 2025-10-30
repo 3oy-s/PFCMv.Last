@@ -78,9 +78,9 @@ const SIDEBAR_ITEMS = [
     // ],
   },
   
-   ...(showWorkplaceSelector
-      ? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/coldStorage/WorkplaceSelector" }]
-      : []),
+  //  ...(showWorkplaceSelector
+  //     ? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/coldStorage/WorkplaceSelector" }]
+  //     : []),
   
   { name: "ออกจากระบบ", icon: TbLogout2, href: "/logout" },
   

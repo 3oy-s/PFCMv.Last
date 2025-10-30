@@ -151,6 +151,7 @@ const ConfirmProdModal = ({
   open,
   onClose,
   material,
+  hu,
   materialName,
   withdraw,
   batch,
@@ -170,70 +171,63 @@ const ConfirmProdModal = ({
   const [error, setError] = useState(null);
 
   const handleConfirm = async () => {
-    const currentDateTime = new Date();
-    currentDateTime.setHours(currentDateTime.getHours() + 7);
-    const formattedDateTime = currentDateTime.toISOString();
+  const currentDateTime = new Date();
+  currentDateTime.setHours(currentDateTime.getHours() + 7);
+  const formattedDateTime = currentDateTime.toISOString();
+  const formattedWithdraw = formatCookedDateTime(withdraw, false);
+  const weightPerPlan = parseFloat(weighttotal) / (selectedPlanSets.length || 1);
+  const formattedEuLevel = level_eu === "NULL" ? null : level_eu !== "" ? `Eu ${level_eu}` : "-";
 
-    const formattedWithdraw = formatCookedDateTime(withdraw, false);
+  // สร้าง dummy plan ถ้าไม่มี
+  const planSetsToSend = selectedPlanSets && selectedPlanSets.length > 0 
+    ? selectedPlanSets 
+    : [{ plan: null, line: null, group: null }];
 
-    const weightPerPlan = parseFloat(weighttotal) / (selectedPlanSets.length || 1);
+  try {
+    setIsLoading(true);
 
-    const formattedEuLevel = level_eu === "NULL" ? null : level_eu !== "" ? `Eu ${level_eu}` : "-";
+    const url = `${API_URL}/api/oven/saveRMForProd`;
 
-    try {
-      setIsLoading(true);
-
-      // เลือก URL ตามเงื่อนไข
-      const url =
-        batchmix === "true"
-          ? `${API_URL}/api/prep/saveRMMixBatch/for/BatchMIX`
-          : emulsion === "true"
-            ? `${API_URL}/api/prep/saveRMForEmu/for/emulsion`
-            : `${API_URL}/api/oven/saveRMForProd`;
-
-      // กำหนด request data ตามกรณี
-      const isEmulsion = emulsion === "true";
-      const isBatchMix = batchmix === "true";
-
-      // สำหรับ Emulsion/BatchMix ถ้าไม่มี plans ให้สร้าง dummy set
-      const planSetsToProcess = (isEmulsion || isBatchMix) && selectedPlanSets.length === 0
-        ? [{ group: null }]
-        : selectedPlanSets;
-
-      const requests = planSetsToProcess.map(set => {
-        const payload = {
-          mat: material,
-          batch: batch,
-          productId: isEmulsion || isBatchMix ? null : set.plan?.prod_id,
-          line_name: isEmulsion || isBatchMix ? "" : set.line?.line_name || "",
-          groupId: set.group?.rm_group_id || null,
-          Dest: deliveryLocation,
-          Emulsion: emulsion,
-          BatchMix: batchmix,
-          receiver: operator,
-          withdraw: formattedWithdraw,
-          userID: userId,
-          operator: operator,
-          datetime: formattedDateTime,
-          weight: weightPerPlan,
-          level_eu: formattedEuLevel,
-        };
-        return axios.post(url, payload);
-      });
-
-      const responses = await Promise.all(requests);
-      if (responses.every(res => res.status === 200)) {
-        if (onSuccess) onSuccess();
-        setShowAlert(true);
-        onClose();
-      }
-    } catch (error) {
-      console.error("Error during API call:", error);
-      setError(error.response?.data?.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
-    } finally {
-      setIsLoading(false);
-    }
+const requests = planSetsToSend.map(set => {
+  const payload = {
+    mat: material,
+    batch: batch,
+    productId: set.plan?.prod_id || null,
+    line_name: set.line?.line_name || "",
+    groupId: set.group ? [set.group?.rm_group_id] : [],  // <-- แก้ตรงนี้
+    Dest: deliveryLocation,
+    Emulsion: "false",
+    BatchMix: "false",
+    receiver: operator,
+    hu: hu,
+    withdraw: formattedWithdraw,
+    userID: userId,
+    operator: operator,
+    datetime: formattedDateTime,
+    weight: weightPerPlan,
+    level_eu: formattedEuLevel,
   };
+
+  console.log("Payload to send:", payload);
+  return axios.post(url, payload);
+});
+
+    await Promise.all(requests);
+
+    onClose();
+    onSuccess();
+
+  } catch (error) {
+    console.error("Error during API call:", error);
+    setError(error.response?.data?.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+    onClose();
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+
+
 
   const formatCookedDateTime = (dateTimeString, shouldAddHours = true) => {
     const date = new Date(dateTimeString);
@@ -356,7 +350,7 @@ const ConfirmProdModal = ({
   );
 };
 
-const DataReviewSAP = ({ open, onClose, material, batch }) => {
+const DataReviewSAP = ({ open, onClose, material, hu,batch }) => {
   const [selectedPlanSets, setSelectedPlanSets] = useState([]);
   const [materialName, setMaterialName] = useState("");
   const [production, setProduction] = useState([]);
@@ -559,10 +553,12 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
     setShowDropdowns(true);
   };
 
-  const handleSaveSuccess = () => {
-    resetForm();
-    onClose();
-  };
+const handleSaveSuccess = () => {
+  resetForm();
+  setIsConfirmProdOpen(false); // ปิด ConfirmProdModal
+  onClose();                   // ปิด DataReviewSAP
+};
+
 
   const handleConfirm = () => {
     if (!weighttotal || isNaN(parseFloat(weighttotal)) || parseFloat(weighttotal) <= 0) {
@@ -631,6 +627,7 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
               <Typography>Material: {material}</Typography>
               <Typography>Material Name: {materialName}</Typography>
               <Typography>Batch: {batch}</Typography>
+              <Typography>HU: {hu}</Typography>
             </Box>
 
             <Box>
@@ -964,6 +961,7 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
         emulsion={emulsion}
         batchmix={batchmix}
         operator={operator}
+        hu={hu}
         withdraw={withdraw}
         weighttotal={weighttotal}
         level_eu={level_eu}

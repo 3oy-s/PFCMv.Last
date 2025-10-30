@@ -17,9 +17,9 @@ const SIDEBAR_ITEMS = [
 	{ name: "เปลี่ยนสถานที่ทำงาน", icon: BarChart2, href: "/packaging/User/LineSelectWP" },
 	{ name: "ประวัติ", icon: BarChart2, href: "/packaging/History/HistoryPage" },
 	// { name: "หน้าหลัก", icon: BarChart2, href: "/packaging" },
-	 ...(showWorkplaceSelector
-		? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/packaging/WorkplaceSelector" }]
-		: []),
+	//  ...(showWorkplaceSelector
+	// 	? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/packaging/WorkplaceSelector" }]
+	// 	: []),
 	
 	{ name: "ออกจากระบบ", icon: BarChart2, href: "/logout" },
 ];

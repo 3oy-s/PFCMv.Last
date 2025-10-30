@@ -226,9 +226,9 @@ const Sidebar = () => {
     // { name: "รายการผสมวัตถุดิบ", icon: PiFishFill, href: "/prep/RM_EMU" },
     { name: "ตรวจสอบ HU", icon: PiFishFill, href: "/prep/TraceBack_HU" },
     { name: "ประวัติ", icon: PiFishFill, href: "/prep/history" },
-    ...(showWorkplaceSelector
-      ? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/prep/WorkplaceSelector" }]
-      : []),
+    // ...(showWorkplaceSelector
+    //   ? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/prep/WorkplaceSelector" }]
+    //   : []),
     // {
     //   name: "รีเฟรชข้อมูลรถเข็น",
     //   icon: VscHistory,

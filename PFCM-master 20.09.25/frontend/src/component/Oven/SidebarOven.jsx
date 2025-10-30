@@ -97,9 +97,9 @@ const SIDEBAR_ITEMS = [
   { name: "วัตถุดิบจากห้องเย็น", icon: LuScanBarcode, href: "/oven/manageOven" },
   { name: "Scan SAP", icon: LuScanBarcode, href: "/oven/products" },
   { name: "วัตถุดิบฝากห้องเย็น", icon: PiFishLight, href: "/oven/sales" },
- ...(showWorkplaceSelector
-    ? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/oven/WorkplaceSelector" }]
-    : []),
+//  ...(showWorkplaceSelector
+//     ? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/oven/WorkplaceSelector" }]
+//     : []),
 
   // { name: "ประวัติต้ม/อบเสร็จ", icon: VscHistory, href: "/oven/analytics" },
   // { 
