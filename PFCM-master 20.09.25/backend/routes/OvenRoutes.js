@@ -127,6 +127,7 @@ WHERE
       batch,
       productId,
       line_name,
+      hu,
       groupId = [],   // default เป็น empty array
       weight,
       operator,
@@ -139,21 +140,6 @@ WHERE
       emulsion = "false",
       batchmix = "false"
     } = req.body;
-
-    // Validation field พื้นฐาน
-    if (!weight || isNaN(parseFloat(weight)) || parseFloat(weight) <= 0) {
-      return res.status(400).json({ success: false, message: "กรุณากรอกน้ำหนักที่ถูกต้อง" });
-    }
-
-    if (!operator || !withdraw || !Dest || !receiver) {
-      return res.status(400).json({ success: false, message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
-    }
-
-    if (canSelectEu && (!level_eu || level_eu === "")) {
-      return res.status(400).json({ success: false, message: "กรุณาเลือกระดับ EU" });
-    }
-
-    // Validation groupId เฉพาะกรณี **ไม่ใช่ emulsion/batchmix**
     if (!(emulsion === "true" || batchmix === "true")) {
       if (!Array.isArray(groupId) || groupId.length === 0) {
         return res.status(400).json({
@@ -210,11 +196,12 @@ WHERE
             .input("stay_place", stayPlace)
             .input("dest", Dest)
             .input("rmfp_line_name", line_name)
+            .input("hu", hu)
             .input("level_eu", level_eu !== "-" ? level_eu : null)
             .query(`
-            INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu)
+            INSERT INTO RMForProd (prod_rm_id, batch, weight, dest, stay_place, rm_group_id, rmfp_line_name, level_eu,hu)
             OUTPUT INSERTED.rmfp_id
-            VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu)
+            VALUES (@prod_rm_id, @batch, @weight, @dest, @stay_place, @rm_group_id, @rmfp_line_name, @level_eu,@hu)
           `);
 
           const RMFP_ID = rmfpResult.recordset[0].rmfp_id;

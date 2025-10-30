@@ -229,7 +229,13 @@ const Sidebar = () => {
     // ...(showWorkplaceSelector
     //   ? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/prep/WorkplaceSelector" }]
     //   : []),
-   
+    // {
+    //   name: "รีเฟรชข้อมูลรถเข็น",
+    //   icon: VscHistory,
+    //   href: "#fetch",
+    //   type: "action",
+    //   action: handleRefresh
+    // },
     { name: "ออกจากระบบ", icon: TbLogout2, href: "/logout" },
   ];
 

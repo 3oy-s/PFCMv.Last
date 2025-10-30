@@ -28,6 +28,7 @@ const SIDEBAR_ITEMS = [
   //  ...(showWorkplaceSelector
   //     ? [{ name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/qualitycontrol/WorkplaceSelector" }]
   //     : []),
+  // { name: "เปลี่ยนสถานที่ทำงาน", icon: BarChart2, href: "/qualitycontrol/User/SelectWP" },
   { name: "ออกจากระบบ", icon: TbLogout2, href: "/logout" },
 ];
 

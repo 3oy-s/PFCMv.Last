@@ -41,12 +41,14 @@ const CameraActivationModal = ({
   const [error, setError] = useState("");
   const [primaryError, setPrimaryError] = useState(false);
   const [secondaryError, setSecondaryError] = useState(false);
+  const [huError, setHuError] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [rawMaterials, setRawMaterials] = useState([]);
   const [loading, setLoading] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isRawMaterialFocused, setIsRawMaterialFocused] = useState(false);
+  const [hu, setHu] = useState('');
 
   const CloseButton = styled(IconButton)(({ theme }) => ({
     position: "absolute",
@@ -55,7 +57,7 @@ const CameraActivationModal = ({
     color: theme.palette.grey[600],
   }));
 
-  const isFormValid = primaryBatch && secondaryBatch && secondaryBatch.length === 10;
+  const isFormValid = primaryBatch && secondaryBatch && secondaryBatch.length === 10 && hu && hu.length === 9;
 
   // Add keyboard event listener for USB scanner
   useEffect(() => {
@@ -100,22 +102,24 @@ const CameraActivationModal = ({
   const processScannerInput = () => {
     if (!inputValue) return;
     
-    // Example input: 11M1EL003002|08FFXNCT38|301598575|270.000|KG
+    // Example input: 14L300000512|NCE80A18K3|301710388|330.000|KG
     const parts = inputValue.split('|');
-    if (parts.length >= 2) {
+    if (parts.length >= 3) {
       const var1 = parts[0].substring(0, 12); // First 12 characters
       const var2 = parts[1].substring(0, 10); // First 10 characters of second part
+      const var3 = parts[2].substring(0, 9);  // First 9 characters of third part (HU)
       
-      console.log('Scanner input processed:', { var1, var2 });
+      console.log('Scanner input processed:', { var1, var2, var3 });
       
       setPrimaryBatch(var1);
       setSecondaryBatch(var2);
+      setHu(var3);
       setInputValue(var1);
       
       // Simulate the scan success flow
       setScanSuccess(true);
       setTimeout(() => {
-        onConfirm(var1, var2);
+        onConfirm(var1, var2, var3);
         setProcessing(false);
         setScanSuccess(false);
       }, 800);
@@ -189,9 +193,11 @@ const CameraActivationModal = ({
   const resetForm = () => {
     setPrimaryBatch("");
     setSecondaryBatch("");
+    setHu("");
     setError("");
     setPrimaryError(false);
     setSecondaryError(false);
+    setHuError(false);
     setScanSuccess(false);
     setProcessing(false);
     setInputValue('');
@@ -212,14 +218,15 @@ const CameraActivationModal = ({
     try {
       const qrParts = result.split("|");
       
-      if (qrParts.length < 2) {
-        setError("รูปแบบ QR Code ไม่ถูกต้อง ต้องมีข้อมูล Raw Material และ Batch");
+      if (qrParts.length < 3) {
+        setError("รูปแบบ QR Code ไม่ถูกต้อง ต้องมีข้อมูล Raw Material, Batch และ HU");
         setProcessing(false);
         return;
       }
       
       const rawMaterial = qrParts[0].trim();
       const batch = qrParts[1].trim().toUpperCase(); // Convert to uppercase
+      const huValue = qrParts[2].trim();
       
       if (batch.length !== 10) {
         setError(`Batch ต้องมี 10 ตัวอักษร (ได้รับ ${batch.length} ตัวอักษร)`);
@@ -227,12 +234,21 @@ const CameraActivationModal = ({
         setProcessing(false);
         return;
       }
+
+      if (huValue.length !== 9) {
+        setError(`HU ต้องมี 9 หลัก (ได้รับ ${huValue.length} หลัก)`);
+        setHuError(true);
+        setProcessing(false);
+        return;
+      }
       
       setPrimaryBatch(rawMaterial);
       setSecondaryBatch(batch);
+      setHu(huValue);
       setInputValue(rawMaterial);
       setPrimaryError(false);
       setSecondaryError(false);
+      setHuError(false);
       setError("");
       
       try {
@@ -244,7 +260,7 @@ const CameraActivationModal = ({
         if (response.ok) {
           setScanSuccess(true);
           setTimeout(() => {
-            onConfirm(rawMaterial, batch);
+            onConfirm(rawMaterial, batch, huValue);
             setProcessing(false);
             setScanSuccess(false);
           }, 800);
@@ -290,6 +306,18 @@ const CameraActivationModal = ({
       setSecondaryError(false);
     }
 
+    if (!hu) {
+      setHuError(true);
+      setError("กรุณากรอกข้อมูล HU");
+      hasError = true;
+    } else if (hu.length !== 9) {
+      setHuError(true);
+      setError("HU ต้องมี 9 หลักเท่านั้น");
+      hasError = true;
+    } else {
+      setHuError(false);
+    }
+
     if (!hasError) {
       try {
         const response = await fetch(
@@ -298,7 +326,7 @@ const CameraActivationModal = ({
         const data = await response.json();
 
         if (response.ok) {
-          onConfirm(primaryBatch, secondaryBatch);
+          onConfirm(primaryBatch, secondaryBatch, hu);
           setProcessing(false);
         } else {
           setPrimaryError(true);
@@ -456,6 +484,39 @@ const CameraActivationModal = ({
                   maxLength: 10,
                   pattern: ".{10}",
                   style: { textTransform: 'uppercase' } // Visual feedback for uppercase
+                }}
+              />
+            </Tooltip>
+
+            <Tooltip title="กรุณากรอกข้อมูล HU (ต้องกรอก 9 หลักเท่านั้น)">
+              <TextField
+                fullWidth
+                label="HU (ต้องกรอก 9 หลัก)"
+                size="small"
+                value={hu}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+                  if (value.length <= 9) {
+                    setHu(value);
+                    setHuError(false);
+                    setError("");
+                    setScanSuccess(false);
+                  }
+                }}
+                error={huError}
+                helperText={huError ? 
+                  (hu.length === 0 ? "กรุณากรอกข้อมูล HU" : "HU ต้องมี 9 หลักเท่านั้น") 
+                  : ""}
+                margin="normal"
+                required
+                InputProps={{ 
+                  endAdornment: <IoInformationCircle color={theme.palette.info.main} />,
+                  readOnly: scanSuccess
+                }}
+                inputProps={{ 
+                  maxLength: 9,
+                  pattern: "[0-9]{9}",
+                  inputMode: 'numeric'
                 }}
               />
             </Tooltip>
