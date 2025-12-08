@@ -68,7 +68,7 @@ const SIDEBAR_ITEMS = [
   { name: "นำเข้าแผนการผลิต", icon: MdConveyorBelt, href: "/sup/ipscvF" },
   { name: "นำเข้าข้อมูลวัตถุดิบ", icon: MdConveyorBelt, href: "/sup/import/rm/csv" },
   { name: "Delay Time Traking", icon: MdConveyorBelt, href: "/sup/DelayTraking" },
-  { name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/sup/WorkplaceSelector" },
+  // { name: "เปลี่ยนที่ทำงาน", icon: FaPeopleCarry, href: "/sup/WorkplaceSelector" },
   { name: "ออกจากระบบ", icon: TbLogout2, href: "/logout" },
 ];
 

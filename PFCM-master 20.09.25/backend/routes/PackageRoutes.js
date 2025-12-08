@@ -3117,7 +3117,8 @@ module.exports = (io) => {
 
 
 
-  router.put("/pack/mixed/trolley", async (req, res) => {
+ 
+router.put("/pack/mixed/trolley", async (req, res) => {
     const { mapping_id, weights, tro_production_id } = req.body;
 
     if (!mapping_id || !Array.isArray(weights) || weights.length === 0 || !tro_production_id) {
@@ -3129,6 +3130,7 @@ module.exports = (io) => {
     try {
       const pool = await connectToDatabase();
 
+      // Query หลักไม่ JOIN กับ Batch
       const query = `
       SELECT DISTINCT
           rmm.mapping_id,
@@ -3192,12 +3194,27 @@ module.exports = (io) => {
 
       const result = await pool.request().query(query);
 
-      console.log('Query result count:', result.recordset.length);
-      console.log('First record:', result.recordset[0]);
-
       if (result.recordset.length === 0) {
         return res.status(404).json({ message: "ไม่พบวัตถุดิบในรถเข็นที่เลือก" });
       }
+
+      // Query แยกสำหรับดึงข้อมูล Batch ทั้งหมด
+      const batchQuery = `
+        SELECT batch_id, batch_before, batch_after, mapping_id
+        FROM Batch
+        WHERE mapping_id IN (${mapping_id.map(id => `'${id}'`).join(',')})
+      `;
+      
+      const batchResult = await pool.request().query(batchQuery);
+      
+      // จัดกลุ่ม Batch ตาม mapping_id
+      const batchByMappingId = {};
+      batchResult.recordset.forEach(batch => {
+        if (!batchByMappingId[batch.mapping_id]) {
+          batchByMappingId[batch.mapping_id] = [];
+        }
+        batchByMappingId[batch.mapping_id].push(batch);
+      });
 
       const mixCode = Date.now() % 2147483647;
       const line_name = result.recordset[0].rmm_line_name;
@@ -3209,27 +3226,24 @@ module.exports = (io) => {
 
       for (let i = 0; i < result.recordset.length; i++) {
         const record = result.recordset[i];
-        let weightToMoveRaw = weights[i];
-
-        // ปัดน้ำหนักและถาดเป็น 2 ตำแหน่งทศนิยม
-        const weight_RM = Number((record.weight_RM ?? 0).toFixed(2));
-        const weightToMove = Number((weightToMoveRaw ?? 0).toFixed(2));
-        const weightPerTray = weight_RM / record.tray_count;
-        const traysUsed = weightToMove / weightPerTray;
-        const roundedTraysUsed = Number(traysUsed.toFixed(2));
-        const remainingWeight = Number((weight_RM - weightToMove).toFixed(2));
-        const tolerance = 0.05;
+        const weightToMove = weights[i];
 
         // Log เพื่อ debug
         console.log(`Record ${i}:`, {
           mapping_id: record.mapping_id,
-          weight_RM: weight_RM,
+          weight_RM: record.weight_RM,
           tray_count: record.tray_count,
-          weightToMove: weightToMove,
-          remainingWeight: remainingWeight,
-          traysUsed: roundedTraysUsed
+          weightToMove: weightToMove
         });
 
+        // คำนวณน้ำหนักต่อถาด
+        const weightPerTray = record.weight_RM / record.tray_count;
+
+        // คำนวณจำนวนถาดที่ใช้
+        const traysUsed = weightToMove / weightPerTray;
+        const roundedTraysUsed = Math.round(traysUsed * 100) / 100;
+
+        // รวมค่าน้ำหนักและจำนวนถาด
         total_weight += weightToMove;
         total_trays += roundedTraysUsed;
 
@@ -3323,6 +3337,22 @@ module.exports = (io) => {
           @receiver_pack_edit${i}, @remark_rework${i},@remark_rework_cold${i}, @location${i},@qccheck_cold${i},@edit_rework${i},GETDATE())
         `);
 
+        // Copy ทุกแถวจากตาราง Batch ที่เกี่ยวข้องกับ mapping_id เดิม
+        const batchRecords = batchByMappingId[record.mapping_id] || [];
+        for (let j = 0; j < batchRecords.length; j++) {
+          const batchRecord = batchRecords[j];
+          await transaction.request()
+            .input(`batch_before_${i}_${j}`, sql.VarChar(15), batchRecord.batch_before)
+            .input(`batch_after_${i}_${j}`, sql.VarChar(15), batchRecord.batch_after)
+            .input(`mapping_id_${i}_${j}`, sql.Int, newMappingId)
+            .query(`
+              INSERT INTO Batch
+              (mapping_id, batch_before, batch_after)
+              VALUES
+              (@mapping_id_${i}_${j}, @batch_before_${i}_${j}, @batch_after_${i}_${j})
+            `);
+        }
+
         // เพิ่มข้อมูลใน RM_mixed
         await transaction.request()
           .input(`mapping_id${i}`, sql.Int, newMappingId)
@@ -3352,45 +3382,49 @@ module.exports = (io) => {
             .input(`new_mapping_id${i}`, sql.Int, newMappingId)
             .input(`batch_after${i}`, sql.VarChar, record.batch_after)
             .query(`
-            INSERT INTO batch (mapping_id, batch_after)
-            VALUES (@new_mapping_id${i}, @batch_after${i})
-          `);
+                  INSERT INTO batch (mapping_id, batch_after)
+                  VALUES (@new_mapping_id${i}, @batch_after${i})
+                  `);
         }
 
         // อัปเดตรายการวัตถุดิบในรถเข็นเดิม
-        if (remainingWeight > tolerance) {
-          const remainingTrays = Number((record.tray_count - roundedTraysUsed).toFixed(2));
+        // ปัดเศษเพื่อป้องกันความผิดพลาดจากทศนิยม
+        const roundedRemainingWeight = Math.round(remainingWeight * 100) / 100;
+        
+        if (roundedRemainingWeight > 0.01) {
+          const remainingTrays = Math.round((record.tray_count - roundedTraysUsed) * 100) / 100;
           await transaction.request()
             .input('remainingWeight', sql.Float, remainingWeight)
             .input('remainingTrays', sql.Float, remainingTrays)
             .input('mapping_id', sql.Int, record.mapping_id)
             .query(`
-            UPDATE TrolleyRMMapping
-            SET weight_RM = @remainingWeight,
-                tray_count = @remainingTrays
-            WHERE mapping_id = @mapping_id
-          `);
-        } else if (remainingWeight >= -tolerance && remainingWeight <= tolerance) {
+                    UPDATE TrolleyRMMapping
+                    SET weight_RM = @remainingWeight,
+                        tray_count = @remainingTrays
+                    WHERE mapping_id = @mapping_id
+                    `);
+        } else if (roundedRemainingWeight >= -0.01 && roundedRemainingWeight <= 0.01) {
+          // ถือว่าเป็น 0 ถ้าอยู่ในช่วง -0.01 ถึง 0.01
           await transaction.request()
             .input('mapping_id', sql.Int, record.mapping_id)
             .query(`
-            UPDATE TrolleyRMMapping 
-            SET stay_place = 'บรรจุเสร็จสิ้น', 
-                dest = 'บรรจุเสร็จสิ้น', 
-                rm_status = NULL,
-                tray_count = 0,
-                weight_RM = 0
-            WHERE mapping_id = @mapping_id
-          `);
+                    UPDATE TrolleyRMMapping 
+                    SET stay_place = 'บรรจุเสร็จสิ้น', 
+                        dest = 'บรรจุเสร็จสิ้น', 
+                        rm_status = NULL,
+                        tray_count = 0,
+                        weight_RM = 0
+                    WHERE mapping_id = @mapping_id
+                    `);
         } else {
           await transaction.rollback();
-          return res.status(400).json({
+          return res.status(400).json({ 
             message: "น้ำหนักที่ต้องการย้ายมากกว่าน้ำหนักที่มีอยู่ในรถเข็น",
             detail: {
               mapping_id: record.mapping_id,
               weight_RM: record.weight_RM,
               weightToMove: weightToMove,
-              remainingWeight: remainingWeight
+              remainingWeight: roundedRemainingWeight
             }
           });
         }
@@ -3573,7 +3607,7 @@ module.exports = (io) => {
     }
   });
 
-  router.get("/pack/mixed/trolley/head/:line_id", async (req, res) => {
+ router.get("/pack/mixed/trolley/head/:line_id", async (req, res) => {
     try {
       const { line_id } = req.params;
       const pool = await connectToDatabase();
@@ -3582,7 +3616,11 @@ module.exports = (io) => {
         SELECT
           rmm.mapping_id,
           rmf.rmfp_id,
-          b.batch_after,
+          (
+            SELECT STRING_AGG(batch_after, ', ') 
+            FROM Batch 
+            WHERE mapping_id = rmx.mapping_id
+          ) AS batch_after,
           p.doc_no,
           p.code,
           l.line_name,
@@ -3602,7 +3640,7 @@ module.exports = (io) => {
           q.defect,
           q.defect_remark,
           q.md_no,
-          CONCAT(q.WorkAreaCode, \'-\', mwa.WorkAreaName) AS WorkAreaCode,
+          CONCAT(q.WorkAreaCode, '-', mwa.WorkAreaName) AS WorkAreaCode,
           q.qccheck,
           q.mdcheck,
           q.defectcheck,
@@ -3644,14 +3682,12 @@ module.exports = (io) => {
           Line l ON l.line_name = rmm.rmm_line_name
         JOIN
           Production p ON p.prod_id = rmm.prod_mix
-        LEFT JOIN
-          Batch b ON b.mapping_id = rmx.mapping_id
         JOIN 
           ProdRawMat prm ON prm.prod_rm_id = rmx.tro_production_id
         JOIN
           QC q ON q.qc_id = rmx.qc_id
         JOIN
-         WorkAreas mwa ON q.WorkAreaCode = mwa.WorkAreaCode
+          WorkAreas mwa ON q.WorkAreaCode = mwa.WorkAreaCode
         JOIN 
           RawMatGroup rmg ON rmg.rm_group_id = rmf.rm_group_id
         JOIN
@@ -3757,19 +3793,23 @@ module.exports = (io) => {
     }
   });
 
-  router.get("/pack/history/All/:line_id", async (req, res) => {
-    try {
-      const { line_id } = req.params
-      const pool = await connectToDatabase();
-      const result = await pool
-        .request()
-        .input(`line_id`, sql.Int, parseInt(line_id, 10))
-        .query(`
+ router.get("/pack/history/All/:line_id", async (req, res) => {
+  try {
+    const { line_id } = req.params
+    const pool = await connectToDatabase();
+    const result = await pool
+      .request()
+      .input(`line_id`, sql.Int, parseInt(line_id, 10))
+      .query(`
     SELECT 
         rmit.mapping_id,
         his.tro_id,
         rmfp.rmfp_id,
-        ba.batch_after,
+        (
+          SELECT STRING_AGG(batch_after, ', ') 
+          FROM Batch 
+          WHERE mapping_id = rmit.mapping_id
+        ) AS batch_after,
         prod.doc_no,
         prod.code,
         li.line_name,
@@ -3788,23 +3828,23 @@ module.exports = (io) => {
         q.defect,
         q.defect_remark,
         md_no,
-			  CONCAT(q.WorkAreaCode, \'-\', mwa.WorkAreaName) AS WorkAreaCode,
+        CONCAT(q.WorkAreaCode, '-', mwa.WorkAreaName) AS WorkAreaCode,
         q.qccheck,
         q.mdcheck,
         q.defectcheck,
         rmit.mix_code,
         his.hist_id,
         CONVERT(VARCHAR, his.cooked_date, 120) AS cooked_date,
-          CONVERT(VARCHAR, his.rmit_date, 120) AS rmit_date,
-          CONVERT(VARCHAR, his.qc_date, 120) AS qc_date,
-          CONVERT(VARCHAR, his.come_cold_date, 120) AS come_cold_date,
-          CONVERT(VARCHAR, his.out_cold_date, 120) AS out_cold_date,
-          CONVERT(VARCHAR, his.come_cold_date_two, 120) AS come_cold_date_two,
-          CONVERT(VARCHAR, his.out_cold_date_two, 120) AS out_cold_date_two,
-          CONVERT(VARCHAR, his.come_cold_date_three, 120) AS come_cold_date_three,
-          CONVERT(VARCHAR, his.out_cold_date_three, 120) AS out_cold_date_three,
-          CONVERT(VARCHAR, his.sc_pack_date, 120) AS sc_pack_date,
-          CONVERT(VARCHAR, his.rework_date, 120) AS rework_date,
+        CONVERT(VARCHAR, his.rmit_date, 120) AS rmit_date,
+        CONVERT(VARCHAR, his.qc_date, 120) AS qc_date,
+        CONVERT(VARCHAR, his.come_cold_date, 120) AS come_cold_date,
+        CONVERT(VARCHAR, his.out_cold_date, 120) AS out_cold_date,
+        CONVERT(VARCHAR, his.come_cold_date_two, 120) AS come_cold_date_two,
+        CONVERT(VARCHAR, his.out_cold_date_two, 120) AS out_cold_date_two,
+        CONVERT(VARCHAR, his.come_cold_date_three, 120) AS come_cold_date_three,
+        CONVERT(VARCHAR, his.out_cold_date_three, 120) AS out_cold_date_three,
+        CONVERT(VARCHAR, his.sc_pack_date, 120) AS sc_pack_date,
+        CONVERT(VARCHAR, his.rework_date, 120) AS rework_date,
         his.receiver,
         his.receiver_prep_two,
         his.receiver_qc,
@@ -3820,8 +3860,6 @@ module.exports = (io) => {
     FROM RMForProd AS rmfp
         JOIN 
           TrolleyRMMapping AS rmit ON rmit.rmfp_id = rmfp.rmfp_id
-        LEFT JOIN 
-          Batch AS ba ON ba.batch_id = rmit.batch_id
         JOIN 
           History AS his ON rmit.mapping_id = his.mapping_id
         JOIN 
@@ -3846,34 +3884,38 @@ module.exports = (io) => {
         AND li.line_id = @line_id
     ORDER BY his.sc_pack_date DESC, his.rework_date DESC, his.come_cold_date DESC, his.come_cold_date_two DESC, his.come_cold_date_three DESC
     `);
-      res.status(200).json({
-        success: true,
-        data: result.recordset,
-      });
+    res.status(200).json({
+      success: true,
+      data: result.recordset,
+    });
 
-    } catch (error) {
-      console.error("Error fetching history data:", error);
-      res.status(500).json({
-        success: false,
-        message: "Internal Server Error",
-        error: error.message,
-      });
-    }
-  });
+  } catch (error) {
+    console.error("Error fetching history data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
 
   router.get("/pack/history/All/mix/:line_id", async (req, res) => {
-    try {
-      const { line_id } = req.params
-      const pool = await connectToDatabase();
-      const result = await pool
-        .request()
-        .input(`line_id`, sql.Int, parseInt(line_id, 10))
-        .query(`
-				SELECT
+  try {
+    const { line_id } = req.params
+    const pool = await connectToDatabase();
+    const result = await pool
+      .request()
+      .input(`line_id`, sql.Int, parseInt(line_id, 10))
+      .query(`
+        SELECT
           rmm.mapping_id,
           h.tro_id,
           rmf.rmfp_id,
-          b.batch_after,
+          (
+            SELECT STRING_AGG(batch_after, ', ') 
+            FROM Batch 
+            WHERE mapping_id = rmx.mapping_id
+          ) AS batch_after,
           p.doc_no,
           p.code,
           l.line_name,
@@ -3892,7 +3934,7 @@ module.exports = (io) => {
           q.defect,
           q.defect_remark,
           q.md_no,
-          CONCAT(q.WorkAreaCode, \'-\', mwa.WorkAreaName) AS WorkAreaCode,
+          CONCAT(q.WorkAreaCode, '-', mwa.WorkAreaName) AS WorkAreaCode,
           q.qccheck,
           q.mdcheck,
           q.defectcheck,
@@ -3934,14 +3976,12 @@ module.exports = (io) => {
           Line l ON l.line_name = rmf.rmfp_line_name
         JOIN
           Production p ON p.prod_id = rmm.prod_mix
-        LEFT JOIN
-          Batch b ON b.batch_id = rmx.batch_id
         JOIN 
           ProdRawMat prm ON prm.prod_rm_id = rmx.tro_production_id
         JOIN
           QC q ON q.qc_id = rmx.qc_id
         JOIN 
-        WorkAreas mwa ON q.WorkAreaCode = mwa.WorkAreaCode
+          WorkAreas mwa ON q.WorkAreaCode = mwa.WorkAreaCode
         JOIN 
           RawMatGroup rmg ON rmg.rm_group_id = rmf.rm_group_id
         JOIN
@@ -3952,22 +3992,22 @@ module.exports = (io) => {
           AND rmf.rm_group_id = rmg.rm_group_id
           AND l.line_id = @line_id
         ORDER BY h.sc_pack_date DESC, h.rework_date DESC, h.come_cold_date DESC, h.come_cold_date_two DESC, h.come_cold_date_three DESC
-  `);
+      `);
 
-      res.status(200).json({
-        success: true,
-        data: result.recordset,
-      });
+    res.status(200).json({
+      success: true,
+      data: result.recordset,
+    });
 
-    } catch (error) {
-      console.error("Error fetching history data:", error);
-      res.status(500).json({
-        success: false,
-        message: "Internal Server Error",
-        error: error.message,
-      });
-    }
-  });
+  } catch (error) {
+    console.error("Error fetching history data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
 
 
   router.put("/pack/export/to/rework/Trolley", async (req, res) => {

@@ -3,12 +3,12 @@ import { Button } from "@mui/material";
 import CameraActivationModal from "./ModalScanSAP";
 import DataReviewSAP from "./ModalConfirmSAP";
 import { IoBarcodeSharp } from "react-icons/io5";
-const API_URL = import.meta.env.VITE_API_URL;
 
 const Parent = () => {
   const [openCameraModal, setOpenCameraModal] = useState(false);
   const [primaryBatch, setPrimaryBatch] = useState(""); // เก็บ Material
   const [secondaryBatch, setSecondaryBatch] = useState(""); // เก็บ Batch
+  const [hu, setHu] = useState(""); // เก็บ HU
   const [openDataReview, setOpenDataReview] = useState(false);
 
   const [material, setMaterial] = useState("");
@@ -21,9 +21,10 @@ const Parent = () => {
   const [weighttotal, setWeightTotal] = useState("");
 
   // เมื่อยืนยันใน CameraModal จะส่งข้อมูลไปยัง ParentComponent
-  const handleConfirmCameraModal = (newPrimaryBatch, newSecondaryBatch) => {
+  const handleConfirmCameraModal = (newPrimaryBatch, newSecondaryBatch, newHu) => {
     setPrimaryBatch(newPrimaryBatch);
     setSecondaryBatch(newSecondaryBatch);
+    setHu(newHu);
     setOpenDataReview(true); // เปิด DataReviewSAP
     setOpenCameraModal(false); // ปิด CameraActivationModal
   };
@@ -35,6 +36,7 @@ const Parent = () => {
   const resetData = () => {
     setPrimaryBatch("");
     setSecondaryBatch("");
+    setHu("");
     setMaterial("");
     setMaterialName("");
     setBatch("");
@@ -45,7 +47,6 @@ const Parent = () => {
     setWeightTotal("");
     setOpenCameraModal(true);
   };
-  
 
   return (
     <div>
@@ -64,6 +65,8 @@ const Parent = () => {
           alignItems: "center",
           borderLeft: "8px solid #41a2e6",
           width: "300px",
+          height: "100",
+          // fontSize: 13,
           marginTop: "20px",
         }}
       >
@@ -71,12 +74,13 @@ const Parent = () => {
           <div
             style={{ color: "#41a2e6", paddingBottom: "5px", fontSize: "15px" }}
           >
-            สแกนป้าย SAP
+            สแกนป้าย SAP{" "}
           </div>
           <div
             style={{ color: "#787878", paddingBottom: "5px", fontSize: "14px" }}
           >
-            เพื่อรับข้อมูลวัตถุดิบ
+            {" "}
+            เพื่อรับข้อมูลวัตถุดิบ{" "}
           </div>
         </div>
         <IoBarcodeSharp
@@ -93,6 +97,8 @@ const Parent = () => {
         secondaryBatch={secondaryBatch} // ส่งข้อมูล Batch
         setPrimaryBatch={setPrimaryBatch} // ให้สามารถตั้งค่า primaryBatch
         setSecondaryBatch={setSecondaryBatch} // ให้สามารถตั้งค่า secondaryBatch
+        hu={hu} // ส่งค่า HU
+        setHu={setHu} // ให้สามารถตั้งค่า HU
       />
 
       <DataReviewSAP
@@ -100,6 +106,7 @@ const Parent = () => {
         onClose={handleCloseDataReview}
         material={primaryBatch}
         batch={secondaryBatch} // ส่งข้อมูลไป DataReviewSAP
+        hu={hu} // ส่งข้อมูลไป DataReviewSAP
       />
     </div>
   );

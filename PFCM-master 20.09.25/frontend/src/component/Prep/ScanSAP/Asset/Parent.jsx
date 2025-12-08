@@ -8,6 +8,7 @@ const Parent = () => {
   const [openCameraModal, setOpenCameraModal] = useState(false);
   const [primaryBatch, setPrimaryBatch] = useState(""); // เก็บ Material
   const [secondaryBatch, setSecondaryBatch] = useState(""); // เก็บ Batch
+  const [hu, setHu] = useState(""); // เก็บ HU
   const [openDataReview, setOpenDataReview] = useState(false);
 
   const [material, setMaterial] = useState("");
@@ -20,9 +21,10 @@ const Parent = () => {
   const [weighttotal, setWeightTotal] = useState("");
 
   // เมื่อยืนยันใน CameraModal จะส่งข้อมูลไปยัง ParentComponent
-  const handleConfirmCameraModal = (newPrimaryBatch, newSecondaryBatch) => {
+  const handleConfirmCameraModal = (newPrimaryBatch, newSecondaryBatch, newHu) => {
     setPrimaryBatch(newPrimaryBatch);
     setSecondaryBatch(newSecondaryBatch);
+    setHu(newHu);
     setOpenDataReview(true); // เปิด DataReviewSAP
     setOpenCameraModal(false); // ปิด CameraActivationModal
   };
@@ -34,6 +36,7 @@ const Parent = () => {
   const resetData = () => {
     setPrimaryBatch("");
     setSecondaryBatch("");
+    setHu("");
     setMaterial("");
     setMaterialName("");
     setBatch("");
@@ -94,6 +97,8 @@ const Parent = () => {
         secondaryBatch={secondaryBatch} // ส่งข้อมูล Batch
         setPrimaryBatch={setPrimaryBatch} // ให้สามารถตั้งค่า primaryBatch
         setSecondaryBatch={setSecondaryBatch} // ให้สามารถตั้งค่า secondaryBatch
+        hu={hu} // ส่งค่า HU
+        setHu={setHu} // ให้สามารถตั้งค่า HU
       />
 
       <DataReviewSAP
@@ -101,6 +106,7 @@ const Parent = () => {
         onClose={handleCloseDataReview}
         material={primaryBatch}
         batch={secondaryBatch} // ส่งข้อมูลไป DataReviewSAP
+        hu={hu} // ส่งข้อมูลไป DataReviewSAP
       />
     </div>
   );

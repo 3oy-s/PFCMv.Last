@@ -116,17 +116,17 @@ const CameraActivationModal = ({
 
       // Simulate the scan success flow
       setScanSuccess(true);
-   setTimeout(() => {
-  onConfirm({
-    material: var1,
-    batch: var2,
-    emulsionweightTotal: weightTotal,
-    selectedMaterials
-  });
-  setProcessing(false);
-  setScanSuccess(false);
-  handleClose(); // ปิด modal หลังส่งข้อมูล
-}, 800);
+      setTimeout(() => {
+        onConfirm({
+          material: var1,
+          batch: var2,
+          emulsionweightTotal: weightTotal,
+          selectedMaterials
+        });
+        setProcessing(false);
+        setScanSuccess(false);
+        handleClose(false);
+      }, 800);
 
 
     }
@@ -253,7 +253,14 @@ const CameraActivationModal = ({
 
         if (response.ok) {
           setScanSuccess(true);
-          setTimeout(() => {
+          setTimeout(async () => {
+            // หยุดกล้องก่อนเปิด modal ถัดไป
+            stopCamera();
+
+            // ปิด modal ปัจจุบัน
+            handleClose();
+
+            // จากนั้นค่อยเปิด modal ถัดไป
             onConfirm({
               material: rawMaterial,
               batch: batch,
@@ -264,6 +271,7 @@ const CameraActivationModal = ({
             setProcessing(false);
             setScanSuccess(false);
           }, 800);
+
         } else {
           setPrimaryError(true);
           setError(data.message || "ไม่พบข้อมูลวัตถุดิบในฐานข้อมูล");
@@ -281,44 +289,44 @@ const CameraActivationModal = ({
   };
 
   const handleConfirm = async () => {
-  if (processing) return;
-  setProcessing(true);
+    if (processing) return;
+    setProcessing(true);
 
-  let hasError = false;
+    let hasError = false;
 
-  if (!primaryBatch) {
-    setPrimaryError(true);
-    setError("กรุณากรอกข้อมูล Raw Material");
-    hasError = true;
-  } else {
-    setPrimaryError(false);
-  }
+    if (!primaryBatch) {
+      setPrimaryError(true);
+      setError("กรุณากรอกข้อมูล Raw Material");
+      hasError = true;
+    } else {
+      setPrimaryError(false);
+    }
 
-  if (!secondaryBatch) {
-    setSecondaryError(true);
-    setError("กรุณากรอกข้อมูล Batch");
-    hasError = true;
-  } else if (secondaryBatch.length !== 10) {
-    setSecondaryError(true);
-    setError("Batch ต้องมี 10 ตัวอักษรเท่านั้น");
-    hasError = true;
-  } else {
-    setSecondaryError(false);
-  }
+    if (!secondaryBatch) {
+      setSecondaryError(true);
+      setError("กรุณากรอกข้อมูล Batch");
+      hasError = true;
+    } else if (secondaryBatch.length !== 10) {
+      setSecondaryError(true);
+      setError("Batch ต้องมี 10 ตัวอักษรเท่านั้น");
+      hasError = true;
+    } else {
+      setSecondaryError(false);
+    }
 
-  if (!hasError) {
-    onConfirm({
-      primaryBatch,
-      secondaryBatch,
-      weightTotal,
-      selectedMaterials
-    });
-    setProcessing(false);
-    handleClose(); // ปิด modal หลังยืนยัน
-  } else {
-    setProcessing(false);
-  }
-};
+    if (!hasError) {
+      onConfirm({
+        primaryBatch,
+        secondaryBatch,
+        weightTotal,
+        selectedMaterials
+      });
+      setProcessing(false);
+      handleClose(); // ปิด modal หลังยืนยัน
+    } else {
+      setProcessing(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -360,8 +368,9 @@ const CameraActivationModal = ({
                 </Typography>
               ))}
               <Typography sx={{ fontWeight: "bold", mt: 1 }}>
-                น้ำหนักรวม: {weightTotal.toFixed(2)} กก.
+                น้ำหนักรวม: {weightTotal ? weightTotal.toFixed(2) : "0.00"} กก.
               </Typography>
+
             </Box>
           )}
 

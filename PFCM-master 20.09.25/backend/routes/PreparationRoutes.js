@@ -5568,147 +5568,133 @@ module.exports = (io) => {
   //   }
   // });
 
-  router.post("/prep/matimport/add/saveTrolley", async (req, res) => {
-    const sql = require("mssql");
-    const {
-      license_plate,
-      batch_after,
-      batch_before,
-      operator,
-      desttype,
-      ntray,
-      Process,
-      weightTotal,
-      mapping_id,
-      dest,
-      tro_id,
-      cookedDateTimeNew,
-      level_eu,
-      preparedDateTimeNew
-    } = req.body;
+router.post("/prep/matimport/add/saveTrolley", async (req, res) => {
+  const sql = require("mssql");
+  const {
+    license_plate,
+    batch_after,
+    batch_before,
+    operator,
+    desttype,
+    ntray,
+    Process,
+    weightTotal,
+    mapping_id,
+    dest,
+    cookedDateTimeNew,
+    level_eu,
+    preparedDateTimeNew
+  } = req.body;
 
-    // ✅ ตรวจสอบ Input ที่จำเป็น
-    const requiredFields = [
-      "license_plate",
-      "mapping_id",
-      "batch_before",
-      "weightTotal",
-      "ntray",
-      "Process",
-      "dest",
-      "cookedDateTimeNew",
-      "preparedDateTimeNew"
-    ];
-    const missingFields = requiredFields.filter(f => !req.body[f] && req.body[f] !== 0);
-    if (missingFields.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: `Missing required fields: ${missingFields.join(", ")}`
-      });
-    }
+  const requiredFields = [
+    "license_plate",
+    "mapping_id",
+    "batch_before",
+    "weightTotal",
+    "ntray",
+    "Process",
+    "dest",
+    "cookedDateTimeNew",
+    "preparedDateTimeNew"
+  ];
+  const missingFields = requiredFields.filter(f => !req.body[f] && req.body[f] !== 0);
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: `Missing required fields: ${missingFields.join(", ")}`
+    });
+  }
 
-    let transaction;
-    try {
-      const pool = await connectToDatabase();
-      transaction = new sql.Transaction(pool);
+  let transaction;
+  try {
+    const pool = await connectToDatabase();
+    transaction = new sql.Transaction(pool);
+    await transaction.begin();
 
-      // ✅ ตรวจสอบ trolley ถ้ามี tro_id
-      if (tro_id) {
-        const checkTrolley = await pool.request()
-          .input("tro_id", tro_id)
-          .query(`
+    // ✅ ตรวจสอบ Trolley
+    if (license_plate) {
+      const checkTrolley = await pool.request()
+        .input("tro_id", license_plate)
+        .query(`
           SELECT tro_status, rsrv_timestamp
           FROM Trolley
           WHERE tro_id = @tro_id
         `);
-
-        if (checkTrolley.recordset.length === 0) {
-          return res.status(404).json({ success: false, error: "ไม่พบรถเข็นนี้ในระบบ" });
-        }
-
-        const { tro_status, rsrv_timestamp } = checkTrolley.recordset[0];
-
-        if (tro_status !== 'rsrv') {
-          return res.status(400).json({ success: false, error: "ไม่สามารถทำรายการได้ เนื่องจากสถานะรถเข็นไม่ถูกต้อง" });
-        }
-
-        const now = new Date();
-        const reservedTime = new Date(rsrv_timestamp);
-        const diffMinutes = (now - reservedTime) / 1000 / 60;
-        if (diffMinutes > 5) {
-          return res.status(400).json({ success: false, error: "ไม่สามารถทำรายการได้ เนื่องจากเลยเวลาที่กำหนด 5 นาที" });
-        }
+      if (checkTrolley.recordset.length === 0) {
+        return res.status(404).json({ success: false, error: "ไม่พบรถเข็นนี้ในระบบ" });
       }
-
-      await transaction.begin();
-
-      // ✅ อัปเดตสถานะ trolley ถ้ามี tro_id
-      if (tro_id) {
-        await transaction.request()
-          .input("tro_id", tro_id)
-          .query(`
-          UPDATE Trolley
-          SET tro_status = '1', status = '1.5', rsrv_timestamp = null
-          WHERE tro_id = @tro_id
-        `);
+      const { tro_status, rsrv_timestamp } = checkTrolley.recordset[0];
+      if (tro_status !== 'rsrv') {
+        return res.status(400).json({ success: false, error: "สถานะรถเข็นไม่ถูกต้อง" });
       }
+      const now = new Date();
+      const reservedTime = new Date(rsrv_timestamp);
+      if ((now - reservedTime) / 1000 / 60 > 5) {
+        return res.status(400).json({ success: false, error: "เกินเวลาที่กำหนด 5 นาที" });
+      }
+    }
 
-      // ✅ อัปเดต TrolleyRMMapping เดิมให้ว่าง
-      await transaction.request()
-        .input("mapping_id", mapping_id)
-        .query(`
-        UPDATE TrolleyRMMapping
-        SET tro_id = null, tl_status = '4664'
+    // ✅ ดึงข้อมูล Batch เดิมทั้งหมด ที่ mapping_id เดิม
+    const oldBatchData = await transaction.request()
+      .input("mapping_id", sql.Int, mapping_id)
+      .query(`
+        SELECT batch_before, batch_after
+        FROM Batch
         WHERE mapping_id = @mapping_id
       `);
 
-      // ✅ สร้าง Batch ใหม่
-      const finalBatchAfter = batch_after || batch_before;
-      if (!finalBatchAfter) {
-        throw new Error("batch_after หรือ batch_before ต้องมีค่า");
-      }
+    // ✅ อัปเดต TrolleyRMMapping เดิมให้ว่าง
+    await transaction.request()
+      .input("mapping_id", mapping_id)
+      .query(`
+        UPDATE TrolleyRMMapping
+        SET tro_id = NULL, tl_status = '4664'
+        WHERE mapping_id = @mapping_id
+      `);
 
-      const batchResult = await transaction.request()
-        .input("batch_before", batch_before)
-        .input("batch_after", finalBatchAfter)
-        .query(`
+    // ✅ สร้าง Batch ใหม่ 1 แถวหลัก (ตาม batch_after/before ที่ส่งมา)
+    const finalBatchAfter = batch_after || batch_before;
+    if (!finalBatchAfter) throw new Error("batch_after หรือ batch_before ต้องมีค่า");
+
+    const batchResult = await transaction.request()
+      .input("batch_before", batch_before)
+      .input("batch_after", finalBatchAfter)
+      .query(`
         INSERT INTO Batch (batch_before, batch_after)
         OUTPUT INSERTED.batch_id
         VALUES (@batch_before, @batch_after)
       `);
-      const batch_id = batchResult.recordset[0].batch_id;
+    const batch_id = batchResult.recordset[0].batch_id;
 
-      // ✅ ดึงข้อมูล mapping เดิม
-      const origData = await transaction.request()
-        .input("mapping_id", mapping_id)
-        .query(`SELECT * FROM TrolleyRMMapping WHERE mapping_id = @mapping_id`);
+    // ✅ ดึงข้อมูล mapping เดิม
+    const origData = await transaction.request()
+      .input("mapping_id", mapping_id)
+      .query(`SELECT * FROM TrolleyRMMapping WHERE mapping_id = @mapping_id`);
+    if (origData.recordset.length === 0)
+      throw new Error(`ไม่พบข้อมูล mapping_id: ${mapping_id}`);
 
-      if (origData.recordset.length === 0) {
-        throw new Error(`ไม่พบข้อมูล mapping_id: ${mapping_id}`);
-      }
+    const oldMap = origData.recordset[0];
 
-      const oldMap = origData.recordset[0];
-
-      // ✅ สร้าง TrolleyRMMapping ใหม่
-      const insertNew = await transaction.request()
-        .input("tro_id", license_plate)
-        .input("weight_RM", weightTotal)
-        .input("tray_count", ntray)
-        .input("dest", dest)
-        .input("stay_place", 'จุดเตรียม')
-        .input("rm_status", 'รอQCตรวจสอบ')
-        .input("process_id", Process)
-        .input("batch_id", batch_id)
-        .input("rmfp_id", oldMap.rmfp_id)
-        .input("tro_production_id", oldMap.tro_production_id)
-        .input("qc_id", oldMap.qc_id)
-        .input("level_eu", oldMap.level_eu)
-        .input("prep_to_cold_time", oldMap.prep_to_cold_time)
-        .input("cold_time", oldMap.cold_time)
-        .input("rework_time", oldMap.rework_time)
-        .input("rmm_line_name", oldMap.rmm_line_name)
-        .input("tl_status", "2.0")
-        .query(`
+    // ✅ Insert Mapping ใหม่
+    const insertNew = await transaction.request()
+      .input("tro_id", license_plate)
+      .input("weight_RM", weightTotal)
+      .input("tray_count", ntray)
+      .input("dest", dest)
+      .input("stay_place", 'จุดเตรียม')
+      .input("rm_status", 'รอQCตรวจสอบ')
+      .input("process_id", Process)
+      .input("batch_id", batch_id)
+      .input("rmfp_id", oldMap.rmfp_id)
+      .input("tro_production_id", oldMap.tro_production_id)
+      .input("qc_id", oldMap.qc_id)
+      .input("level_eu", oldMap.level_eu)
+      .input("prep_to_cold_time", oldMap.prep_to_cold_time)
+      .input("cold_time", oldMap.cold_time)
+      .input("rework_time", oldMap.rework_time)
+      .input("rmm_line_name", oldMap.rmm_line_name)
+      .input("tl_status", "2.0")
+      .query(`
         INSERT INTO TrolleyRMMapping (
           tro_id, dest, stay_place, weight_RM, tray_count,
           rm_status, process_id, batch_id, rmfp_id, tro_production_id,
@@ -5723,56 +5709,67 @@ module.exports = (io) => {
           @rmm_line_name, GETDATE(), @tl_status
         )
       `);
-      const new_mapping_id = insertNew.recordset[0].mapping_id;
+    const new_mapping_id = insertNew.recordset[0].mapping_id;
 
-      // ✅ ดึงข้อมูล History เดิม
-      const origHisData = await transaction.request()
-        .input("mapping_id", mapping_id)
-        .query(`SELECT * FROM History WHERE mapping_id = @mapping_id`);
-
-      if (origHisData.recordset.length === 0) {
-        throw new Error(`ไม่พบประวัติ mapping_id: ${mapping_id}`);
-      }
-
-      const his = origHisData.recordset[0];
-
-      // ✅ คืน trolley กลับสถานะ (ถ้ามี tro_id)
-      if (tro_id) {
+    // ✅ คัดลอก Batch เดิมทุกแถว และผูก mapping_id ใหม่
+    if (oldBatchData.recordset.length > 0) {
+      for (const b of oldBatchData.recordset) {
         await transaction.request()
-          .input("tro_id", license_plate)
+          .input("batch_before", b.batch_before)
+          .input("batch_after", b.batch_after)
+          .input("mapping_id", new_mapping_id)
           .query(`
+            INSERT INTO Batch (batch_before, batch_after, mapping_id)
+            VALUES (@batch_before, @batch_after, @mapping_id)
+          `);
+      }
+    }
+
+    // ✅ ดึงข้อมูล History เดิม
+    const origHisData = await transaction.request()
+      .input("mapping_id", mapping_id)
+      .query(`SELECT * FROM History WHERE mapping_id = @mapping_id`);
+    if (origHisData.recordset.length === 0)
+      throw new Error(`ไม่พบประวัติ mapping_id: ${mapping_id}`);
+    const his = origHisData.recordset[0];
+
+    // ✅ คืนสถานะ trolley (ถ้ามี)
+    if (license_plate) {
+      await transaction.request()
+        .input("tro_id", license_plate)
+        .query(`
           UPDATE Trolley
-          SET tro_status = '0', rsrv_timestamp = null
+          SET tro_status = '0', rsrv_timestamp = NULL
           WHERE tro_id = @tro_id
         `);
-      }
+    }
 
-      // ✅ Insert History ใหม่
-      await transaction.request()
-        .input("mapping_id", sql.Int, new_mapping_id)
-        .input("receiver_prep_two", sql.NVarChar, operator)
-        .input("cooked_date", cookedDateTimeNew)
-        .input("rmit_date", preparedDateTimeNew)
-        .input("withdraw_date", his.withdraw_date)
-        .input("come_cold_date", his.come_cold_date)
-        .input("out_cold_date", his.out_cold_date)
-        .input("receiver", his.receiver)
-        .input("receiver_out_cold", his.receiver_out_cold)
-        .input("location", his.location)
-        .input("first_prod", his.first_prod)
-        .input("two_prod", his.two_prod)
-        .input("three_prod", his.three_prod)
-        .input("name_edit_prod_two", his.name_edit_prod_two)
-        .input("name_edit_prod_three", his.name_edit_prod_three)
-        .input("weight_RM", weightTotal)
-        .input("tray_count", ntray)
-        .input("cold_dest", his.cold_dest)
-        .input("cold_to_pack_time", his.cold_to_pack_time)
-        .input("qccheck_cold", his.qccheck_cold)
-        .input("remark_rework", his.remark_rework)
-        .input("remark_rework_cold", his.remark_rework_cold)
-        .input("edit_rework", his.edit_rework)
-        .query(`
+    // ✅ Insert History ใหม่
+    await transaction.request()
+      .input("mapping_id", new_mapping_id)
+      .input("receiver_prep_two", operator)
+      .input("cooked_date", cookedDateTimeNew)
+      .input("rmit_date", preparedDateTimeNew)
+      .input("withdraw_date", his.withdraw_date)
+      .input("come_cold_date", his.come_cold_date)
+      .input("out_cold_date", his.out_cold_date)
+      .input("receiver", his.receiver)
+      .input("receiver_out_cold", his.receiver_out_cold)
+      .input("location", his.location)
+      .input("first_prod", his.first_prod)
+      .input("two_prod", his.two_prod)
+      .input("three_prod", his.three_prod)
+      .input("name_edit_prod_two", his.name_edit_prod_two)
+      .input("name_edit_prod_three", his.name_edit_prod_three)
+      .input("weight_RM", weightTotal)
+      .input("tray_count", ntray)
+      .input("cold_dest", his.cold_dest)
+      .input("cold_to_pack_time", his.cold_to_pack_time)
+      .input("qccheck_cold", his.qccheck_cold)
+      .input("remark_rework", his.remark_rework)
+      .input("remark_rework_cold", his.remark_rework_cold)
+      .input("edit_rework", his.edit_rework)
+      .query(`
         INSERT INTO History (
           mapping_id, receiver_prep_two, rmit_date, cooked_date,
           withdraw_date, come_cold_date, out_cold_date, receiver,
@@ -5791,24 +5788,35 @@ module.exports = (io) => {
         )
       `);
 
-      // ✅ Commit transaction
-      await transaction.commit();
+    // ✅ ลบ mapping เดิม
+    const deleteResult = await transaction.request()
+  .input("old_mapping_id", sql.Int, Number(mapping_id))
+  .query(`
+    DELETE FROM TrolleyRMMapping
+    WHERE mapping_id = @old_mapping_id
+  `);
 
-      // ✅ แจ้ง frontend
-      io.to('QcCheckRoom').emit('dataUpdated', 'gotUpdated');
+console.log("🧾 ลบ Mapping เดิม:", mapping_id, "=> rowsAffected =", deleteResult.rowsAffected);
 
-      return res.status(200).json({
-        success: true,
-        message: "บันทึกข้อมูลเสร็จสิ้น",
-        new_mapping_id
-      });
 
-    } catch (err) {
-      if (transaction) await transaction.rollback();
-      console.error("SQL error:", err);
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
+    // ✅ Commit
+    await transaction.commit();
+
+    // ✅ แจ้ง event
+    io.to("QcCheckRoom").emit("dataUpdated", "gotUpdated");
+
+    return res.status(200).json({
+      success: true,
+      message: "บันทึกข้อมูลเสร็จสิ้น และคัดลอก Batch เรียบร้อย",
+      new_mapping_id
+    });
+
+  } catch (err) {
+    if (transaction) await transaction.rollback();
+    console.error("SQL error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 
   // router.post("/mapping/successTrolley", async (req, res) => {
@@ -6709,12 +6717,12 @@ ORDER BY
   //   }
   // });
   router.post("/prep/mat/rework/saveTrolley", async (req, res) => {
-    const { license_plate, ntray, weightTotal, mapping_id, dest, tro_id, recorder, rm_status, edit_rework } = req.body;
+    const { license_plate, ntray, weightTotal, mapping_id, dest,  recorder, rm_status, edit_rework } = req.body;
     const io = req.app.get("io");
     const sql = require("mssql");
 
     // 1️⃣ ตรวจสอบ input ครบ
-    const requiredFields = ["license_plate", "ntray", "weightTotal", "mapping_id", "dest", "tro_id", "recorder", "rm_status"];
+    const requiredFields = ["license_plate", "ntray", "weightTotal", "mapping_id", "dest", "recorder", "rm_status"];
     const missingFields = requiredFields.filter(f => !req.body[f] && req.body[f] !== 0);
     if (missingFields.length > 0) {
       return res.status(400).json({ success: false, error: `Missing required fields: ${missingFields.join(", ")}` });
@@ -6748,11 +6756,6 @@ ORDER BY
         await transaction.rollback();
         return res.status(400).json({ success: false, error: "ไม่สามารถทำรายการได้ เนื่องจากเลยเวลาที่กำหนด 5 นาที" });
       }
-
-      // 3️⃣ อัปเดต Trolley status เป็น 1
-      await transaction.request()
-        .input("tro_id", tro_id)
-        .query(`UPDATE Trolley SET  status = '1' WHERE tro_id = @tro_id`);
 
       // 4️⃣ ดึงข้อมูล rework
       const rmGroupResult = await transaction.request()
@@ -6840,7 +6843,6 @@ ORDER BY
 
       // 9️⃣ ส่งข้อมูลผ่าน Socket.IO
       io.to("QcCheckRoom").emit("dataUpdated", {
-        tro_id,
         license_plate,
         weightTotal,
         ntray,

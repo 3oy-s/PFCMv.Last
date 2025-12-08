@@ -277,7 +277,7 @@ const Modal3 = ({ open, onClose, data, onEdit, onSuccess, CookedDateTime }) => {
             )}
 
             <Typography>ป้ายทะเบียนคันใหม่: {inputValues[0] || "ไม่มีข้อมูล"}</Typography>
-            <Typography>ป้ายทะเบียนคันเก่า: {data?.tro_id || "ข้อมูลไม่พบ"}</Typography>
+            {/* <Typography>ป้ายทะเบียนคันเก่า: {data?.tro_id || "ข้อมูลไม่พบ"}</Typography> */}
             <Typography>น้ำหนักวัตถุดิบ/รถเข็น: {input2?.weightPerCart || "ข้อมูลไม่พบ"}</Typography>
             <Typography>จำนวนถาด: {input2?.numberOfTrays || "ข้อมูลไม่พบ"}</Typography>
 

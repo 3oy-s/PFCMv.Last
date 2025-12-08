@@ -5,6 +5,7 @@ import WarehouseIcon from "@mui/icons-material/Warehouse";
 import MixIcon from "@mui/icons-material/Blender";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CancelIcon from "@mui/icons-material/CancelOutlined";
+import SearchIcon from "@mui/icons-material/Search";
 import {
   AppBar,
   Backdrop,
@@ -29,6 +30,7 @@ import {
   Typography,
   Alert,
   IconButton,
+  InputAdornment,
 } from "@mui/material";
 
 axios.defaults.withCredentials = true;
@@ -37,7 +39,9 @@ const API_URL = import.meta.env.VITE_API_URL;
 const Modal4 = ({ open, onClose, onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [materials, setMaterials] = useState([]);
+  const [filteredMaterials, setFilteredMaterials] = useState([]);
   const [selectedWeights, setSelectedWeights] = useState({});
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState("");
@@ -46,21 +50,24 @@ const Modal4 = ({ open, onClose, onSuccess }) => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch materials from new API
+  // ✅ ดึงข้อมูลวัตถุดิบ
   const fetchMaterials = async () => {
     setIsLoading(true);
     try {
       const res = await axios.get(`${API_URL}/api/prep/getRMMixBatch`);
       if (res.data && res.data.success && Array.isArray(res.data.data)) {
         setMaterials(res.data.data);
+        setFilteredMaterials(res.data.data);
       } else {
         setMaterials([]);
+        setFilteredMaterials([]);
         showSnackbar("ไม่พบรายการวัตถุดิบ", "warning");
       }
     } catch (err) {
       console.error("fetchMaterials error", err);
       showSnackbar("ไม่สามารถดึงข้อมูลวัตถุดิบได้", "error");
       setMaterials([]);
+      setFilteredMaterials([]);
     } finally {
       setIsLoading(false);
     }
@@ -72,123 +79,112 @@ const Modal4 = ({ open, onClose, onSuccess }) => {
     }
   }, [open]);
 
+  // ✅ ฟังก์ชันแสดง Snackbar
   const showSnackbar = (msg, severity = "info") => {
     setSnackbarMsg(msg);
     setSnackbarSeverity(severity);
     setOpenSnackbar(true);
   };
 
+  // ✅ ค้นหา (filter ข้อมูล)
+// ✅ ค้นหา (filter ข้อมูล)
+const handleSearch = (e) => {
+  const term = e.target.value.toLowerCase();
+  setSearchTerm(term);
+
+  if (!term) {
+    setFilteredMaterials(materials);
+    return;
+  }
+
+  const filtered = materials.filter((m) => {
+    const mat = (m.mat ?? "").toString().toLowerCase();
+    const batch = (m.batch ?? "").toString().toLowerCase();
+    const hu = (m.hu ?? "").toString().toLowerCase();
+
+    return mat.includes(term) || batch.includes(term) || hu.includes(term);
+  });
+
+  setFilteredMaterials(filtered);
+};
+
+
+
+  // ✅ เมื่อกรอกน้ำหนัก
   const onWeightChange = (rmfbatch_id, value) => {
     const numValue = parseFloat(value) || 0;
-    const material = materials.find(m => m.rmfbatch_id === rmfbatch_id);
-    
+    const material = materials.find((m) => m.rmfbatch_id === rmfbatch_id);
+
     if (material && numValue > material.weight) {
       showSnackbar(`น้ำหนักไม่สามารถเกิน ${material.weight} กก.`, "warning");
       return;
     }
 
-    setSelectedWeights(prev => ({
+    setSelectedWeights((prev) => ({
       ...prev,
-      [rmfbatch_id]: numValue
+      [rmfbatch_id]: numValue,
     }));
   };
 
   const onRefresh = async () => {
     await fetchMaterials();
     setSelectedWeights({});
+    setSearchTerm("");
     showSnackbar("อัปเดตข้อมูลแล้ว", "success");
   };
 
   const getSelectedMaterials = () => {
-    return materials.filter(m => 
-      selectedWeights[m.rmfbatch_id] && selectedWeights[m.rmfbatch_id] > 0
+    return materials.filter(
+      (m) => selectedWeights[m.rmfbatch_id] && selectedWeights[m.rmfbatch_id] > 0
     );
   };
 
   const getTotalWeight = () => {
-    return Object.values(selectedWeights).reduce((sum, weight) => sum + (weight || 0), 0);
+    return Object.values(selectedWeights).reduce(
+      (sum, weight) => sum + (weight || 0),
+      0
+    );
   };
 
-  // const onMixClick = () => {
-  //   const selectedMaterials = getSelectedMaterials();
-  //   if (selectedMaterials.length === 0) {
-  //     showSnackbar("กรุณาเลือกวัตถุดิบและกรอกน้ำหนักอย่างน้อย 1 รายการ", "warning");
-  //     return;
-  //   }
-  //   setConfirmOpen(true);
-  // };
-
+  // ✅ ตรวจสอบก่อนผสม
   const onMixClick = () => {
-  const selectedMaterials = getSelectedMaterials();
-  if (selectedMaterials.length === 0) {
-    showSnackbar("กรุณาเลือกวัตถุดิบและกรอกน้ำหนักอย่างน้อย 1 รายการ", "warning");
-    return;
-  }
+    const selectedMaterials = getSelectedMaterials();
 
-  // ส่งข้อมูลกลับ parent และเปิด CameraActivationModal
-  handleClose();
-};
+    if (selectedMaterials.length === 0) {
+      showSnackbar("กรุณาเลือกวัตถุดิบและกรอกน้ำหนักอย่างน้อย 1 รายการ", "warning");
+      return;
+    }
 
+    // 🔍 ตรวจสอบว่าทั้งหมดเป็น mat เดียวกัน
+    const firstMat = selectedMaterials[0].mat;
+    const allSameMat = selectedMaterials.every((m) => m.mat === firstMat);
 
-  const submitMix = async () => {
-    setIsSubmitting(true);
-    try {
-      const selectedMaterials = getSelectedMaterials();
-      const payload = {
-        materials: selectedMaterials.map(material => ({
-          rmfbatch_id: material.rmfbatch_id,
-          mat: material.mat,
-          batch: material.batch,
-          weight: selectedWeights[material.rmfbatch_id],
-          level_eu: material.level_eu,
-          hu: material.hu
-        }))
-      };
+    if (!allSameMat) {
+      showSnackbar("ไม่สามารถผสมได้เนื่องจากคนละ Mat", "error");
+      return;
+    }
 
-      const res = await axios.post(`${API_URL}/api/prep/mix/emulsions`, payload);
+    // ✅ ผ่านเงื่อนไข ส่งข้อมูลกลับไป modal ถัดไป
+    handleClose();
+  };
 
-  if (res.data && res.data.success) {
-  showSnackbar("ผสมวัตถุดิบสำเร็จ", "success");
-  await fetchMaterials();
-  setSelectedWeights({});
-  setConfirmOpen(false);
-  if (typeof onSuccess === "function") onSuccess();
+  // ✅ ปิด modal และส่งข้อมูลกลับ parent
+  const handleClose = () => {
+    const selectedMaterials = getSelectedMaterials().map((material) => ({
+      rmfbatch_id: material.rmfbatch_id,
+      mat: material.mat,
+      batch: material.batch,
+      weight: selectedWeights[material.rmfbatch_id],
+      level_eu: material.level_eu,
+      hu: material.hu,
+    }));
 
-  // ส่งกลับ selected materials + total weight
-  handleClose();
-} else {
-        showSnackbar(res.data.message || "เกิดข้อผิดพลาดขณะผสม", "error");
-      }
-    } catch (err) {
-      console.error("submitMix error", err);
-      showSnackbar(
-        err?.response?.data?.error || err?.response?.data?.message || err.message,
-        "error"
-      );
-    } finally {
-      setIsSubmitting(false);
+    const totalWeight = getTotalWeight();
+
+    if (typeof onClose === "function") {
+      onClose({ selectedMaterials, totalWeight });
     }
   };
-
-  // แก้ onClose ภายใน Modal4
-const handleClose = () => {
-  const selectedMaterials = getSelectedMaterials().map(material => ({
-    rmfbatch_id: material.rmfbatch_id,
-    mat: material.mat,
-    batch: material.batch,
-    weight: selectedWeights[material.rmfbatch_id],
-    level_eu: material.level_eu,
-    hu: material.hu
-  }));
-
-  const totalWeight = getTotalWeight();
-
-  // ส่งกลับไป parent
-  if (typeof onClose === "function") {
-    onClose({ selectedMaterials, totalWeight });
-  }
-};
-
 
   return (
     <Fade in={open}>
@@ -202,6 +198,7 @@ const handleClose = () => {
           className="bg-white rounded-lg shadow-lg w-[1200px] h-[700px] overflow-hidden flex flex-col"
           style={{ color: "#585858" }}
         >
+          {/* Header */}
           <AppBar position="static" sx={{ backgroundColor: "#4e73df" }}>
             <Toolbar sx={{ minHeight: "50px", px: 2 }}>
               <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -221,17 +218,35 @@ const handleClose = () => {
 
           {/* Content */}
           <Box sx={{ flex: 1, p: 2, overflow: "auto" }}>
+            {/* 🔍 ช่องค้นหา */}
+            <Box sx={{ mb: 2, display: "flex", justifyContent: "flex-end" }}>
+              <TextField
+                size="small"
+                placeholder="ค้นหารหัสวัตถุดิบ / batch / HU"
+                value={searchTerm}
+                onChange={handleSearch}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ width: 300 }}
+              />
+            </Box>
+
             <Typography variant="h6" sx={{ mb: 2 }}>
               รายการวัตถุดิบ
             </Typography>
-            
+
             <TableContainer component={Paper} variant="outlined">
               <Table size="small">
                 <TableHead sx={{ backgroundColor: "#f8f9fc" }}>
                   <TableRow>
                     <TableCell align="center">ลำดับ</TableCell>
                     <TableCell>รหัสวัตถุดิบ</TableCell>
-                    <TableCell>batch</TableCell>
+                    <TableCell>Batch</TableCell>
                     <TableCell>HU</TableCell>
                     <TableCell align="right">น้ำหนักคงเหลือ (กก.)</TableCell>
                     <TableCell>ระดับ EU</TableCell>
@@ -240,7 +255,7 @@ const handleClose = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {materials.map((item, index) => (
+                  {filteredMaterials.map((item, index) => (
                     <TableRow key={item.rmfbatch_id}>
                       <TableCell align="center">{index + 1}</TableCell>
                       <TableCell>{item.mat}</TableCell>
@@ -248,20 +263,21 @@ const handleClose = () => {
                       <TableCell>{item.hu}</TableCell>
                       <TableCell align="right">{item.weight.toFixed(2)}</TableCell>
                       <TableCell>{item.level_eu}</TableCell>
-                      <TableCell>{item.hu}</TableCell>
                       <TableCell>
-                        {new Date(item.withdraw_date).toLocaleString('th-TH')}
+                        {new Date(item.withdraw_date).toLocaleString("th-TH")}
                       </TableCell>
                       <TableCell align="center">
                         <TextField
                           size="small"
                           type="number"
                           value={selectedWeights[item.rmfbatch_id] || ""}
-                          onChange={(e) => onWeightChange(item.rmfbatch_id, e.target.value)}
-                          inputProps={{ 
-                            step: "0.01", 
+                          onChange={(e) =>
+                            onWeightChange(item.rmfbatch_id, e.target.value)
+                          }
+                          inputProps={{
+                            step: "0.01",
                             min: "0",
-                            max: item.weight.toString()
+                            max: item.weight.toString(),
                           }}
                           sx={{ width: 120 }}
                           placeholder="0.00"
@@ -269,9 +285,9 @@ const handleClose = () => {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {materials.length === 0 && (
+                  {filteredMaterials.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} align="center">
+                      <TableCell colSpan={8} align="center">
                         {isLoading ? "กำลังโหลดข้อมูล..." : "ไม่มีรายการวัตถุดิบ"}
                       </TableCell>
                     </TableRow>
@@ -281,15 +297,15 @@ const handleClose = () => {
             </TableContainer>
 
             {/* Summary */}
-            <Box 
-              sx={{ 
-                mt: 2, 
-                p: 2, 
-                backgroundColor: "#f8f9fc", 
+            <Box
+              sx={{
+                mt: 2,
+                p: 2,
+                backgroundColor: "#f8f9fc",
                 borderRadius: 1,
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "center"
+                alignItems: "center",
               }}
             >
               <Typography variant="h6">
@@ -311,85 +327,19 @@ const handleClose = () => {
               >
                 ผสมวัตถุดิบ
               </Button>
-           <Button
-  variant="outlined"
-  startIcon={<CancelIcon />}
-  onClick={handleClose}
-  disabled={isSubmitting}
-  size="large"
->
-  ยกเลิก
-</Button>
-
-            </Box>
-          </Box>
-
-          {/* Confirm Dialog */}
-          <Dialog
-            open={confirmOpen}
-            onClose={() => !isSubmitting && setConfirmOpen(false)}
-            maxWidth="md"
-            fullWidth
-          >
-            <DialogTitle>ยืนยันการผสมวัตถุดิบ</DialogTitle>
-            <DialogContent>
-              <Typography variant="body1" sx={{ mb: 2, fontWeight: "bold" }}>
-                รายการที่จะผสม:
-              </Typography>
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead sx={{ backgroundColor: "#f8f9fc" }}>
-                    <TableRow>
-                      <TableCell>ลำดับ</TableCell>
-                      <TableCell>รหัสวัตถุดิบ</TableCell>
-                      <TableCell>batch</TableCell>
-                      <TableCell>ระดับ EU</TableCell>
-                      <TableCell align="right">น้ำหนัก (กก.)</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {getSelectedMaterials().map((material, idx) => (
-                      <TableRow key={`confirm-${material.rmfbatch_id}`}>
-                        <TableCell>{idx + 1}</TableCell>
-                        <TableCell>{material.mat}</TableCell>
-                        <TableCell>{material.batch}</TableCell>
-                        <TableCell>{material.level_eu}</TableCell>
-                        <TableCell>{material.hu}</TableCell>
-                        <TableCell align="right">
-                          {selectedWeights[material.rmfbatch_id].toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow sx={{ backgroundColor: "#f8f9fc" }}>
-                      <TableCell colSpan={4} align="right" sx={{ fontWeight: "bold" }}>
-                        น้ำหนักรวม:
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: "bold" }}>
-                        {getTotalWeight().toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </DialogContent>
-            <DialogActions>
-              <Button 
-                onClick={() => setConfirmOpen(false)}
+              <Button
+                variant="outlined"
+                startIcon={<CancelIcon />}
+                onClick={handleClose}
                 disabled={isSubmitting}
+                size="large"
               >
                 ยกเลิก
               </Button>
-              <Button 
-                onClick={submitMix} 
-                variant="contained" 
-                disabled={isSubmitting}
-                startIcon={isSubmitting ? <CircularProgress size={20} /> : <MixIcon />}
-              >
-                {isSubmitting ? "กำลังผสม..." : "ยืนยันผสม"}
-              </Button>
-            </DialogActions>
-          </Dialog>
+            </Box>
+          </Box>
 
+          {/* Snackbar */}
           <Snackbar
             open={openSnackbar}
             autoHideDuration={3000}

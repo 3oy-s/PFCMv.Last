@@ -1,0 +1,38 @@
+2025-10-30 11:53:27: 🔌 Connecting to MSSQL... (Attempt 1/1)
+2025-10-30 11:53:28: Worker 608 started on port 3000
+2025-10-30 11:53:28: Accessible on:
+2025-10-30 11:53:28:   http://172.48.0.114:3000
+2025-10-30 11:53:28: ✅ Redis adapter connected
+2025-10-30 11:53:29: Client connected: klJUDneO9INeNCHyAAAB
+2025-10-30 11:53:29: ✅ New connection: klJUDneO9INeNCHyAAAB
+2025-10-30 11:53:29: ✅ Database connection successful!
+2025-10-30 11:53:29: Database connection successful
+2025-10-30 11:53:32: 🔌 Connecting to MSSQL... (Attempt 1/1)
+2025-10-30 11:53:33: Worker 9400 started on port 3000
+2025-10-30 11:53:33: Accessible on:
+2025-10-30 11:53:33:   http://172.48.0.114:3000
+2025-10-30 11:53:33: ✅ Redis adapter connected
+2025-10-30 11:53:33: Client connected: 5PX42bhQytB_KL6EAAAB
+2025-10-30 11:53:33: ✅ New connection: 5PX42bhQytB_KL6EAAAB
+2025-10-30 11:53:33: ✅ Database connection successful!
+2025-10-30 11:53:33: Database connection successful
+2025-10-30 11:53:34: 🔄 Using existing DB connection pool
+2025-10-30 11:53:36: 🔌 Connecting to MSSQL... (Attempt 1/1)
+2025-10-30 11:53:37: Worker 13188 started on port 3000
+2025-10-30 11:53:37: Accessible on:
+2025-10-30 11:53:37:   http://172.48.0.114:3000
+2025-10-30 11:53:37: ✅ Redis adapter connected
+2025-10-30 11:53:37: ✅ Database connection successful!
+2025-10-30 11:53:37: Database connection successful
+2025-10-30 11:53:37: 🔄 Using existing DB connection pool
+2025-10-30 11:53:38: Client connected: K9gJWIcZozQnYlwTAAAB
+2025-10-30 11:53:38: ✅ New connection: K9gJWIcZozQnYlwTAAAB
+2025-10-30 11:53:39: 🔄 Using existing DB connection pool
+2025-10-30 11:53:43: 🔌 Connecting to MSSQL... (Attempt 1/1)
+2025-10-30 11:53:44: Worker 2080 started on port 3000
+2025-10-30 11:53:44: Accessible on:
+2025-10-30 11:53:44:   http://172.48.0.114:3000
+2025-10-30 11:53:44: ✅ Redis adapter connected
+2025-10-30 11:53:44: ✅ Database connection successful!
+2025-10-30 11:53:44: Database connection successful
+2025-10-30 11:53:45: 🔄 Using existing DB connection pool

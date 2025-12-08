@@ -27,7 +27,7 @@ const Row = ({
   index
 }) => {
   const isOpen = openRowId === row.mapping_id;
-  const { rmfp_id, stay_place, dest, rm_type_id, mapping_id, remark_qc, rm_status, oven_to_cold, qccheck_cold, remark_rework, remark_rework_cold, ...displayRow } = row;
+  const { rmfp_id, stay_place, dest,tro_id, rm_type_id, mapping_id, remark_qc, rm_status, oven_to_cold, qccheck_cold, remark_rework, remark_rework_cold, ...displayRow } = row;
   const backgroundColor = index % 2 === 0 ? '#ffffff' : "hsl(210, 100.00%, 88%)";
 
   // Create a new display object with the correct column order and values
@@ -36,7 +36,6 @@ const Row = ({
     mat: displayRow.mat,
     mat_name: displayRow.mat_name,
     production: displayRow.production,
-    tro_id: displayRow.tro_id,
     weight_RM: displayRow.weight_RM ? Number(displayRow.weight_RM).toFixed(2) : '-',// Display weight in the weight column
     tray_count: displayRow.tray_count, // Display tray count in the tray count column
     level_eu: displayRow.level_eu,
@@ -340,7 +339,6 @@ const TableMainPrep = ({ handleOpenModal, data, handleRowClick, handleOpenEditMo
     'mat',
     'mat_name',
     'production',
-    'tro_id',
     'weight_RM',
     'tray_count',
     'level_eu',
@@ -407,9 +405,9 @@ const TableMainPrep = ({ handleOpenModal, data, handleRowClick, handleOpenEditMo
               <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "160px" }}>
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>แผนการผลิต</Box>
               </TableCell>
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "120px" }}>
+              {/* <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "120px" }}>
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>ป้ายทะเบียน</Box>
-              </TableCell>
+              </TableCell> */}
               <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "100px" }}>
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>น้ำหนัก</Box>
               </TableCell>

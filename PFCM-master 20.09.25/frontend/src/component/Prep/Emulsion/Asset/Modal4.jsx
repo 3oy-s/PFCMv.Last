@@ -5,6 +5,7 @@ import WarehouseIcon from "@mui/icons-material/Warehouse";
 import MixIcon from "@mui/icons-material/Blender";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CancelIcon from "@mui/icons-material/CancelOutlined";
+import SearchIcon from "@mui/icons-material/Search";
 import {
   AppBar,
   Backdrop,
@@ -29,6 +30,7 @@ import {
   Typography,
   Alert,
   IconButton,
+  InputAdornment,
 } from "@mui/material";
 
 axios.defaults.withCredentials = true;
@@ -37,7 +39,9 @@ const API_URL = import.meta.env.VITE_API_URL;
 const Modal4 = ({ open, onClose, onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [materials, setMaterials] = useState([]);
+  const [filteredMaterials, setFilteredMaterials] = useState([]); // ✅ เพิ่ม state สำหรับ filter
   const [selectedWeights, setSelectedWeights] = useState({});
+  const [searchTerm, setSearchTerm] = useState(""); // ✅ ช่องค้นหา
 
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState("");
@@ -46,21 +50,24 @@ const Modal4 = ({ open, onClose, onSuccess }) => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch materials from new API
+  // ✅ ดึงข้อมูลวัตถุดิบ
   const fetchMaterials = async () => {
     setIsLoading(true);
     try {
       const res = await axios.get(`${API_URL}/api/prep/getRMForEmuList`);
       if (res.data && res.data.success && Array.isArray(res.data.data)) {
         setMaterials(res.data.data);
+        setFilteredMaterials(res.data.data); // ✅ ตั้งค่าเริ่มต้น
       } else {
         setMaterials([]);
+        setFilteredMaterials([]);
         showSnackbar("ไม่พบรายการวัตถุดิบ", "warning");
       }
     } catch (err) {
       console.error("fetchMaterials error", err);
       showSnackbar("ไม่สามารถดึงข้อมูลวัตถุดิบได้", "error");
       setMaterials([]);
+      setFilteredMaterials([]);
     } finally {
       setIsLoading(false);
     }
@@ -78,117 +85,81 @@ const Modal4 = ({ open, onClose, onSuccess }) => {
     setOpenSnackbar(true);
   };
 
+  // ✅ ฟังก์ชันค้นหา
+  const handleSearch = (e) => {
+    const term = e.target.value.toLowerCase();
+    setSearchTerm(term);
+
+    if (!term) {
+      setFilteredMaterials(materials);
+      return;
+    }
+
+    const filtered = materials.filter((m) => {
+      const mat = (m.mat ?? "").toString().toLowerCase();
+      const batch = (m.batch ?? "").toString().toLowerCase();
+      const hu = (m.hu ?? "").toString().toLowerCase();
+      return mat.includes(term) || batch.includes(term) || hu.includes(term);
+    });
+
+    setFilteredMaterials(filtered);
+  };
+
   const onWeightChange = (rmfemu_id, value) => {
     const numValue = parseFloat(value) || 0;
-    const material = materials.find(m => m.rmfemu_id === rmfemu_id);
-    
+    const material = materials.find((m) => m.rmfemu_id === rmfemu_id);
+
     if (material && numValue > material.weight) {
       showSnackbar(`น้ำหนักไม่สามารถเกิน ${material.weight} กก.`, "warning");
       return;
     }
 
-    setSelectedWeights(prev => ({
+    setSelectedWeights((prev) => ({
       ...prev,
-      [rmfemu_id]: numValue
+      [rmfemu_id]: numValue,
     }));
   };
 
   const onRefresh = async () => {
     await fetchMaterials();
     setSelectedWeights({});
+    setSearchTerm(""); // ✅ รีเซ็ตช่องค้นหา
     showSnackbar("อัปเดตข้อมูลแล้ว", "success");
   };
 
-  const getSelectedMaterials = () => {
-    return materials.filter(m => 
-      selectedWeights[m.rmfemu_id] && selectedWeights[m.rmfemu_id] > 0
+  const getSelectedMaterials = () =>
+    materials.filter(
+      (m) => selectedWeights[m.rmfemu_id] && selectedWeights[m.rmfemu_id] > 0
     );
-  };
 
-  const getTotalWeight = () => {
-    return Object.values(selectedWeights).reduce((sum, weight) => sum + (weight || 0), 0);
-  };
-
-  // const onMixClick = () => {
-  //   const selectedMaterials = getSelectedMaterials();
-  //   if (selectedMaterials.length === 0) {
-  //     showSnackbar("กรุณาเลือกวัตถุดิบและกรอกน้ำหนักอย่างน้อย 1 รายการ", "warning");
-  //     return;
-  //   }
-  //   setConfirmOpen(true);
-  // };
+  const getTotalWeight = () =>
+    Object.values(selectedWeights).reduce((sum, w) => sum + (w || 0), 0);
 
   const onMixClick = () => {
-  const selectedMaterials = getSelectedMaterials();
-  if (selectedMaterials.length === 0) {
-    showSnackbar("กรุณาเลือกวัตถุดิบและกรอกน้ำหนักอย่างน้อย 1 รายการ", "warning");
-    return;
-  }
-
-  // ส่งข้อมูลกลับ parent และเปิด CameraActivationModal
-  handleClose();
-};
-
-
-  const submitMix = async () => {
-    setIsSubmitting(true);
-    try {
-      const selectedMaterials = getSelectedMaterials();
-      const payload = {
-        materials: selectedMaterials.map(material => ({
-          rmfemu_id: material.rmfemu_id,
-          mat: material.mat,
-          batch: material.batch,
-          hu: material.hu,
-          weight: selectedWeights[material.rmfemu_id],
-          level_eu: material.level_eu
-        }))
-      };
-
-      const res = await axios.post(`${API_URL}/api/prep/mix/emulsions`, payload);
-
-  if (res.data && res.data.success) {
-  showSnackbar("ผสมวัตถุดิบสำเร็จ", "success");
-  await fetchMaterials();
-  setSelectedWeights({});
-  setConfirmOpen(false);
-  if (typeof onSuccess === "function") onSuccess();
-
-  // ส่งกลับ selected materials + total weight
-  handleClose();
-} else {
-        showSnackbar(res.data.message || "เกิดข้อผิดพลาดขณะผสม", "error");
-      }
-    } catch (err) {
-      console.error("submitMix error", err);
-      showSnackbar(
-        err?.response?.data?.error || err?.response?.data?.message || err.message,
-        "error"
-      );
-    } finally {
-      setIsSubmitting(false);
+    const selectedMaterials = getSelectedMaterials();
+    if (selectedMaterials.length === 0) {
+      showSnackbar("กรุณาเลือกวัตถุดิบและกรอกน้ำหนักอย่างน้อย 1 รายการ", "warning");
+      return;
     }
+    handleClose();
   };
 
-  // แก้ onClose ภายใน Modal4
-const handleClose = () => {
-  const selectedMaterials = getSelectedMaterials().map(material => ({
-    rmfemu_id: material.rmfemu_id,
-    mat: material.mat,
-    batch: material.batch,
-    hu: material.hu,
-    weight: selectedWeights[material.rmfemu_id],
-    level_eu: material.level_eu
-  }));
+  const handleClose = () => {
+    const selectedMaterials = getSelectedMaterials().map((m) => ({
+      rmfemu_id: m.rmfemu_id,
+      mat: m.mat,
+      batch: m.batch,
+      hu: m.hu,
+      weight: selectedWeights[m.rmfemu_id],
+      level_eu: m.level_eu,
+    }));
 
-  const totalWeight = getTotalWeight();
+    const totalWeight = getTotalWeight();
 
-  // ส่งกลับไป parent
-  if (typeof onClose === "function") {
-    onClose({ selectedMaterials, totalWeight });
-  }
-};
-
+    if (typeof onClose === "function") {
+      onClose({ selectedMaterials, totalWeight });
+    }
+  };
 
   return (
     <Fade in={open}>
@@ -202,6 +173,7 @@ const handleClose = () => {
           className="bg-white rounded-lg shadow-lg w-[1200px] h-[700px] overflow-hidden flex flex-col"
           style={{ color: "#585858" }}
         >
+          {/* Header */}
           <AppBar position="static" sx={{ backgroundColor: "#4e73df" }}>
             <Toolbar sx={{ minHeight: "50px", px: 2 }}>
               <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -221,17 +193,35 @@ const handleClose = () => {
 
           {/* Content */}
           <Box sx={{ flex: 1, p: 2, overflow: "auto" }}>
+            {/* 🔍 ช่องค้นหา */}
+            <Box sx={{ mb: 2, display: "flex", justifyContent: "flex-end" }}>
+              <TextField
+                size="small"
+                placeholder="ค้นหารหัสวัตถุดิบ / batch / HU"
+                value={searchTerm}
+                onChange={handleSearch}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ width: 300 }}
+              />
+            </Box>
+
             <Typography variant="h6" sx={{ mb: 2 }}>
               รายการวัตถุดิบ
             </Typography>
-            
+
             <TableContainer component={Paper} variant="outlined">
               <Table size="small">
                 <TableHead sx={{ backgroundColor: "#f8f9fc" }}>
                   <TableRow>
                     <TableCell align="center">ลำดับ</TableCell>
                     <TableCell>รหัสวัตถุดิบ</TableCell>
-                    <TableCell>batch</TableCell>
+                    <TableCell>Batch</TableCell>
                     <TableCell>HU</TableCell>
                     <TableCell align="right">น้ำหนักคงเหลือ (กก.)</TableCell>
                     <TableCell>ระดับ EU</TableCell>
@@ -240,7 +230,7 @@ const handleClose = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {materials.map((item, index) => (
+                  {filteredMaterials.map((item, index) => (
                     <TableRow key={item.rmfemu_id}>
                       <TableCell align="center">{index + 1}</TableCell>
                       <TableCell>{item.mat}</TableCell>
@@ -249,18 +239,20 @@ const handleClose = () => {
                       <TableCell align="right">{item.weight.toFixed(2)}</TableCell>
                       <TableCell>{item.level_eu}</TableCell>
                       <TableCell>
-                        {new Date(item.withdraw_date).toLocaleString('th-TH')}
+                        {new Date(item.withdraw_date).toLocaleString("th-TH")}
                       </TableCell>
                       <TableCell align="center">
                         <TextField
                           size="small"
                           type="number"
                           value={selectedWeights[item.rmfemu_id] || ""}
-                          onChange={(e) => onWeightChange(item.rmfemu_id, e.target.value)}
-                          inputProps={{ 
-                            step: "0.01", 
+                          onChange={(e) =>
+                            onWeightChange(item.rmfemu_id, e.target.value)
+                          }
+                          inputProps={{
+                            step: "0.01",
                             min: "0",
-                            max: item.weight.toString()
+                            max: item.weight.toString(),
                           }}
                           sx={{ width: 120 }}
                           placeholder="0.00"
@@ -268,9 +260,9 @@ const handleClose = () => {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {materials.length === 0 && (
+                  {filteredMaterials.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} align="center">
+                      <TableCell colSpan={8} align="center">
                         {isLoading ? "กำลังโหลดข้อมูล..." : "ไม่มีรายการวัตถุดิบ"}
                       </TableCell>
                     </TableRow>
@@ -280,15 +272,15 @@ const handleClose = () => {
             </TableContainer>
 
             {/* Summary */}
-            <Box 
-              sx={{ 
-                mt: 2, 
-                p: 2, 
-                backgroundColor: "#f8f9fc", 
+            <Box
+              sx={{
+                mt: 2,
+                p: 2,
+                backgroundColor: "#f8f9fc",
                 borderRadius: 1,
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "center"
+                alignItems: "center",
               }}
             >
               <Typography variant="h6">
@@ -310,84 +302,19 @@ const handleClose = () => {
               >
                 ผสมวัตถุดิบ
               </Button>
-           <Button
-  variant="outlined"
-  startIcon={<CancelIcon />}
-  onClick={handleClose}
-  disabled={isSubmitting}
-  size="large"
->
-  ยกเลิก
-</Button>
-
-            </Box>
-          </Box>
-
-          {/* Confirm Dialog */}
-          <Dialog
-            open={confirmOpen}
-            onClose={() => !isSubmitting && setConfirmOpen(false)}
-            maxWidth="md"
-            fullWidth
-          >
-            <DialogTitle>ยืนยันการผสมวัตถุดิบ</DialogTitle>
-            <DialogContent>
-              <Typography variant="body1" sx={{ mb: 2, fontWeight: "bold" }}>
-                รายการที่จะผสม:
-              </Typography>
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead sx={{ backgroundColor: "#f8f9fc" }}>
-                    <TableRow>
-                      <TableCell>ลำดับ</TableCell>
-                      <TableCell>รหัสวัตถุดิบ</TableCell>
-                      <TableCell>batch</TableCell>
-                      <TableCell>ระดับ EU</TableCell>
-                      <TableCell align="right">น้ำหนัก (กก.)</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {getSelectedMaterials().map((material, idx) => (
-                      <TableRow key={`confirm-${material.rmfemu_id}`}>
-                        <TableCell>{idx + 1}</TableCell>
-                        <TableCell>{material.mat}</TableCell>
-                        <TableCell>{material.batch}</TableCell>
-                        <TableCell>{material.level_eu}</TableCell>
-                        <TableCell align="right">
-                          {selectedWeights[material.rmfemu_id].toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow sx={{ backgroundColor: "#f8f9fc" }}>
-                      <TableCell colSpan={4} align="right" sx={{ fontWeight: "bold" }}>
-                        น้ำหนักรวม:
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: "bold" }}>
-                        {getTotalWeight().toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </DialogContent>
-            <DialogActions>
-              <Button 
-                onClick={() => setConfirmOpen(false)}
+              <Button
+                variant="outlined"
+                startIcon={<CancelIcon />}
+                onClick={handleClose}
                 disabled={isSubmitting}
+                size="large"
               >
                 ยกเลิก
               </Button>
-              <Button 
-                onClick={submitMix} 
-                variant="contained" 
-                disabled={isSubmitting}
-                startIcon={isSubmitting ? <CircularProgress size={20} /> : <MixIcon />}
-              >
-                {isSubmitting ? "กำลังผสม..." : "ยืนยันผสม"}
-              </Button>
-            </DialogActions>
-          </Dialog>
+            </Box>
+          </Box>
 
+          {/* Snackbar */}
           <Snackbar
             open={openSnackbar}
             autoHideDuration={3000}

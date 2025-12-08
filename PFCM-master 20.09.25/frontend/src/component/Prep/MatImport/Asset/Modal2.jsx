@@ -358,7 +358,7 @@ const Modal2 = ({ open, onClose, onNext, data, mapping_id, tro_id, CookedDateTim
             )}
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginTop: "5px" }}>
+          {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginTop: "5px" }}>
             <Typography style={{ fontSize: "15px" }} color="rgba(0, 0, 0, 0.6)">
               Batch เก่า:
             </Typography>
@@ -384,9 +384,9 @@ const Modal2 = ({ open, onClose, onNext, data, mapping_id, tro_id, CookedDateTim
             ) : (
               <Typography variant="body2">ไม่มีข้อมูล</Typography>
             )}
-          </Box>
+          </Box> */}
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginTop: "5px" }}>
+          {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginTop: "5px" }}>
             <Typography style={{ fontSize: "15px" }} color="rgba(0, 0, 0, 0.6)">
               ประวัติการแก้ไข:
             </Typography>
@@ -398,7 +398,7 @@ const Modal2 = ({ open, onClose, onNext, data, mapping_id, tro_id, CookedDateTim
             ) : (
               <Typography variant="body2">ไม่มีข้อมูล</Typography>
             )}
-          </Box>
+          </Box> */}
 
           <Divider sx={{ mt: 1, mb: 2 }} />
 

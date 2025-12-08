@@ -332,7 +332,7 @@ const ConfirmProdModal = ({
   );
 };
 
-const DataReviewSAP = ({ open, onClose, material, batch }) => {
+const DataReviewSAP = ({ open, onClose, material, batch,hu }) => {
   const [selectedPlanSets, setSelectedPlanSets] = useState([]);
   const [materialName, setMaterialName] = useState("");
   const [production, setProduction] = useState([]);
@@ -652,6 +652,7 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
               <Typography>Material: {material}</Typography>
               <Typography>Material Name: {materialName}</Typography>
               <Typography>Batch: {batch}</Typography>
+              <Typography>HU: {hu}</Typography>
             </Box>
 
             <Box>
@@ -962,6 +963,7 @@ const DataReviewSAP = ({ open, onClose, material, batch }) => {
         material={material}
         materialName={materialName}
         batch={batch}
+        hu={hu}
         selectedPlanSets={selectedPlanSets.filter(set => set.plan && set.line && set.group)}
         deliveryLocation={deliveryLocation}
         emulsion={emulsion}
