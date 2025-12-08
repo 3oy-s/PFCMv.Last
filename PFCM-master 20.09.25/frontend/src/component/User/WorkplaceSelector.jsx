@@ -91,7 +91,7 @@ const WorkplaceSelector = () => {
      {
       wp_id: "7",
       name: "ห้องเย็นใหญ่",
-      route: "http://10.88.87.97:5173/coldStorages"
+      route: "http://10.205.165.97:5173/coldStorages"
     }
   ];
 

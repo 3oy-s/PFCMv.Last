@@ -274,7 +274,7 @@ const RawMatSelectionModal = ({ open, onClose, onAdd, currentTroId, onSelectionC
             <Box sx={style}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                     <Typography variant="h6" component="h2">
-                        เลือกวัตถุดิบจากห้องเย็น
+                        เลือกวัตถุดิบจากห้องเย็น.
                     </Typography>
                     <IconButton onClick={onClose}>
                         <CloseIcon />

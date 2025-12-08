@@ -15,14 +15,8 @@ import { IoClose } from "react-icons/io5";
 import CancelIcon from "@mui/icons-material/Cancel";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import axios from "axios";
+import QrScanner from "qr-scanner";
 axios.defaults.withCredentials = true;
-
-
-// Mock QR Scanner for demo
-const QrScanner = {
-  start: () => { },
-  stop: () => { },
-};
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -75,12 +69,10 @@ const Modal1 = ({
   const [inputError, setInputError] = useState(false);
   const [apiError, setApiError] = useState("");
 
-  // เปลี่ยนจาก single batch input เป็น array ของ batch inputs
   const [batchInputs, setBatchInputs] = useState({});
   const [batchErrors, setBatchErrors] = useState({});
   const [isEditableUser, setIsEditableUser] = useState(false);
 
-  // ดึง user_id จาก localStorage
   useEffect(() => {
     const storedUser = localStorage.getItem("user_id");
     const userId = storedUser ? parseInt(storedUser, 10) : null;
@@ -88,13 +80,10 @@ const Modal1 = ({
     setIsEditableUser(allowedUsers.includes(userId));
   }, []);
 
-  // ตรวจสอบว่าฟอร์มถูกต้องหรือไม่
   const isFormValid = () => {
     const isTrolleyValid = inputValue.trim() !== "" && inputValue.trim().length <= 4;
 
-    // ถ้าเป็น rm_type ที่ต้องการ batch
     if ([3, 6, 7, 8].includes(rm_type_id)) {
-      // ต้องกรอก batch ครบทุก batch ใน batchArray
       const allBatchesFilled = batchArray.every((b) => {
         const input = batchInputs[b] || "";
         return input.trim() !== "" && input.length === 10;
@@ -105,7 +94,6 @@ const Modal1 = ({
     return isTrolleyValid;
   };
 
-  // Reset form เมื่อเปิด modal
   useEffect(() => {
     if (open) {
       setInputValue("");
@@ -113,7 +101,6 @@ const Modal1 = ({
       setApiError("");
       setInputError(false);
 
-      // สร้าง initial batch inputs
       const initialBatchInputs = {};
       const initialBatchErrors = {};
 
@@ -129,6 +116,7 @@ const Modal1 = ({
     }
   }, [open, batchArray]);
 
+  // ใช้วิธีเดียวกับชุดที่ 1
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -137,10 +125,29 @@ const Modal1 = ({
       videoRef.current.srcObject = stream;
       videoRef.current.play();
 
-      // QR Scanner implementation (simplified for demo)
-      // In production, use actual QrScanner library
+      const qrScanner = new QrScanner(
+        videoRef.current,
+        (result) => {
+          if (result) {
+            let value = result?.data || result;
+            // ตัดให้ไม่เกิน 4 ตัวเลข
+            value = value.replace(/\D/g, "").slice(-4);
+            setScannedValue(value);
+            setInputValue(value);
+            checkTrolleyStatus(value);
+          }
+        },
+        {
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+        }
+      );
+
+      qrScannerRef.current = qrScanner;
+      qrScanner.start();
     } catch (err) {
       console.error("Error opening camera:", err);
+      setApiError("ไม่สามารถเปิดกล้องได้ กรุณาตรวจสอบการอนุญาตใช้งานกล้อง");
     }
   };
 
@@ -165,13 +172,9 @@ const Modal1 = ({
 
   const checkTrolleyStatus = async (value) => {
     try {
-      // Mock API call - replace with actual axios call
       const response = await axios.get(`${API_URL}/api/checkTrolley`, {
         params: { tro: value },
       });
-
-      // Simulated response
-      // const response = { data: { success: true, message: "รถเข็นพร้อมใช้งาน" } };
 
       if (response.data.success === false) {
         setApiError(response.data.message || "ไม่มีรถเข็นคันนี้ในระบบ");
@@ -193,13 +196,10 @@ const Modal1 = ({
 
   const reserveTrolley = async (tro_id) => {
     try {
-      // Mock API call - replace with actual axios call
       const response = await axios.post(`${API_URL}/api/reserveTrolley`, {
         tro_id: tro_id,
       });
 
-      // Simulated response
-      // const response = { data: { success: true } };
       return response.data.success;
     } catch (error) {
       setApiError("รถเข็นถูกจองแล้ว");
@@ -212,13 +212,11 @@ const Modal1 = ({
     setBatchErrors({});
     setApiError("");
 
-    // ตรวจสอบ trolley
     if (inputValue.trim() === "" || inputValue.trim().length > 4) {
       setInputError(true);
       return;
     }
 
-    // ตรวจสอบ batch inputs
     if ([3, 6, 7, 8].includes(rm_type_id)) {
       const newBatchErrors = {};
       let hasError = false;
@@ -243,23 +241,20 @@ const Modal1 = ({
     const isReserved = await reserveTrolley(inputValue);
     if (!isReserved) return;
 
-    // สร้าง array ของ batch_after สำหรับแต่ละ batch
     const batchAfterArray = batchArray.map((b) => ({
       batch_before: b,
-      batch_after: batchInputs[b] ? batchInputs[b] : b, // ถ้าไม่มีค่า ใช้ b
+      batch_after: batchInputs[b] ? batchInputs[b] : b,
     }));
-
 
     onNext({
       inputValues: [inputValue],
       batch: batch,
       batchArray: batchArray,
-      batchAfterArray: batchAfterArray, // ส่งข้อมูล batch_after ทั้งหมด
+      batchAfterArray: batchAfterArray,
       rmfp_id: rmfp_id,
     });
   };
 
-  // Handle batch input change
   const handleBatchInputChange = (batchValue, newValue) => {
     const upperValue = newValue.toUpperCase();
     if (upperValue.length <= 10) {
@@ -274,7 +269,6 @@ const Modal1 = ({
     }
   };
 
-  // Use old batch for specific input
   const useOldBatch = (batchValue) => {
     setBatchInputs((prev) => ({
       ...prev,
@@ -348,10 +342,10 @@ const Modal1 = ({
 
           <video
             ref={videoRef}
-            style={{
-              width: "100%",
-              marginBottom: theme.spacing(1),
-              borderRadius: "4px",
+            style={{ 
+              width: "100%", 
+              marginBottom: theme.spacing(1), 
+              borderRadius: "4px" 
             }}
             autoPlay
             muted
@@ -359,7 +353,6 @@ const Modal1 = ({
 
           <Divider sx={{ mt: 1, mb: 1 }} />
 
-          {/* Batch Array Display */}
           <Typography
             sx={{
               fontSize: "16px",
@@ -392,7 +385,6 @@ const Modal1 = ({
             )}
           </Box>
 
-          {/* Multiple Batch Inputs - แสดงเฉพาะเมื่อเป็น rm_type ที่ต้องการ */}
           {[3, 6, 7, 8].includes(rm_type_id) &&
             batchArray &&
             batchArray.length > 0 && (
@@ -470,7 +462,6 @@ const Modal1 = ({
               </Box>
             )}
 
-          {/* Trolley Input */}
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <TextField
               fullWidth
