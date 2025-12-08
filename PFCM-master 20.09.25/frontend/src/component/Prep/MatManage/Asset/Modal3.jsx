@@ -158,28 +158,28 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
       const numberOfTrays = safeDecimalConvert(input2?.numberOfTrays, 0);
 
       const payload = {
-  license_plate: Array.isArray(inputValues) ? inputValues.join(" ") : inputValues,
-  rmfpID: rmfp_id || "",
-  // batch_before: batchBefore || "",
-  // batch_after: batchAfter || "", // อันนี้ optional ขึ้นอยู่กับ backend
-  batchAfterArray: batchAfterArray || [], // <-- ส่งแบบ object
-  cookedDateTimeNew: formattedDateTime || "",
-  preparedDateTimeNew: formattedPreparedTime || "",
-  weightTotal: weightTotal,
-  ntray: numberOfTrays,
-  recorder: input2?.operator || "",
-  Dest: input2?.deliveryLocation || "",
-  Process: input2?.selectedProcessType?.process_id || "",
-  deliveryType: input2?.deliveryType || "",
-  userID: Number(userId),
-  level_eu: level_eu || "",
-  tray_count: numberOfTrays,
-  weight_RM: weightTotal,
-  mat_name: materialName,
-  withdraw_date: formattedWithdrawDate || "",
-  production: productionValue,
-  mat: materialCode || mat || ""
-};
+        license_plate: Array.isArray(inputValues) ? inputValues.join(" ") : inputValues,
+        rmfpID: rmfp_id || "",
+        // batch_before: batchBefore || "",
+        // batch_after: batchAfter || "", // อันนี้ optional ขึ้นอยู่กับ backend
+        batchAfterArray: batchAfterArray || [], // <-- ส่งแบบ object
+        cookedDateTimeNew: formattedDateTime || "",
+        preparedDateTimeNew: formattedPreparedTime || "",
+        weightTotal: weightTotal,
+        ntray: numberOfTrays,
+        recorder: input2?.operator || "",
+        Dest: input2?.deliveryLocation || "",
+        Process: input2?.selectedProcessType?.process_id || "",
+        deliveryType: input2?.deliveryType || "",
+        userID: Number(userId),
+        level_eu: level_eu || "",
+        tray_count: numberOfTrays,
+        weight_RM: weightTotal,
+        mat_name: materialName,
+        withdraw_date: formattedWithdrawDate || "",
+        production: productionValue,
+        mat: materialCode || mat || ""
+      };
 
 
       console.log("Payload before sending:", payload);
@@ -239,7 +239,7 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
 
     } catch (error) {
       console.error("Error:", error);
-      setError("ไม่สามารถทำรายการได้ เนื่องจากเลยเวลาที่กำหนด 5 นาที หรือ เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+      setError("ไม่สามารถทำรายการได้ เนื่องจากเลยเวลาที่กำหนด 5 นาที ");
       setIsLoading(false);
       setIsProcessing(false);
     }
@@ -273,15 +273,15 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
   // }, [data]);
 
   useEffect(() => {
-  // ดึงค่า batchAfterArray แบบ object
-  if (data?.batchAfterArray && Array.isArray(data.batchAfterArray)) {
-    const afterBatches = data.batchAfterArray.map(item => ({
-      batch_before: item.batch_before,
-      batch_after: item.batch_after || item.new_batch_after || ""
-    }));
-    setBatchAfterArray(afterBatches);
-  }
-}, [data]);
+    // ดึงค่า batchAfterArray แบบ object
+    if (data?.batchAfterArray && Array.isArray(data.batchAfterArray)) {
+      const afterBatches = data.batchAfterArray.map(item => ({
+        batch_before: item.batch_before,
+        batch_after: item.batch_after || item.new_batch_after || ""
+      }));
+      setBatchAfterArray(afterBatches);
+    }
+  }, [data]);
 
 
   const handleBatchAfterChange = (event) => {
@@ -334,7 +334,9 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
                 </Typography>
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 2 }}>
                   {batchArray.map((batchItem, idx) => {
-                    const newBatch = batchAfterArray[idx] || "N/A";
+                    const newBatchObj = batchAfterArray[idx];
+                    const newBatch = newBatchObj?.batch_after || "N/A";
+
                     return (
                       <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         {/* Batch เดิม */}

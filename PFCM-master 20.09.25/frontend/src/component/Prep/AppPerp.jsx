@@ -16,6 +16,7 @@ import EmulsionPage from "./Emulsion/EmusionPage.jsx";
 import RM_EMU from "./RMEmu/MainPage.jsx";
 import BatchMIXPage from "./BatchMIX/BatchMIXPage.jsx";
 import TraceBack_HU from "./TraceBackHU/MainPage.jsx";
+import EditDataTrolley from "./EditDataTrolley/EditDataTrolley.jsx";
 
 function AppPrep() {
   return (
@@ -46,6 +47,7 @@ function AppPrep() {
         <Route path="/Emulsions" element={<EmulsionPage />} />
         <Route path="/BatchMIX" element={<BatchMIXPage />} />
         <Route path="/TraceBack_HU" element={<TraceBack_HU />} />
+        <Route path="/EditDataTrolley" element={<EditDataTrolley />} />
       </Routes>
     </div>
   );

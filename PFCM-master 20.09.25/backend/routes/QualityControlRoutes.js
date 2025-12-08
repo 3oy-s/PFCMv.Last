@@ -5,17 +5,17 @@ module.exports = (io) => {
 	const router = express.Router();
 
 	router.get("/qc/main/fetchRMForProd", async (req, res) => {
-  try {
-    const { rm_type_ids } = req.query;
+		try {
+			const { rm_type_ids } = req.query;
 
-    if (!rm_type_ids) {
-      return res.status(400).json({ success: false, error: "RM Type IDs are required" });
-    }
+			if (!rm_type_ids) {
+				return res.status(400).json({ success: false, error: "RM Type IDs are required" });
+			}
 
-    const rmTypeIdsArray = rm_type_ids.split(',');
-    const pool = await connectToDatabase();
+			const rmTypeIdsArray = rm_type_ids.split(',');
+			const pool = await connectToDatabase();
 
-    const query = `
+			const query = `
       SELECT
         rmf.rmfp_id,
         STRING_AGG(b.batch_after, ', ') AS batch, -- ✅ รวมค่าทั้งหมดใน mapping เดียว
@@ -76,40 +76,40 @@ module.exports = (io) => {
       ORDER BY MAX(htr.cooked_date) DESC
     `;
 
-    const result = await pool.request().query(query);
+			const result = await pool.request().query(query);
 
-    const formattedData = result.recordset.map(item => {
-      const date = new Date(item.cooked_date);
-      const year = date.getUTCFullYear();
-      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(date.getUTCDate()).padStart(2, '0');
-      const hours = String(date.getUTCHours()).padStart(2, '0');
-      const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-      item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
-      delete item.cooked_date;
-      return item;
-    });
+			const formattedData = result.recordset.map(item => {
+				const date = new Date(item.cooked_date);
+				const year = date.getUTCFullYear();
+				const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+				const day = String(date.getUTCDate()).padStart(2, '0');
+				const hours = String(date.getUTCHours()).padStart(2, '0');
+				const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+				item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
+				delete item.cooked_date;
+				return item;
+			});
 
-    res.json({ success: true, data: formattedData });
-  } catch (err) {
-    console.error("SQL error", err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+			res.json({ success: true, data: formattedData });
+		} catch (err) {
+			console.error("SQL error", err);
+			res.status(500).json({ success: false, error: err.message });
+		}
+	});
 
 
-router.get("/qc/fetchRMForProd", async (req, res) => {
-  try {
-    const { rm_type_ids } = req.query;
+	router.get("/qc/fetchRMForProd", async (req, res) => {
+		try {
+			const { rm_type_ids } = req.query;
 
-    if (!rm_type_ids) {
-      return res.status(400).json({ success: false, error: "RM Type IDs are required" });
-    }
+			if (!rm_type_ids) {
+				return res.status(400).json({ success: false, error: "RM Type IDs are required" });
+			}
 
-    const rmTypeIdsArray = rm_type_ids.split(',');
-    const pool = await connectToDatabase();
+			const rmTypeIdsArray = rm_type_ids.split(',');
+			const pool = await connectToDatabase();
 
-    const query = `
+			const query = `
       SELECT
         rmm.mapping_id,
         rmf.rmfp_id,
@@ -189,187 +189,187 @@ router.get("/qc/fetchRMForProd", async (req, res) => {
       ORDER BY MAX(htr.cooked_date) DESC;
     `;
 
-    const result = await pool.request().query(query);
+			const result = await pool.request().query(query);
 
-    const formattedData = result.recordset.map(item => {
-      // Format cooked_date
-      if (item.cooked_date) {
-        const cookedDate = new Date(item.cooked_date);
-        const year = cookedDate.getUTCFullYear();
-        const month = String(cookedDate.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(cookedDate.getUTCDate()).padStart(2, '0');
-        const hours = String(cookedDate.getUTCHours()).padStart(2, '0');
-        const minutes = String(cookedDate.getUTCMinutes()).padStart(2, '0');
-        item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
-        delete item.cooked_date;
-      }
+			const formattedData = result.recordset.map(item => {
+				// Format cooked_date
+				if (item.cooked_date) {
+					const cookedDate = new Date(item.cooked_date);
+					const year = cookedDate.getUTCFullYear();
+					const month = String(cookedDate.getUTCMonth() + 1).padStart(2, '0');
+					const day = String(cookedDate.getUTCDate()).padStart(2, '0');
+					const hours = String(cookedDate.getUTCHours()).padStart(2, '0');
+					const minutes = String(cookedDate.getUTCMinutes()).padStart(2, '0');
+					item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
+					delete item.cooked_date;
+				}
 
-      // Format rmit_date
-      if (item.rmit_date) {
-        const rmitDate = new Date(item.rmit_date);
-        const year = rmitDate.getUTCFullYear();
-        const month = String(rmitDate.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(rmitDate.getUTCDate()).padStart(2, '0');
-        const hours = String(rmitDate.getUTCHours()).padStart(2, '0');
-        const minutes = String(rmitDate.getUTCMinutes()).padStart(2, '0');
-        item.rmit_date = `${year}-${month}-${day} ${hours}:${minutes}`;
-      }
+				// Format rmit_date
+				if (item.rmit_date) {
+					const rmitDate = new Date(item.rmit_date);
+					const year = rmitDate.getUTCFullYear();
+					const month = String(rmitDate.getUTCMonth() + 1).padStart(2, '0');
+					const day = String(rmitDate.getUTCDate()).padStart(2, '0');
+					const hours = String(rmitDate.getUTCHours()).padStart(2, '0');
+					const minutes = String(rmitDate.getUTCMinutes()).padStart(2, '0');
+					item.rmit_date = `${year}-${month}-${day} ${hours}:${minutes}`;
+				}
 
-      return item;
-    });
+				return item;
+			});
 
-    res.json({ success: true, data: formattedData });
-  } catch (err) {
-    console.error("SQL error", err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+			res.json({ success: true, data: formattedData });
+		} catch (err) {
+			console.error("SQL error", err);
+			res.status(500).json({ success: false, error: err.message });
+		}
+	});
 
 
 	router.post("/qc/check", async (req, res) => {
-	let transaction;
-	try {
-		const {
-			mapping_id,
-			color,
-			odor,
-			texture,
-			sq_remark,
-			md,
-			md_remark,
-			defect,
-			defect_remark,
-			Defectacceptance,
-			Sensoryacceptance,
-			md_no,
-			operator,
-			rm_status_qc,
-			WorkAreaCode,
-			Moisture,
-			Temp,
-			md_time,
-			tro_id,
-			percent_fine,
-			weight_RM,
-			rmm_line_name,
-			tray_count,
-			dest,
-			general_remark,
-			prepare_mor_night
-		} = req.body;
+		let transaction;
+		try {
+			const {
+				mapping_id,
+				color,
+				odor,
+				texture,
+				sq_remark,
+				md,
+				md_remark,
+				defect,
+				defect_remark,
+				Defectacceptance,
+				Sensoryacceptance,
+				md_no,
+				operator,
+				rm_status_qc,
+				WorkAreaCode,
+				Moisture,
+				Temp,
+				md_time,
+				tro_id,
+				percent_fine,
+				weight_RM,
+				rmm_line_name,
+				tray_count,
+				dest,
+				general_remark,
+				prepare_mor_night
+			} = req.body;
 
-		let thaiMdDateTime = null;
-		let destlast = dest;
+			let thaiMdDateTime = null;
+			let destlast = dest;
 
-		console.log("dest :", dest);
+			console.log("dest :", dest);
 
-		if (md_time) {
-			try {
-				const dateObj = new Date(md_time);
-				dateObj.setHours(dateObj.getHours() + 7); // ปรับเวลาเป็นไทย
-				thaiMdDateTime = dateObj;
-			} catch (error) {
-				console.error("Error parsing md_time:", error);
-				thaiMdDateTime = null;
+			if (md_time) {
+				try {
+					const dateObj = new Date(md_time);
+					dateObj.setHours(dateObj.getHours() + 7); // ปรับเวลาเป็นไทย
+					thaiMdDateTime = dateObj;
+				} catch (error) {
+					console.error("Error parsing md_time:", error);
+					thaiMdDateTime = null;
+				}
 			}
-		}
 
-		// ✅ ตรวจสอบค่าที่จำเป็น
-		if (
-			!mapping_id ||
-			isNaN(mapping_id) ||
-			color === undefined ||
-			odor === undefined ||
-			texture === undefined ||
-			md === undefined ||
-			defect === undefined ||
-			!operator ||
-			(md === 1 && (!md_no || !WorkAreaCode))
-		) {
-			return res.status(400).json({
-				success: false,
-				message: "กรุณากรอกข้อมูลให้ครบถ้วน",
-			});
-		}
+			// ✅ ตรวจสอบค่าที่จำเป็น
+			if (
+				!mapping_id ||
+				isNaN(mapping_id) ||
+				color === undefined ||
+				odor === undefined ||
+				texture === undefined ||
+				md === undefined ||
+				defect === undefined ||
+				!operator ||
+				(md === 1 && (!md_no || !WorkAreaCode))
+			) {
+				return res.status(400).json({
+					success: false,
+					message: "กรุณากรอกข้อมูลให้ครบถ้วน",
+				});
+			}
 
-		const pool = await connectToDatabase();
+			const pool = await connectToDatabase();
 
-		// ✅ ตรวจสอบ MD
-		if (Number(md) === 1) {
-			const mdCheck = await pool
-				.request()
-				.input("md_no", sql.NVarChar, md_no)
-				.query(`
+			// ✅ ตรวจสอบ MD
+			if (Number(md) === 1) {
+				const mdCheck = await pool
+					.request()
+					.input("md_no", sql.NVarChar, md_no)
+					.query(`
 					SELECT md_no
 					FROM [PFCMv2].[dbo].[MetalDetectors]
 					WHERE md_no = @md_no AND Status = CAST(1 AS BIT)
 				`);
 
-			if (mdCheck.recordset.length === 0) {
-				return res.status(400).json({
-					success: false,
-					message: `ไม่พบเครื่อง Metal Detector หมายเลข ${md_no} หรือเครื่องไม่พร้อมใช้งาน`,
-				});
+				if (mdCheck.recordset.length === 0) {
+					return res.status(400).json({
+						success: false,
+						message: `ไม่พบเครื่อง Metal Detector หมายเลข ${md_no} หรือเครื่องไม่พร้อมใช้งาน`,
+					});
+				}
 			}
-		}
 
-		// ✅ ตรวจสอบ mapping_id
-		const mappingCheck = await pool
-			.request()
-			.input("mapping_id", sql.Int, mapping_id)
-			.query(`
+			// ✅ ตรวจสอบ mapping_id
+			const mappingCheck = await pool
+				.request()
+				.input("mapping_id", sql.Int, mapping_id)
+				.query(`
 				SELECT mapping_id
 				FROM [PFCMv2].[dbo].[TrolleyRMMapping]
 				WHERE mapping_id = @mapping_id
 			`);
 
-		if (mappingCheck.recordset.length === 0) {
-			return res.status(400).json({
-				success: false,
-				message: `ไม่พบ mapping_id ${mapping_id} ในระบบ`,
-			});
-		}
-
-		// ✅ ตั้งค่าเริ่มต้น
-		let rm_status = "QcCheck";
-		let qccheck = "ผ่าน";
-		let defect_check = "ผ่าน";
-		let md_check = "ผ่าน";
-
-		if ([color, odor, texture].includes(0) && Sensoryacceptance !== 1) {
-			rm_status = "QcCheck รอแก้ไข";
-			qccheck = "ไม่ผ่าน";
-			destlast = "จุดเตรียม";
-			console.log("destlast sen ไม่ผ่าน :", destlast);
-		}
-
-		if (defect === 0 && Defectacceptance !== 1) {
-			rm_status = "QcCheck รอแก้ไข";
-			defect_check = "ไม่ผ่าน";
-			destlast = "จุดเตรียม";
-			console.log("destlast defect ไม่ผ่าน :", destlast);
-		}
-
-		if (md === 0) {
-			if ((defect === 0 && Defectacceptance !== 1) || ([color, odor, texture].includes(0) && Sensoryacceptance !== 1)) {
-				rm_status = "QcCheck รอแก้ไข";
-				destlast = "จุดเตรียม";
-				console.log("destlast md defect หรือ sen ไม่ผ่าน :", destlast);
-			} else {
-				rm_status = "QcCheck รอ MD";
-				md_check = "รอผ่าน MD";
+			if (mappingCheck.recordset.length === 0) {
+				return res.status(400).json({
+					success: false,
+					message: `ไม่พบ mapping_id ${mapping_id} ในระบบ`,
+				});
 			}
-		}
 
-		// ✅ เริ่ม Transaction
-		transaction = new sql.Transaction(pool);
-		await transaction.begin();
+			// ✅ ตั้งค่าเริ่มต้น
+			let rm_status = "QcCheck";
+			let qccheck = "ผ่าน";
+			let defect_check = "ผ่าน";
+			let md_check = "ผ่าน";
 
-		// ✅ ค้นหาเวลา rework / mix / prep_to_pack
-		const timeData = await transaction
-			.request()
-			.input("mapping_id", sql.Int, mapping_id)
-			.query(`
+			if ([color, odor, texture].includes(0) && Sensoryacceptance !== 1) {
+				rm_status = "QcCheck รอแก้ไข";
+				qccheck = "ไม่ผ่าน";
+				destlast = "จุดเตรียม";
+				console.log("destlast sen ไม่ผ่าน :", destlast);
+			}
+
+			if (defect === 0 && Defectacceptance !== 1) {
+				rm_status = "QcCheck รอแก้ไข";
+				defect_check = "ไม่ผ่าน";
+				destlast = "จุดเตรียม";
+				console.log("destlast defect ไม่ผ่าน :", destlast);
+			}
+
+			if (md === 0) {
+				if ((defect === 0 && Defectacceptance !== 1) || ([color, odor, texture].includes(0) && Sensoryacceptance !== 1)) {
+					rm_status = "QcCheck รอแก้ไข";
+					destlast = "จุดเตรียม";
+					console.log("destlast md defect หรือ sen ไม่ผ่าน :", destlast);
+				} else {
+					rm_status = "QcCheck รอ MD";
+					md_check = "รอผ่าน MD";
+				}
+			}
+
+			// ✅ เริ่ม Transaction
+			transaction = new sql.Transaction(pool);
+			await transaction.begin();
+
+			// ✅ ค้นหาเวลา rework / mix / prep_to_pack
+			const timeData = await transaction
+				.request()
+				.input("mapping_id", sql.Int, mapping_id)
+				.query(`
 				SELECT 
 					rmm.rework_time,
 					rmm.mix_time,
@@ -382,46 +382,46 @@ router.get("/qc/fetchRMForProd", async (req, res) => {
 				WHERE mapping_id = @mapping_id
 			`);
 
-		let rework_time = null;
-		let mix_time = null;
-		let prep_to_pack_time = null;
+			let rework_time = null;
+			let mix_time = null;
+			let prep_to_pack_time = null;
 
-		if (timeData.recordset.length > 0) {
-			rework_time = timeData.recordset[0].rework_time;
-			mix_time = timeData.recordset[0].mix_time;
+			if (timeData.recordset.length > 0) {
+				rework_time = timeData.recordset[0].rework_time;
+				mix_time = timeData.recordset[0].mix_time;
 
-			if (destlast === 'ไปบรรจุ') {
-				prep_to_pack_time = timeData.recordset[0].prep_to_pack_time ?? timeData.recordset[0].prep_to_pack;
-			} else {
-				prep_to_pack_time = timeData.recordset[0].prep_to_pack_time;
+				if (destlast === 'ไปบรรจุ') {
+					prep_to_pack_time = timeData.recordset[0].prep_to_pack_time ?? timeData.recordset[0].prep_to_pack;
+				} else {
+					prep_to_pack_time = timeData.recordset[0].prep_to_pack_time;
+				}
 			}
-		}
 
-		// ✅ INSERT QC
-		const insertResult = await transaction
-			.request()
-			.input("color", sql.Bit, color ? 1 : 0)
-			.input("odor", sql.Bit, odor ? 1 : 0)
-			.input("texture", sql.Bit, texture ? 1 : 0)
-			.input("sq_remark", sql.NVarChar, sq_remark || null)
-			.input("md", sql.Bit, md ? 1 : 0)
-			.input("md_remark", sql.NVarChar, md_remark || null)
-			.input("defect", sql.Bit, defect ? 1 : 0)
-			.input("defect_remark", sql.NVarChar, defect_remark || null)
-			.input("Defectacceptance", sql.Bit, Defectacceptance ? 1 : 0)
-			.input("Sensoryacceptance", sql.Bit, Sensoryacceptance ? 1 : 0)
-			.input("md_no", sql.NVarChar, md_no)
-			.input("WorkAreaCode", sql.NVarChar, WorkAreaCode)
-			.input("qccheck", sql.NVarChar, qccheck)
-			.input("md_check", sql.NVarChar, md_check)
-			.input("defect_check", sql.NVarChar, defect_check)
-			.input("Moisture", sql.NVarChar, Moisture || null)
-			.input("Temp", sql.NVarChar, Temp || null)
-			.input("md_time", sql.DateTime, thaiMdDateTime)
-			.input("percent_fine", sql.NVarChar, percent_fine || null)
-			.input("general_remark", sql.NVarChar, general_remark || null)
-			.input("prepare_mor_night", sql.NVarChar, prepare_mor_night || null)
-			.query(`
+			// ✅ INSERT QC
+			const insertResult = await transaction
+				.request()
+				.input("color", sql.Bit, color ? 1 : 0)
+				.input("odor", sql.Bit, odor ? 1 : 0)
+				.input("texture", sql.Bit, texture ? 1 : 0)
+				.input("sq_remark", sql.NVarChar, sq_remark || null)
+				.input("md", sql.Bit, md ? 1 : 0)
+				.input("md_remark", sql.NVarChar, md_remark || null)
+				.input("defect", sql.Bit, defect ? 1 : 0)
+				.input("defect_remark", sql.NVarChar, defect_remark || null)
+				.input("Defectacceptance", sql.Bit, Defectacceptance ? 1 : 0)
+				.input("Sensoryacceptance", sql.Bit, Sensoryacceptance ? 1 : 0)
+				.input("md_no", sql.NVarChar, md_no)
+				.input("WorkAreaCode", sql.NVarChar, WorkAreaCode)
+				.input("qccheck", sql.NVarChar, qccheck)
+				.input("md_check", sql.NVarChar, md_check)
+				.input("defect_check", sql.NVarChar, defect_check)
+				.input("Moisture", sql.NVarChar, Moisture || null)
+				.input("Temp", sql.NVarChar, Temp || null)
+				.input("md_time", sql.DateTime, thaiMdDateTime)
+				.input("percent_fine", sql.NVarChar, percent_fine || null)
+				.input("general_remark", sql.NVarChar, general_remark || null)
+				.input("prepare_mor_night", sql.NVarChar, prepare_mor_night || null)
+				.query(`
 				DECLARE @InsertedTable TABLE (qc_id INT);
 				INSERT INTO [PFCMv2].[dbo].[QC] 
 					(color, odor, texture, sq_acceptance, sq_remark, md, md_remark, defect, defect_acceptance, defect_remark, md_no, WorkAreaCode, qccheck, mdcheck, defectcheck, Moisture, Temp, md_time, percent_fine, qc_datetime, general_remark,prepare_mor_night)
@@ -431,61 +431,61 @@ router.get("/qc/fetchRMForProd", async (req, res) => {
 				SELECT qc_id FROM @InsertedTable;
 			`);
 
-		const qc_id = insertResult.recordset[0].qc_id;
+			const qc_id = insertResult.recordset[0].qc_id;
 
-		// ✅ UPDATE TrolleyRMMapping
-		if (destlast === 'ไปบรรจุ') {
-			await transaction
-				.request()
-				.input("mapping_id", sql.Int, mapping_id)
-				.input("rm_status", sql.NVarChar, rm_status)
-				.input("dest", sql.NVarChar, destlast)
-				.input("qc_id", sql.Int, qc_id)
-				.input("prep_to_pack_time", sql.Int, prep_to_pack_time)
-				.query(`
+			// ✅ UPDATE TrolleyRMMapping
+			if (destlast === 'ไปบรรจุ') {
+				await transaction
+					.request()
+					.input("mapping_id", sql.Int, mapping_id)
+					.input("rm_status", sql.NVarChar, rm_status)
+					.input("dest", sql.NVarChar, destlast)
+					.input("qc_id", sql.Int, qc_id)
+					.input("prep_to_pack_time", sql.Int, prep_to_pack_time)
+					.query(`
 					UPDATE [PFCMv2].[dbo].[TrolleyRMMapping]
 					SET rm_status = @rm_status, qc_id = @qc_id, prep_to_pack_time = @prep_to_pack_time , dest = @dest
 					WHERE mapping_id = @mapping_id
 				`);
-		} else {
-			await transaction
-				.request()
-				.input("mapping_id", sql.Int, mapping_id)
-				.input("rm_status", sql.NVarChar, rm_status)
-				.input("dest", sql.NVarChar, destlast)
-				.input("qc_id", sql.Int, qc_id)
-				.query(`
+			} else {
+				await transaction
+					.request()
+					.input("mapping_id", sql.Int, mapping_id)
+					.input("rm_status", sql.NVarChar, rm_status)
+					.input("dest", sql.NVarChar, destlast)
+					.input("qc_id", sql.Int, qc_id)
+					.query(`
 					UPDATE [PFCMv2].[dbo].[TrolleyRMMapping]
 					SET rm_status = @rm_status, qc_id = @qc_id,dest = @dest
 					WHERE mapping_id = @mapping_id
 				`);
-		}
+			}
 
-		let adjusted_md_time = null;
-		if (md_time) {
-			adjusted_md_time = new Date(md_time);
-			adjusted_md_time.setHours(adjusted_md_time.getHours() + 7);
-		}
+			let adjusted_md_time = null;
+			if (md_time) {
+				adjusted_md_time = new Date(md_time);
+				adjusted_md_time.setHours(adjusted_md_time.getHours() + 7);
+			}
 
-		// ✅ UPDATE History
-		if (destlast === 'ไปบรรจุ') {
-			await transaction
-				.request()
-				.input("mapping_id", sql.Int, mapping_id)
-				.input("receiver", sql.NVarChar, operator)
-				.input("tro_id", sql.NVarChar, tro_id)
-				.input("Moisture", sql.NVarChar, Moisture)
-				.input("percent_fine", sql.NVarChar, percent_fine)
-				.input("Temp", sql.NVarChar, Temp)
-				.input("md_time", sql.DateTime, adjusted_md_time)
-				.input("rmm_line_name", sql.NVarChar, rmm_line_name)
-				.input("weight_RM", sql.Float, weight_RM)
-				.input("tray_count", sql.Int, tray_count)
-				.input("dest", sql.NVarChar, destlast)
-				.input("rework_time", sql.Int, rework_time)
-				.input("mix_time", sql.Int, mix_time)
-				.input("prep_to_pack_time", sql.Int, prep_to_pack_time)
-				.query(`
+			// ✅ UPDATE History
+			if (destlast === 'ไปบรรจุ') {
+				await transaction
+					.request()
+					.input("mapping_id", sql.Int, mapping_id)
+					.input("receiver", sql.NVarChar, operator)
+					.input("tro_id", sql.NVarChar, tro_id)
+					.input("Moisture", sql.NVarChar, Moisture)
+					.input("percent_fine", sql.NVarChar, percent_fine)
+					.input("Temp", sql.NVarChar, Temp)
+					.input("md_time", sql.DateTime, adjusted_md_time)
+					.input("rmm_line_name", sql.NVarChar, rmm_line_name)
+					.input("weight_RM", sql.Float, weight_RM)
+					.input("tray_count", sql.Int, tray_count)
+					.input("dest", sql.NVarChar, destlast)
+					.input("rework_time", sql.Int, rework_time)
+					.input("mix_time", sql.Int, mix_time)
+					.input("prep_to_pack_time", sql.Int, prep_to_pack_time)
+					.query(`
 					UPDATE [PFCMv2].[dbo].[History]
 					SET receiver_qc = @receiver,
 						tro_id = @tro_id,
@@ -504,46 +504,46 @@ router.get("/qc/fetchRMForProd", async (req, res) => {
 					WHERE mapping_id = @mapping_id
 				`);
 
-			// ✅ เคลียร์รถเข็นเฉพาะตอน dest = 'ไปบรรจุ'
-			if (tro_id) {
-				// รถเข็นว่าง
-				await transaction
-					.request()
-					.input("tro_id", sql.NVarChar, tro_id)
-					.query(`
+				// ✅ เคลียร์รถเข็นเฉพาะตอน dest = 'ไปบรรจุ'
+				if (tro_id) {
+					// รถเข็นว่าง
+					await transaction
+						.request()
+						.input("tro_id", sql.NVarChar, tro_id)
+						.query(`
 						UPDATE [PFCMv2].[dbo].[Trolley]
 						SET tro_status = 1
 						WHERE tro_id = @tro_id
 					`);
 
-				// ล้างรถจาก mapping
-				await transaction
-					.request()
-					.input("mapping_id", sql.Int, mapping_id)
-					.query(`
+					// ล้างรถจาก mapping
+					await transaction
+						.request()
+						.input("mapping_id", sql.Int, mapping_id)
+						.query(`
 						UPDATE [PFCMv2].[dbo].[TrolleyRMMapping]
 						SET tro_id = NULL
 						WHERE mapping_id = @mapping_id
 					`);
 
-				console.log(`เคลียร์รถเข็น tro_id = ${tro_id} ให้เป็นว่างแล้ว`);
-			}
-		} else {
-			await transaction
-				.request()
-				.input("mapping_id", sql.Int, mapping_id)
-				.input("receiver", sql.NVarChar, operator)
-				.input("tro_id", sql.NVarChar, tro_id)
-				.input("Moisture", sql.NVarChar, Moisture)
-				.input("percent_fine", sql.NVarChar, percent_fine)
-				.input("Temp", sql.NVarChar, Temp)
-				.input("md_time", sql.DateTime, adjusted_md_time)
-				.input("rmm_line_name", sql.NVarChar, rmm_line_name)
-				.input("weight_RM", sql.Float, weight_RM)
-				.input("tray_count", sql.Int, tray_count)
-				.input("dest", sql.NVarChar, destlast)
-				.input("prepare_mor_night", sql.NVarChar, prepare_mor_night)
-				.query(`
+					console.log(`เคลียร์รถเข็น tro_id = ${tro_id} ให้เป็นว่างแล้ว`);
+				}
+			} else {
+				await transaction
+					.request()
+					.input("mapping_id", sql.Int, mapping_id)
+					.input("receiver", sql.NVarChar, operator)
+					.input("tro_id", sql.NVarChar, tro_id)
+					.input("Moisture", sql.NVarChar, Moisture)
+					.input("percent_fine", sql.NVarChar, percent_fine)
+					.input("Temp", sql.NVarChar, Temp)
+					.input("md_time", sql.DateTime, adjusted_md_time)
+					.input("rmm_line_name", sql.NVarChar, rmm_line_name)
+					.input("weight_RM", sql.Float, weight_RM)
+					.input("tray_count", sql.Int, tray_count)
+					.input("dest", sql.NVarChar, destlast)
+					.input("prepare_mor_night", sql.NVarChar, prepare_mor_night)
+					.query(`
 					UPDATE [PFCMv2].[dbo].[History]
 					SET receiver_qc = @receiver,
 						tro_id = @tro_id,
@@ -559,41 +559,41 @@ router.get("/qc/fetchRMForProd", async (req, res) => {
 						qc_date = GETDATE()
 					WHERE mapping_id = @mapping_id
 				`);
+			}
+
+			// ✅ Commit
+			await transaction.commit();
+
+			// ✅ Socket emit
+			const io = req.app.get("io");
+			const formattedData = {
+				mappingId: mapping_id,
+				qcId: qc_id,
+				rmStatus: rm_status,
+				qccheck,
+				mdcheck: md_check,
+				defectcheck: defect_check,
+				updatedAt: new Date(),
+				operator,
+				dest,
+				trayCount: tray_count,
+				weightRM: weight_RM,
+			};
+			io.to("QcCheckRoom").emit("dataUpdated", formattedData);
+
+			res.json({ success: true, message: "บันทึกข้อมูลสำเร็จ", qc_id });
+
+		} catch (err) {
+			console.error("SQL Error:", err);
+			if (transaction) await transaction.rollback();
+			res.status(500).json({
+				success: false,
+				message: "เกิดข้อผิดพลาดในระบบ",
+				error: err.message,
+				stack: err.stack,
+			});
 		}
-
-		// ✅ Commit
-		await transaction.commit();
-
-		// ✅ Socket emit
-		const io = req.app.get("io");
-		const formattedData = {
-			mappingId: mapping_id,
-			qcId: qc_id,
-			rmStatus: rm_status,
-			qccheck,
-			mdcheck: md_check,
-			defectcheck: defect_check,
-			updatedAt: new Date(),
-			operator,
-			dest,
-			trayCount: tray_count,
-			weightRM: weight_RM,
-		};
-		io.to("QcCheckRoom").emit("dataUpdated", formattedData);
-
-		res.json({ success: true, message: "บันทึกข้อมูลสำเร็จ", qc_id });
-
-	} catch (err) {
-		console.error("SQL Error:", err);
-		if (transaction) await transaction.rollback();
-		res.status(500).json({
-			success: false,
-			message: "เกิดข้อผิดพลาดในระบบ",
-			error: err.message,
-			stack: err.stack,
-		});
-	}
-});
+	});
 
 
 
@@ -635,7 +635,11 @@ router.get("/qc/fetchRMForProd", async (req, res) => {
           htr.three_prod,
           htr.name_edit_prod_two,
           htr.name_edit_prod_three,
-          htr.prepare_mor_night
+          htr.prepare_mor_night,
+		  htr.rmit_date,
+	CONVERT(varchar(16), htr.rmit_date, 120) AS rmit_date_formatted,
+		  htr.withdraw_date,
+    CONVERT(varchar(16), htr.withdraw_date, 120) AS withdraw_date_formatted
 		  
         FROM TrolleyRMMapping rmm
         JOIN QC qc ON rmm.qc_id = qc.qc_id
@@ -655,25 +659,25 @@ router.get("/qc/fetchRMForProd", async (req, res) => {
 		}
 	});
 
-router.get("/qc/History/All", async (req, res) => {
-  try {
-    const { page = 1, pageSize = 20 } = req.query;
-    const rm_type_ids = req.query.rm_type_ids; // รับ rm_type_ids จาก query parameters
+	router.get("/qc/History/All", async (req, res) => {
+		try {
+			const { page = 1, pageSize = 20 } = req.query;
+			const rm_type_ids = req.query.rm_type_ids; // รับ rm_type_ids จาก query parameters
 
-    if (!rm_type_ids) {
-      return res.status(400).json({ success: false, error: "RM Type IDs are required" });
-    }
+			if (!rm_type_ids) {
+				return res.status(400).json({ success: false, error: "RM Type IDs are required" });
+			}
 
-    const rmTypeIdsArray = rm_type_ids.split(',');
-    const offset = (page - 1) * pageSize;
-    console.log('Request params:', { page, pageSize, offset, rm_type_ids });
+			const rmTypeIdsArray = rm_type_ids.split(',');
+			const offset = (page - 1) * pageSize;
+			console.log('Request params:', { page, pageSize, offset, rm_type_ids });
 
-    console.log('Connecting to database...');
-    const pool = await connectToDatabase();
-    console.log('Database connected, executing query...');
+			console.log('Connecting to database...');
+			const pool = await connectToDatabase();
+			console.log('Database connected, executing query...');
 
-    // 1. Query สำหรับนับจำนวนทั้งหมด (พร้อมกรอง rm_type_id)
-    const countQuery = `
+			// 1. Query สำหรับนับจำนวนทั้งหมด (พร้อมกรอง rm_type_id)
+			const countQuery = `
       SELECT COUNT(*) AS total
       FROM RMForProd rmf
       JOIN TrolleyRMMapping rmm ON rmf.rmfp_id = rmm.rmfp_id
@@ -687,11 +691,11 @@ router.get("/qc/History/All", async (req, res) => {
       WHERE rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')})
     `;
 
-    const countResult = await pool.request().query(countQuery);
-    const totalRows = countResult.recordset[0].total;
+			const countResult = await pool.request().query(countQuery);
+			const totalRows = countResult.recordset[0].total;
 
-    // 2. Query หลักพร้อม pagination และกรอง rm_type_id
-    const mainQuery = `
+			// 2. Query หลักพร้อม pagination และกรอง rm_type_id
+			const mainQuery = `
      SELECT
     rmm.mapping_id,
     rmf.rmfp_id,
@@ -819,36 +823,36 @@ router.get("/qc/History/All", async (req, res) => {
   FETCH NEXT @pageSize ROWS ONLY
     `;
 
-    const result = await pool.request()
-      .input('offset', sql.Int, offset)
-      .input('pageSize', sql.Int, pageSize)
-      .query(mainQuery);
+			const result = await pool.request()
+				.input('offset', sql.Int, offset)
+				.input('pageSize', sql.Int, pageSize)
+				.query(mainQuery);
 
-    console.log("Data fetched:", result.recordset.length, 'records');
+			console.log("Data fetched:", result.recordset.length, 'records');
 
-    const formattedData = result.recordset.map(item => {
-      const date = new Date(item.cooked_date);
-      const year = date.getUTCFullYear();
-      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(date.getUTCDate()).padStart(2, '0');
-      const hours = String(date.getUTCHours()).padStart(2, '0');
-      const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+			const formattedData = result.recordset.map(item => {
+				const date = new Date(item.cooked_date);
+				const year = date.getUTCFullYear();
+				const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+				const day = String(date.getUTCDate()).padStart(2, '0');
+				const hours = String(date.getUTCHours()).padStart(2, '0');
+				const minutes = String(date.getUTCMinutes()).padStart(2, '0');
 
-      item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
-      delete item.cooked_date;
+				item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
+				delete item.cooked_date;
 
-      item.WorkAreaCode = item.WorkAreaCode || null;
+				item.WorkAreaCode = item.WorkAreaCode || null;
 
-      return item;
-    });
+				return item;
+			});
 
-    console.log('Sending response with', formattedData.length, 'records');
-    res.json({ success: true, data: formattedData, total: totalRows });
-  } catch (err) {
-    console.error("SQL error:", err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+			console.log('Sending response with', formattedData.length, 'records');
+			res.json({ success: true, data: formattedData, total: totalRows });
+		} catch (err) {
+			console.error("SQL error:", err);
+			res.status(500).json({ success: false, error: err.message });
+		}
+	});
 
 
 	router.put("/update-destination", async (req, res) => {
@@ -1358,116 +1362,116 @@ router.get("/qc/History/All", async (req, res) => {
 
 	// API สำหรับแก้ไขวันที่/เวลา QC ตรวจสอบ
 	router.post("/update-qc-datetime", async (req, res) => {
-	let transaction;
-	try {
-		const { mapping_id, qc_datetime } = req.body;
+		let transaction;
+		try {
+			const { mapping_id, qc_datetime } = req.body;
 
-		// 1. ตรวจสอบข้อมูลที่จำเป็น
-		if (!mapping_id || !qc_datetime) {
-			return res.status(400).json({
-				success: false,
-				message: "กรุณาระบุ mapping_id และวันที่/เวลา",
-			});
-		}
+			// 1. ตรวจสอบข้อมูลที่จำเป็น
+			if (!mapping_id || !qc_datetime) {
+				return res.status(400).json({
+					success: false,
+					message: "กรุณาระบุ mapping_id และวันที่/เวลา",
+				});
+			}
 
-		// 2. เชื่อมต่อฐานข้อมูล
-		const pool = await connectToDatabase();
+			// 2. เชื่อมต่อฐานข้อมูล
+			const pool = await connectToDatabase();
 
-		// 3. ตรวจสอบว่า mapping_id มีอยู่และมีการเชื่อมโยงกับ qc_id
-		const mappingCheck = await pool
-			.request()
-			.input("mapping_id", sql.Int, mapping_id)
-			.query(`
+			// 3. ตรวจสอบว่า mapping_id มีอยู่และมีการเชื่อมโยงกับ qc_id
+			const mappingCheck = await pool
+				.request()
+				.input("mapping_id", sql.Int, mapping_id)
+				.query(`
 				SELECT qc_id
 				FROM [PFCMv2].[dbo].[TrolleyRMMapping]
 				WHERE mapping_id = @mapping_id AND qc_id IS NOT NULL
 			`);
 
-		if (mappingCheck.recordset.length === 0) {
-			return res.status(404).json({
-				success: false,
-				message: `ไม่พบข้อมูล QC สำหรับ mapping_id ${mapping_id}`,
-			});
-		}
+			if (mappingCheck.recordset.length === 0) {
+				return res.status(404).json({
+					success: false,
+					message: `ไม่พบข้อมูล QC สำหรับ mapping_id ${mapping_id}`,
+				});
+			}
 
-		const qc_id = mappingCheck.recordset[0].qc_id;
+			const qc_id = mappingCheck.recordset[0].qc_id;
 
-		// ✅ 4. ดึง tro_id จากตาราง History
-		const historyCheck = await pool
-			.request()
-			.input("mapping_id", sql.Int, mapping_id)
-			.query(`
+			// ✅ 4. ดึง tro_id จากตาราง History
+			const historyCheck = await pool
+				.request()
+				.input("mapping_id", sql.Int, mapping_id)
+				.query(`
 				SELECT tro_id
 				FROM [PFCMv2].[dbo].[History]
 				WHERE mapping_id = @mapping_id
 			`);
 
-		let tro_id = null;
-		if (historyCheck.recordset.length > 0) {
-			tro_id = historyCheck.recordset[0].tro_id;
-		}
+			let tro_id = null;
+			if (historyCheck.recordset.length > 0) {
+				tro_id = historyCheck.recordset[0].tro_id;
+			}
 
-		// 5. เริ่ม Transaction
-		transaction = new sql.Transaction(pool);
-		await transaction.begin();
+			// 5. เริ่ม Transaction
+			transaction = new sql.Transaction(pool);
+			await transaction.begin();
 
-		// 6. อัปเดตวันที่/เวลา QC ในตาราง QC
-		await transaction
-			.request()
-			.input("qc_id", sql.Int, qc_id)
-			.input("qc_datetime", sql.DateTime, new Date(qc_datetime))
-			.query(`
+			// 6. อัปเดตวันที่/เวลา QC ในตาราง QC
+			await transaction
+				.request()
+				.input("qc_id", sql.Int, qc_id)
+				.input("qc_datetime", sql.DateTime, new Date(qc_datetime))
+				.query(`
 				UPDATE [PFCMv2].[dbo].[QC]
 				SET qc_datetime = @qc_datetime
 				WHERE qc_id = @qc_id
 			`);
 
-		// 7. อัปเดตวันที่ QC ในตาราง History
-		await transaction
-			.request()
-			.input("mapping_id", sql.Int, mapping_id)
-			.input("qc_date", sql.DateTime, new Date(qc_datetime))
-			.query(`
+			// 7. อัปเดตวันที่ QC ในตาราง History
+			await transaction
+				.request()
+				.input("mapping_id", sql.Int, mapping_id)
+				.input("qc_date", sql.DateTime, new Date(qc_datetime))
+				.query(`
 				UPDATE [PFCMv2].[dbo].[History]
 				SET qc_date = @qc_date
 				WHERE mapping_id = @mapping_id
 			`);
 
-		// 8. Commit Transaction
-		await transaction.commit();
+			// 8. Commit Transaction
+			await transaction.commit();
 
-		// 9. ส่งการแจ้งเตือนผ่าน Socket.io (ถ้ามีการใช้งาน)
-		const broadcastData = {
-			message: "QC datetime has been updated successfully!",
-			mapping_id,
-			qc_id,
-			tro_id, // ✅ เพิ่ม tro_id ใน broadcast ด้วย
-		};
-		if (req.app.get("io")) {
-			req.app.get("io").to("QcCheckRoom").emit("qcDateTimeUpdated", broadcastData);
-		}
+			// 9. ส่งการแจ้งเตือนผ่าน Socket.io (ถ้ามีการใช้งาน)
+			const broadcastData = {
+				message: "QC datetime has been updated successfully!",
+				mapping_id,
+				qc_id,
+				tro_id, // ✅ เพิ่ม tro_id ใน broadcast ด้วย
+			};
+			if (req.app.get("io")) {
+				req.app.get("io").to("QcCheckRoom").emit("qcDateTimeUpdated", broadcastData);
+			}
 
-		// 10. ส่ง Response
-		res.json({
-			success: true,
-			message: "อัปเดตวันที่/เวลาสำเร็จ",
-			mapping_id,
-			qc_id,
-			tro_id,
-			qc_datetime_formatted: new Date(qc_datetime).toLocaleString("th-TH"),
-		});
-	} catch (err) {
-		console.error("SQL Error:", err);
-		if (transaction) {
-			await transaction.rollback();
+			// 10. ส่ง Response
+			res.json({
+				success: true,
+				message: "อัปเดตวันที่/เวลาสำเร็จ",
+				mapping_id,
+				qc_id,
+				tro_id,
+				qc_datetime_formatted: new Date(qc_datetime).toLocaleString("th-TH"),
+			});
+		} catch (err) {
+			console.error("SQL Error:", err);
+			if (transaction) {
+				await transaction.rollback();
+			}
+			res.status(500).json({
+				success: false,
+				message: "เกิดข้อผิดพลาดในระบบ",
+				error: err.message,
+			});
 		}
-		res.status(500).json({
-			success: false,
-			message: "เกิดข้อผิดพลาดในระบบ",
-			error: err.message,
-		});
-	}
-});
+	});
 
 
 	router.post("/update-md-datetime", async (req, res) => {

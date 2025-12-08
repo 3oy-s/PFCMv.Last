@@ -418,7 +418,7 @@ const Row = ({
           icon={<EditIcon style={{ color: '#ffc107', fontSize: '22px' }} />}
           backgroundColor={backgroundColor}
         />
-        <Packsend
+        {/* <Packsend
           width={CUSTOM_COLUMN_WIDTHS.edit}
           onClick={(e) => {
             e.stopPropagation();
@@ -426,7 +426,7 @@ const Row = ({
           }}
           icon={<FaRegCheckCircle style={{ color: '#ff0000', fontSize: '22px' }} />}
           backgroundColor={backgroundColor}
-        />
+        /> */}
       </TableRow>
       <TableRow>
         <TableCell style={{ padding: "0px", border: "0px solid" }}></TableCell>
@@ -680,14 +680,14 @@ const TableMainPrep = ({
               </TableCell>
 
               {/* แก้ไข */}
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #e0e0e0", fontSize: '12px', color: '#787878', padding: '5px', width: "90px" }}>
+              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #e0e0e0", fontSize: '12px', color: '#787878', padding: '5px',borderTopRightRadius: '8px', borderBottomRightRadius: '8px', width: "90px" }}>
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>แก้ไข</Box>
               </TableCell>
 
               {/* เปลี่ยนเป็นเคลียร์น้ำหนักและย้ายมาท้ายสุด */}
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #e0e0e0", fontSize: '12px', color: '#787878', padding: '5px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px', width: "90px" }}>
+              {/* <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #e0e0e0", fontSize: '12px', color: '#787878', padding: '5px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px', width: "90px" }}>
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>เคลียร์น้ำหนัก</Box>
-              </TableCell>
+              </TableCell> */}
             </TableRow>
           </TableHead>
 
