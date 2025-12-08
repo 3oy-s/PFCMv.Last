@@ -24,9 +24,7 @@ const ScanSAPPage = () => {
         <CameraActivationModal />
         <ParentComponent />
       </main>
-      <main className="max-w-8xl mx-auto py-1 px-1 lg:px-8">
-        <Buttom title="Copyright © 2025 i-Tail Corporation Public Company Limited. All right reserved" />
-      </main>
+     
     </div>
   );
 };
