@@ -216,6 +216,7 @@ const Sidebar = () => {
   // กำหนดรายการเมนู - รวมทั้งสองไฟล์
   const SIDEBAR_ITEMS = [
     { name: "หน้าหลัก", icon: GoHomeFill, href: "/prep" },
+    { name: "แก้ไขข้อมูลรถเข็น", icon: PiFishFill, href: "/prep/EditDataTrolley" },
     { name: "วัตถุดิบจากห้องเย็น", icon: LuScanBarcode, href: "/prep/manageprep" },
     { name: "Scan SAP", icon: LuScanBarcode, href: "/prep/ScanSAP/ScanSAPPage" },
     { name: "ผสมวัตถุดิบ", icon: PiFishSimple, href: "/prep/Emulsions" },

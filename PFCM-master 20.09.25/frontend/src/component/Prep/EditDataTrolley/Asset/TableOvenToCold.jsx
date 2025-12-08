@@ -18,12 +18,12 @@ import { InputAdornment } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/Edit";
 
-const TrolleyTable = ({ data }) => {
+const TrolleyTable = ({ data, handleOpenEditModal }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredRows, setFilteredRows] = useState(data?.trolleys || []);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
-  const [openModal, setOpenModal] = useState(false);
+
 
   useEffect(() => {
     if (data?.trolleys) {
@@ -109,6 +109,7 @@ const TrolleyTable = ({ data }) => {
               }}
             />
           </TableCell>
+
           <TableCell
             align="center"
             style={{
@@ -141,6 +142,7 @@ const TrolleyTable = ({ data }) => {
           >
             {row.mat || '-'}
           </TableCell>
+
           <TableCell
             align="center"
             style={{
@@ -157,6 +159,40 @@ const TrolleyTable = ({ data }) => {
           >
             {row.mat_name || '-'}
           </TableCell>
+
+          <TableCell
+            align="center"
+            style={{
+              borderTop: '1px solid #e0e0e0',
+              borderBottom: '1px solid #e0e0e0',
+              borderLeft: "1px solid #f2f2f2",
+              fontSize: '14px',
+              height: '40px',
+              padding: '0px 10px',
+              color: textColor,
+              backgroundColor: backgroundColor,
+              width: '150px'
+            }}
+          >
+            {row.tray_count || '-'}
+          </TableCell>
+          <TableCell
+            align="center"
+            style={{
+              borderTop: '1px solid #e0e0e0',
+              borderBottom: '1px solid #e0e0e0',
+              borderLeft: "1px solid #f2f2f2",
+              fontSize: '14px',
+              height: '40px',
+              padding: '0px 10px',
+              color: textColor,
+              backgroundColor: backgroundColor,
+              width: '150px'
+            }}
+          >
+            {row.weight_RM || '-'}
+          </TableCell>
+
           <TableCell
             align="center"
             style={{
@@ -173,6 +209,7 @@ const TrolleyTable = ({ data }) => {
           >
             {row.production || '-'}
           </TableCell>
+
           <TableCell
             align="center"
             style={{
@@ -184,26 +221,10 @@ const TrolleyTable = ({ data }) => {
               padding: '0px 10px',
               color: textColor,
               backgroundColor: backgroundColor,
-              width: '150px'
+              minWidth: '300px'
             }}
           >
-            {row.cooked_date || '-'}
-          </TableCell>
-          <TableCell
-            align="center"
-            style={{
-              borderTop: '1px solid #e0e0e0',
-              borderBottom: '1px solid #e0e0e0',
-              fontSize: '14px',
-              borderLeft: "1px solid #f2f2f2",
-              height: '40px',
-              padding: '0px 10px',
-              color: textColor,
-              backgroundColor: backgroundColor,
-              width: '150px'
-            }}
-          >
-            {row.rmit_date || '-'}
+            {row.trolley_location || '-'}
           </TableCell>
 
           <TableCell
@@ -218,13 +239,24 @@ const TrolleyTable = ({ data }) => {
               fontSize: '14px',
               height: '40px',
               padding: '0px 10px',
-              color: textColor,
               backgroundColor: backgroundColor,
-              minWidth: '300px'
+              width: '100px'
             }}
           >
-            {row.trolley_location || '-'}
+            <IconButton
+              onClick={() => handleOpenEditModal(row)}  // แก้จาก handleEdit(row) เป็น handleOpenEditModal(row)
+              size="small"
+              sx={{
+                color: '#007BFF',
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                }
+              }}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
           </TableCell>
+
         </TableRow>
         <TableRow>
           <TableCell style={{ padding: "0px", border: "0px solid" }} />
@@ -392,6 +424,35 @@ const TrolleyTable = ({ data }) => {
               >
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>รายชื่อวัตถุดิบ</Box>
               </TableCell>
+
+              <TableCell
+                align="center"
+                style={{
+                  backgroundColor: "hsl(210, 100%, 60%)",
+                  borderTop: "1px solid #e0e0e0",
+                  borderBottom: "1px solid #e0e0e0",
+                  borderRight: "1px solid #f2f2f2",
+                  fontSize: '12px',
+                  padding: '5px',
+                  minWidth: "100px"
+                }}
+              >
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>ถาด</Box>
+              </TableCell>
+              <TableCell
+                align="center"
+                style={{
+                  backgroundColor: "hsl(210, 100%, 60%)",
+                  borderTop: "1px solid #e0e0e0",
+                  borderBottom: "1px solid #e0e0e0",
+                  borderRight: "1px solid #f2f2f2",
+                  fontSize: '12px',
+                  padding: '5px',
+                  minWidth: "100px"
+                }}
+              >
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>น้ำหนัก</Box>
+              </TableCell>
               <TableCell
                 align="center"
                 style={{
@@ -406,20 +467,7 @@ const TrolleyTable = ({ data }) => {
               >
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>แผนการผลิต</Box>
               </TableCell>
-              <TableCell
-                align="center"
-                style={{
-                  backgroundColor: "hsl(210, 100%, 60%)",
-                  borderTop: "1px solid #e0e0e0",
-                  borderBottom: "1px solid #e0e0e0",
-                  borderRight: "1px solid #f2f2f2",
-                  fontSize: '12px',
-                  padding: '5px',
-                  minWidth: "160px"
-                }}
-              >
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>เวลาอบเสร็จ/ต้มเสร็จ</Box>
-              </TableCell>
+
 
               <TableCell
                 align="center"
@@ -430,10 +478,10 @@ const TrolleyTable = ({ data }) => {
                   borderRight: "1px solid #f2f2f2",
                   fontSize: '12px',
                   padding: '5px',
-                  minWidth: "160px"
+                  minWidth: "300px"
                 }}
               >
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>เวลาเตรียมเสร็จ</Box>
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>สถานที่รถเข็น</Box>
               </TableCell>
 
 
@@ -445,13 +493,13 @@ const TrolleyTable = ({ data }) => {
                   borderBottomRightRadius: "8px",
                   borderTop: "1px solid #e0e0e0",
                   borderBottom: "1px solid #e0e0e0",
-                  borderRight: "1px solid #f2f2f2",
+                  borderRight: "1px solid #e0e0e0",
                   fontSize: '12px',
                   padding: '5px',
-                  minWidth: "300px"
+                  minWidth: "100px"
                 }}
               >
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>สถานที่รถเข็น</Box>
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>แก้ไข</Box>
               </TableCell>
             </TableRow>
           </TableHead>

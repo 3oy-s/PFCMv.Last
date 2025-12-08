@@ -11,9 +11,6 @@ import io from 'socket.io-client';
 const API_URL = import.meta.env.VITE_API_URL;
 
 const ParentComponent = () => {
-  const [openModal1, setOpenModal1] = useState(false);
-  const [openModal2, setOpenModal2] = useState(false);
-  const [openModal3, setOpenModal3] = useState(false);
   const [openEditModal, setOpenEditModal] = useState(false);
   const [openSuccessModal, setOpenSuccessModal] = useState(false);
   const [dataForModal1, setDataForModal1] = useState(null);
@@ -34,6 +31,13 @@ const ParentComponent = () => {
 
   const [socket, setSocket] = useState(null);
 
+  const rmTypeIdRaw = localStorage.getItem("rm_type_id");
+  const rmTypeId = Array.isArray(rmTypeIdRaw)
+    ? rmTypeIdRaw[0]
+    : JSON.parse(rmTypeIdRaw)?.[0] ?? rmTypeIdRaw;
+
+  console.log("rmTypeId (final):", rmTypeId);
+
 
 
   // Debounced fetchData
@@ -48,7 +52,7 @@ const ParentComponent = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/prep/main/fetchAllTrolleys`);
+      const response = await axios.get(`${API_URL}/api/prep/EditDataTrolley/fetchAllTrolleys?rm_type_id=${rmTypeId}`);
       console.log("Trolley data fetched:", response.data);
       setTableData(response.data.success ? response.data.data : {
         trolleys: [],
@@ -129,44 +133,33 @@ const ParentComponent = () => {
     setDataForModal3(null);
   };
 
-  const handleOpenModal1 = (data) => {
-    setDataForModal1(data);
-    setOpenModal1(true);
-  };
-
-  const handleOpenModal2 = (data) => {
-    setDataForModal2({
-      ...data,
-      rmfp_id: dataForModal1?.rmfp_id
-    });
-    setOpenModal2(true);
-    setOpenModal1(false);
-  };
-
-  const handleOpenModal3 = (data) => {
-    setDataForModal3(data);
-    setOpenModal3(true);
-    setOpenModal2(false);
-  };
 
   const handleOpenEditModal = (data) => {
     setDataForEditModal({
+      mapping_id: data.mapping_id,
       batch: data.batch,
       mat: data.mat,
       mat_name: data.mat_name,
       production: data.production,
-      rmfp_id: data.rmfp_id
+      line_name: data.line_name,        // เพิ่ม
+      weight_RM: data.weight_RM || 0,         // เพิ่ม น้ำหนักปัจจุบัน
+      trolley_number: data.trolley_number,  // เพิ่ม (ถ้ามี)
+      tro_id: data.tro_id                     // เพิ่ม tro_id
     });
     setOpenEditModal(true);
   };
 
   const handleOpenSuccess = (data) => {
     setDataForSuccessModal({
+      mapping_id: data.mapping_id,
       batch: data.batch,
       mat: data.mat,
       mat_name: data.mat_name,
       production: data.production,
-      rmfp_id: data.rmfp_id,
+      line_name: data.line_name,
+      weight_RM: data.weight_RM || 0,
+      trolley_number: data.trolley_number,
+      tro_id: data.tro_id
     });
     setOpenSuccessModal(true);
   };
@@ -177,59 +170,13 @@ const ParentComponent = () => {
   };
 
 
-
   return (
     <div>
+
       <TableMainPrep
-        handleOpenModal={handleOpenModal1}
         handleOpenEditModal={handleOpenEditModal}
         handleOpenSuccess={handleOpenSuccess}
         data={tableData}
-      />
-      {/* <Modal1 
-        open={openModal1} 
-        onClose={() => setOpenModal1(false)} 
-        onNext={handleOpenModal2} 
-        data={dataForModal1}
-      /> */}
-
-      <Modal1
-        open={openModal1}
-        onClose={() => setOpenModal1(false)}
-        onNext={handleOpenModal2}
-        data={dataForModal1} />
-
-      {/* <Modal2 
-        open={openModal2} 
-        onClose={() => {
-          setOpenModal2(false);
-          clearData();
-        }} 
-        onNext={handleOpenModal3} 
-        data={dataForModal2}
-        clearData={clearData} 
-      /> */}
-      <Modal2 open={openModal2}
-        onClose={() => {
-          setOpenModal2(false);
-          clearData();
-        }}
-        onNext={handleOpenModal3}
-        data={dataForModal2}
-        clearData={clearData} />
-
-      <Modal3
-        open={openModal3}
-        onClose={() => {
-          setOpenModal3(false);
-          clearData();
-        }}
-        data={dataForModal3}
-        onEdit={() => {
-          setOpenModal2(true);
-          setOpenModal3(false);
-        }}
-        clearData={clearData}
       />
       <ModalEditPD
         open={openEditModal}
@@ -238,7 +185,7 @@ const ParentComponent = () => {
         data={dataForEditModal}
         onSuccess={fetchData}
       />
-      <ModalSuccess
+      {/* <ModalSuccess
         open={openSuccessModal}
         onClose={() => setOpenSuccessModal(false)}
         mat={dataForSuccessModal?.mat}
@@ -248,7 +195,7 @@ const ParentComponent = () => {
         rmfp_id={dataForSuccessModal?.rmfp_id}
         selectedPlans={dataForSuccessModal?.selectedPlans}
         onSuccess={fetchData}
-      />
+      /> */}
     </div>
   );
 };

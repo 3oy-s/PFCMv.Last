@@ -49,7 +49,6 @@ const ModalSuccess = ({ mapping_id, weights, tro_production_id, onClose }) => {
       }
 
       try {
-        // กำหนดให้ได้ส่งข้อมูลไปแล้ว ก่อนที่จะเริ่มส่ง request จริงๆ
         hasSubmitted.current = true;
         
         const response = await fetch(`${API_URL}/api/pack/mixed/trolley`, {

@@ -5648,8 +5648,8 @@ module.exports = (io) => {
               AND b2.batch_after IS NOT NULL
     ),
     rmf.batch
-) AS batch
-                CONCAT(p.doc_no, ' (', h.rmm_line_name, ')') AS code,
+) AS batch,
+                p.doc_no + ' (' + h.rmm_line_name + ')' AS code,
                 h.tro_id AS trolleyId,
                 s.slot_id,
                 h.weight_RM AS weight,

@@ -588,10 +588,13 @@ module.exports = (io) => {
     const { rmfpID, ProdID, mat, line_name, name_edit_prod, before_prod } = req.body;
     const io = req.app.get("io");  // ดึง io object สำหรับ socket.io
 
+
     console.log("body :", req.body);
+
 
     try {
       const pool = await connectToDatabase();
+
 
       // ตรวจสอบว่ามีแผนการผลิตสำหรับวัตถุดิบที่เลือกหรือไม่
       const result = await pool.request()
@@ -602,11 +605,14 @@ module.exports = (io) => {
         WHERE prod_id = @prod_id AND mat = @mat
       `);
 
+
       if (result.recordset.length === 0) {
         return res.status(400).json({ success: false, message: "ไม่มีแผนการผลิตที่เลือกสำหรับวัตถุดิบนี้" });
       }
 
+
       const ProdRMID = result.recordset[0].prod_rm_id;
+
 
       // อัปเดตข้อมูลในตาราง RMForProd
       await pool.request()
@@ -615,11 +621,12 @@ module.exports = (io) => {
         .input("rmfp_line_name", line_name)
         .query(`
         UPDATE RMForProd
-        SET 
+        SET
           rmfp_line_name = @rmfp_line_name,
           prod_rm_id = @prod_rm_id
         WHERE rmfp_id = @rmfp_id
       `);
+
 
       // ดึงข้อมูลแผนการผลิตใหม่และ hist_id
       const pull_production = await pool.request()
@@ -639,12 +646,15 @@ module.exports = (io) => {
         WHERE rmfp_id = @rmfp_id
       `);
 
+
       const production = pull_production.recordset[0].production;
       const hist_id_rmfp = pull_production.recordset[0].hist_id_rmfp;
+
 
       console.log("hist_id_rmfp :", hist_id_rmfp);
       console.log("production :", production);
       console.log("name_edit_prod :", name_edit_prod);
+
 
       // ตรวจสอบข้อมูลปัจจุบันใน History เพื่อดูว่าควรอัปเดตที่ฟิลด์ไหน
       const checkHistory = await pool.request()
@@ -655,11 +665,14 @@ module.exports = (io) => {
         WHERE hist_id = @hist_id
       `);
 
+
       let updateField = "";
       let canUpdate = true;
 
+
       if (checkHistory.recordset.length > 0) {
         const { two_prod, three_prod } = checkHistory.recordset[0];
+
 
         // กรณีที่ 1: ถ้า two_prod เป็น NULL ให้อัปเดตที่ two_prod
         if (two_prod === null) {
@@ -675,12 +688,14 @@ module.exports = (io) => {
         }
       }
 
+
       if (!canUpdate) {
         return res.status(400).json({
           success: false,
           message: "ไม่สามารถแก้ไขแผนการผลิตได้ เนื่องจากมีการแก้ไขครบ 3 ครั้งแล้ว"
         });
       }
+
 
       // สร้าง query string ตามฟิลด์ที่ต้องการอัปเดต
       let updateQuery = "";
@@ -700,6 +715,7 @@ module.exports = (io) => {
       `;
       }
 
+
       // ดำเนินการอัปเดต History
       await pool.request()
         .input("hist_id", hist_id_rmfp)
@@ -707,6 +723,7 @@ module.exports = (io) => {
         .input("name_edit_prod", name_edit_prod)
         .input("before_prod", before_prod)
         .query(updateQuery);
+
 
       // ดึงข้อมูลที่อัปเดตแล้วเพื่อส่งกลับ
       const refreshed = await pool.request().query(`
@@ -728,11 +745,12 @@ module.exports = (io) => {
       JOIN RawMatCookedGroup rmcg ON rm.mat = rmcg.mat
       JOIN RawMatGroup rmg ON rmcg.rm_group_id = rmf.rm_group_id
       JOIN History htr ON rmf.hist_id_rmfp = htr.hist_id
-      WHERE 
+      WHERE
         rmf.stay_place IN ('จุดเตรียมรับเข้า', 'หม้ออบ')
         AND rmf.dest IN ('ไปจุดเตรียม', 'จุดเตรียม')
         AND rmf.rm_group_id = rmg.rm_group_id
     `);
+
 
       const formattedData = refreshed.recordset.map(item => {
         const date = new Date(item.cooked_date);
@@ -746,6 +764,7 @@ module.exports = (io) => {
         return item;
       });
 
+
       // ส่งข้อมูลผ่าน socket.io
       io.to('saveRMForProdRoom').emit('dataUpdated', formattedData);
       io.to('QcCheckRoom').emit('dataUpdated', {
@@ -757,17 +776,377 @@ module.exports = (io) => {
         update_field: updateField
       });
 
+
       return res.status(200).json({
         success: true,
         message: "แก้ไขแผนการผลิตเสร็จสิ้น",
         update_field: updateField
       });
 
+
     } catch (err) {
       console.error("SQL error", err);
       return res.status(500).json({ success: false, error: err.message });
     }
   });
+
+  router.get("/checkEditHistoryByMapping", async (req, res) => {
+    const { mapping_id } = req.query;
+
+    try {
+      const pool = await connectToDatabase();
+
+      // ✅ JOIN กับตาราง TrolleyRMMapping เพื่อดึง rm_status
+      const result = await pool.request()
+        .input("mapping_id", mapping_id)
+        .query(`
+        SELECT h.two_prod, h.three_prod, trm.rm_status
+        FROM History h
+        LEFT JOIN TrolleyRMMapping trm ON h.mapping_id = trm.mapping_id
+        WHERE h.mapping_id = @mapping_id
+      `);
+
+      if (result.recordset.length === 0) {
+        return res.json({
+          success: false,
+          error: "ไม่พบข้อมูล History"
+        });
+      }
+
+      const { two_prod, three_prod, rm_status } = result.recordset[0];
+      const editLimitReached = two_prod !== null && three_prod !== null;
+
+      res.json({
+        success: true,
+        editLimitReached,
+        rm_status: rm_status || "" // ✅ ส่ง rm_status กลับไป
+      });
+
+    } catch (err) {
+      console.error("SQL error", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+
+  router.get("/getDetailsByMapping", async (req, res) => {
+    try {
+      const { mapping_id } = req.query; // ใช้ query parameter
+      const sql = require("mssql");
+      const pool = await connectToDatabase();
+
+      const result = await pool.request()
+        .input("mapping_id", sql.Int, mapping_id)
+        .query(`
+        SELECT 
+          rmm.tro_id,
+          rmm.rm_status,
+          rmm.dest,
+          rmm.tray_count,
+          rmm.weight_RM,
+          rmm.rmm_line_name,
+          rmfp.level_eu,
+          rmfp.batch,
+          rm.mat_name,
+          pc.process_name,
+          p.doc_no,
+          qc.qccheck,
+          qc.mdcheck,
+          qc.defectcheck,
+          FORMAT(qc.md_time, 'yyyy-MM-dd HH:mm') AS md_time_formatted,
+          FORMAT(qc.qc_datetime, 'yyyy-MM-dd HH:mm') AS qc_datetime_formatted,
+          htr.receiver,
+          htr.receiver_qc,
+          CONCAT(qc.WorkAreaCode, '-', mwa.WorkAreaName) AS WorkAreaCode,
+          qc.md_no,
+          htr.location,
+          htr.first_prod,
+          htr.two_prod,
+          htr.three_prod,
+          htr.name_edit_prod_two,
+          htr.name_edit_prod_three,
+          htr.prepare_mor_night,
+          htr.rmit_date,
+          htr.withdraw_date,
+          CONVERT(varchar(16), htr.withdraw_date, 120) AS withdraw_date_formatted
+		  
+        FROM TrolleyRMMapping rmm
+        JOIN QC qc ON rmm.qc_id = qc.qc_id
+        JOIN History htr ON rmm.mapping_id = htr.mapping_id
+        JOIN RMForProd rmfp ON rmm.rmfp_id = rmfp.rmfp_id
+        JOIN ProdRawMat prm ON rmfp.prod_rm_id = prm.prod_rm_id
+        JOIN RawMat rm ON prm.mat = rm.mat
+        JOIN Process pc on rmm.process_id = pc.process_id
+        JOIN Production p ON prm.prod_id = p.prod_id
+        LEFT JOIN WorkAreas mwa ON qc.WorkAreaCode = mwa.WorkAreaCode
+        WHERE rmm.mapping_id = @mapping_id;
+      `);
+
+      if (result.recordset.length === 0) {
+        return res.status(404).json({ success: false, message: "Data not found" });
+      }
+
+      res.json({ success: true, data: result.recordset[0] });
+    } catch (err) {
+      console.error("SQL error", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+
+  router.put("/updateEditProd", async (req, res) => {
+    const {
+      mapping_id,
+      prod_id,
+      mat,
+      line_name,
+      name_edit_prod,
+      before_prod,
+      after_prod,
+      tray_count,
+      weight_RM,
+      deliveryLocation
+    } = req.body;
+
+    const io = req.app.get("io");
+
+    console.log("📥 Request body:", req.body);
+
+    try {
+      const pool = await connectToDatabase();
+
+      // 1) ตรวจสอบ mapping_id + ดึงข้อมูลปัจจุบัน
+      const checkMapping = await pool.request()
+        .input("mapping_id", sql.Int, mapping_id)
+        .query(`
+        SELECT m.mapping_id, m.tro_production_id, m.rmfp_id, m.tro_id,
+               m.dest, m.rm_status,
+               h.hist_id, h.two_prod, h.three_prod
+        FROM TrolleyRMMapping m
+        JOIN History h ON m.mapping_id = h.mapping_id
+        WHERE m.mapping_id = @mapping_id
+      `);
+
+      if (checkMapping.recordset.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "ไม่พบ mapping_id ที่ต้องการอัปเดต"
+        });
+      }
+
+      const {
+        hist_id,
+        two_prod,
+        three_prod,
+        rmfp_id,
+        tro_id,
+        dest: currentDest,
+        rm_status: currentRmStatus
+      } = checkMapping.recordset[0];
+
+      console.log(`📋 ข้อมูลเดิม - mapping_id: ${mapping_id}, rmfp_id: ${rmfp_id}`);
+      console.log(`📋 rm_status เดิม: ${currentRmStatus}`);
+
+      // ตรวจสอบว่า QC ตรวจสอบแล้วหรือยัง
+      // ถ้า rm_status เป็น "QcCheck" แสดงว่าตรวจสอบแล้ว
+      // ถ้าเป็น "รอQCตรวจสอบ" แสดงว่ายังไม่ได้ตรวจสอบ
+      const isQCChecked = currentRmStatus === 'QcCheck';
+
+      console.log(`🔍 QC ตรวจสอบแล้ว: ${isQCChecked}`);
+
+      // 2) หา prod_rm_id จาก prod_id
+      const getProdRM = await pool.request()
+        .input("prod_id", sql.Int, prod_id)
+        .input("mat", sql.VarChar, mat)
+        .query(`
+        SELECT prod_rm_id
+        FROM ProdRawMat 
+        WHERE prod_id = @prod_id AND mat = @mat
+      `);
+
+      if (getProdRM.recordset.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "ไม่พบ prod_rm_id จาก prod_id และ mat ที่ระบุ"
+        });
+      }
+
+      const prod_rm_id = getProdRM.recordset[0].prod_rm_id;
+
+      // 3) อัปเดต RMForProd โดยใช้ rmfp_id เดิม (เปลี่ยนแค่ prod_rm_id)
+      await pool.request()
+        .input("rmfp_id", sql.Int, rmfp_id)
+        .input("prod_rm_id", sql.Int, prod_rm_id)
+        .input("weight_RM", sql.Float, weight_RM)
+        .input("line_name", sql.VarChar, line_name)
+        .query(`
+        UPDATE RMForProd
+        SET prod_rm_id = @prod_rm_id,
+            weight = @weight_RM,
+            rmfp_line_name = @line_name
+        WHERE rmfp_id = @rmfp_id
+      `);
+
+      console.log(`✅ อัปเดต RMForProd (rmfp_id: ${rmfp_id}) → prod_rm_id: ${prod_rm_id}`);
+
+      // 4) กำหนด dest และ rm_status
+      // ถ้า QC ตรวจสอบแล้ว ให้เก็บค่าเดิม
+      let Dest, rm_status;
+
+      if (isQCChecked) {
+        // เก็บเฉพาะ rm_status เดิม
+        rm_status = currentRmStatus;
+        // dest ยังคำนวณใหม่ตามปกติ
+        Dest = (deliveryLocation === 'เข้าห้องเย็น') ? 'เข้าห้องเย็น' : 'ไปบรรจุ';
+        console.log(`✅ เก็บค่า rm_status เดิม: ${rm_status}, dest ใหม่: ${Dest}`);
+      } else {
+        // กำหนดค่าใหม่ถ้ายังไม่ผ่าน QC
+        Dest = (deliveryLocation === 'เข้าห้องเย็น')
+          ? 'เข้าห้องเย็น'
+          : 'ไปบรรจุ';
+        rm_status = 'รอQCตรวจสอบ';
+        console.log(`✅ กำหนดค่าใหม่ - dest: ${Dest}, rm_status: ${rm_status}`);
+      }
+
+      // 5) อัปเดต TrolleyRMMapping
+      await pool.request()
+        .input("mapping_id", sql.Int, mapping_id)
+        .input("tro_production_id", sql.Int, prod_rm_id)
+        .input("rmm_line_name", sql.VarChar, line_name)
+        .input("tray_count", sql.Int, tray_count)
+        .input("weight_RM", sql.Float, weight_RM)
+        .input("dest", sql.VarChar, Dest)
+        .input("rm_status", sql.VarChar, rm_status)
+        .query(`
+        UPDATE TrolleyRMMapping
+        SET tro_production_id = @tro_production_id,
+            rmm_line_name = @rmm_line_name,
+            tray_count = @tray_count,
+            weight_RM = @weight_RM,
+            dest = @dest,
+            rm_status = @rm_status
+        WHERE mapping_id = @mapping_id  
+      `);
+
+      console.log(`✅ อัปเดต TrolleyRMMapping (mapping_id: ${mapping_id})`);
+      console.log(`   prod_rm_id: ${prod_rm_id}`);
+      console.log(`   rm_status: ${rm_status}`);
+      console.log(`   dest: ${Dest}`);
+      console.log(`   deliveryLocation รับมา: ${deliveryLocation}`);
+
+      // 6) ดึง production string ใหม่
+      const pullProd = await pool.request()
+        .input("prod_rm_id", sql.Int, prod_rm_id)
+        .input("line_name", sql.VarChar, line_name)
+        .query(`
+        SELECT CONCAT(p.doc_no, ' (', @line_name, ')') AS production
+        FROM ProdRawMat pr
+        JOIN Production p ON pr.prod_id = p.prod_id
+        WHERE pr.prod_rm_id = @prod_rm_id
+      `);
+
+      const production = pullProd.recordset[0]?.production ?? "";
+
+      // 7) ตรวจสอบว่าแก้ไขได้อีกหรือไม่
+      let updateField = "";
+      let nameField = "";
+
+      if (two_prod == null) {
+        updateField = "two_prod";
+        nameField = "name_edit_prod_two";
+      } else if (three_prod == null) {
+        updateField = "three_prod";
+        nameField = "name_edit_prod_three";
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "แก้ไขแผนการผลิตครบ 3 ครั้งแล้ว"
+        });
+      }
+
+      // 8) อัปเดต History
+      await pool.request()
+        .input("hist_id", sql.Int, hist_id)
+        .input("production", sql.VarChar, production)
+        .input("name_edit_prod", sql.VarChar, name_edit_prod)
+        .input("tray_count", sql.Int, tray_count)
+        .input("weight_RM", sql.Float, weight_RM)
+        .input("dest", sql.VarChar, Dest)
+        .input("rmm_line_name", sql.VarChar, line_name)
+        .query(`
+        UPDATE History
+        SET ${updateField} = @production,
+            ${nameField} = @name_edit_prod,
+            tray_count = @tray_count,
+            weight_RM = @weight_RM,
+            dest = @dest,
+            rmm_line_name = @rmm_line_name
+        WHERE hist_id = @hist_id
+      `);
+
+      console.log(`✅ อัปเดต History (hist_id: ${hist_id})`);
+
+      // 9) ตรวจสอบข้อมูลหลัง Update
+      const verifyData = await pool.request()
+        .input("mapping_id", sql.Int, mapping_id)
+        .query(`
+        SELECT 
+          m.mapping_id,
+          m.rmfp_id,
+          m.tro_production_id,
+          m.rm_status,
+          m.dest,
+          rmf.prod_rm_id,
+          p.doc_no
+        FROM TrolleyRMMapping m
+        LEFT JOIN RMForProd rmf ON m.rmfp_id = rmf.rmfp_id
+        LEFT JOIN ProdRawMat pr ON rmf.prod_rm_id = pr.prod_rm_id
+        LEFT JOIN Production p ON pr.prod_id = p.prod_id
+        WHERE m.mapping_id = @mapping_id
+      `);
+
+      console.log("🔍 ข้อมูลหลัง Update:", verifyData.recordset[0]);
+
+      // 10) ส่ง Socket.IO event
+      io.emit("trolleyUpdated", {
+        mapping_id,
+        rm_status,
+        production,
+        line_name,
+        dest: Dest,
+        rmfp_id,
+        isQCChecked // เพิ่มข้อมูลนี้เพื่อแจ้ง client
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: isQCChecked
+          ? "อัปเดตสำเร็จ (เก็บสถานะ QC เดิม)"
+          : "อัปเดตสำเร็จ",
+        data: {
+          mapping_id,
+          production,
+          tray_count,
+          weight_RM,
+          line_name,
+          dest: Dest,
+          rm_status,
+          rmfp_id,
+          prod_rm_id,
+          isQCChecked,
+          verifiedData: verifyData.recordset[0]
+        }
+      });
+
+    } catch (err) {
+      console.error("❌ SQL error:", err);
+      return res.status(500).json({
+        success: false,
+        error: err.message
+      });
+    }
+  });
+
 
   router.post("/successTrolley", async (req, res) => {
     const { rmfpID } = req.body;
@@ -2094,9 +2473,6 @@ module.exports = (io) => {
       });
     }
   });
-
-
-  module.exports = router;
 
   return router;
 };
