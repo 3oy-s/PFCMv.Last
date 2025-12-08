@@ -987,7 +987,7 @@ SELECT
     rmm.mapping_id,
     rmm.tro_id,
     rmm.rmfp_id,
-    b.batch_combined AS batch,  -- เปลี่ยนจาก batch_after เป็น batch_combined
+    b.batch_combined AS batch,
     rm.mat_name,
     rm.mat,
     CONCAT(p.doc_no, '(', rmm.rmm_line_name, ')') AS production,
@@ -1010,40 +1010,31 @@ SELECT
     0 AS isMixed
 FROM 
     TrolleyRMMapping rmm
-JOIN 
+LEFT JOIN 
     RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
-JOIN 
+LEFT JOIN 
     ProdRawMat prm ON prm.prod_rm_id = rmm.tro_production_id
-JOIN 
+LEFT JOIN 
     RawMat rm ON rm.mat = prm.mat
-JOIN (
-    -- Subquery ที่รวม batch_after หลายค่าเข้าด้วยกันด้วย STRING_AGG
+LEFT JOIN (
     SELECT 
         mapping_id,
         STRING_AGG(batch_after, ', ') AS batch_combined
-    FROM 
-        batch
-    GROUP BY 
-        mapping_id
+    FROM batch
+    GROUP BY mapping_id
 ) b ON rmm.mapping_id = b.mapping_id
-JOIN
-    Qc q ON rmm.qc_id = q.qc_id
-JOIN 
-    Production p ON p.prod_id = prm.prod_id
-JOIN
-    RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
-JOIN
-    History h ON rmm.mapping_id = h.mapping_id
-JOIN
-    Slot s ON rmm.tro_id = s.tro_id
-JOIN
-    ColdStorage cs ON s.cs_id = cs.cs_id
+LEFT JOIN Qc q ON rmm.qc_id = q.qc_id
+LEFT JOIN Production p ON p.prod_id = prm.prod_id
+LEFT JOIN RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
+LEFT JOIN History h ON rmm.mapping_id = h.mapping_id
+LEFT JOIN Slot s ON rmm.tro_id = s.tro_id
+LEFT JOIN ColdStorage cs ON s.cs_id = cs.cs_id
 WHERE
     rmm.tro_id != @current_tro_id
     AND rmm.dest = 'ห้องเย็น'
     AND rmm.stay_place = 'เข้าห้องเย็น'
     AND rmm.weight_RM > 0
-    AND rmm.tro_id IS NOT NULL
+    AND rmm.tro_id IS NOT NULL;
 `;
 
             // ดึงข้อมูลวัตถุดิบผสม
@@ -5483,44 +5474,36 @@ WHERE
             status = ''
         } = req.query;
 
-
         // Convert page and pageSize to numbers
         const pageNum = parseInt(page, 10) || 1;
         const pageSizeNum = parseInt(pageSize, 10) || 100;
-
 
         try {
             const pool = await connectToDatabase();
             // Use converted variables for page and pageSize
             const offset = (pageNum - 1) * pageSizeNum;
 
-
             // Format dates to cover the entire day
             let formattedStartDate = startDate;
             let formattedEndDate = endDate;
-
 
             // If format is YYYY-MM-DD (without time), add time
             if (formattedStartDate.length === 10) {
                 formattedStartDate += ' 00:00:00';
             }
 
-
             if (formattedEndDate.length === 10) {
                 formattedEndDate += ' 23:59:59';
             }
 
-
             // Create additional conditions for WHERE clause
             let additionalWhereConditions = '';
-
 
             console.log('Filtering params:', {
                 startDate: formattedStartDate,
                 endDate: formattedEndDate,
                 filterType
             });
-
 
             // Add condition: filter only entries with cold room entry or exit
             additionalWhereConditions += `
@@ -5534,12 +5517,10 @@ WHERE
                 )
             `;
 
-
             // Add search condition
             if (searchTerm) {
                 additionalWhereConditions += ` AND (rm.mat_name LIKE @searchTerm OR rm.mat LIKE @searchTerm)`;
             }
-
 
             // Add status condition
             if (status) {
@@ -5569,7 +5550,6 @@ WHERE
                 `;
                 }
             }
-
 
             // Add date range filter condition
             if (startDate && endDate) {
@@ -5628,7 +5608,6 @@ WHERE
                 }
             }
 
-
             // Count total query
             const countQuery = `
             SELECT COUNT(*) AS total
@@ -5643,7 +5622,6 @@ WHERE
             ${additionalWhereConditions}
         `;
 
-
             // Main query
             const mainQuery = `
             SELECT
@@ -5657,8 +5635,8 @@ WHERE
               AND b2.batch_after IS NOT NULL
     ),
     rmf.batch
-) AS batch
-                CONCAT(p.doc_no, ' (', h.rmm_line_name, ')') AS code,
+) AS batch,
+                p.doc_no + ' (' + h.rmm_line_name + ')' AS code,
                 h.tro_id AS trolleyId,
                 s.slot_id,
                 h.weight_RM AS weight,
@@ -5725,27 +5703,27 @@ WHERE
                 Slot s ON rmm.tro_id = s.tro_id
             ${additionalWhereConditions}
             ORDER BY
-                COALESCE(
-                    h.come_cold_date_three, h.out_cold_date_three,
-                    h.come_cold_date_two, h.out_cold_date_two,
-                    h.come_cold_date, h.out_cold_date
-                ) DESC
+    CASE
+        WHEN h.come_cold_date_three IS NOT NULL THEN h.come_cold_date_three
+        WHEN h.out_cold_date_three IS NOT NULL THEN h.out_cold_date_three
+        WHEN h.come_cold_date_two IS NOT NULL THEN h.come_cold_date_two
+        WHEN h.out_cold_date_two IS NOT NULL THEN h.out_cold_date_two
+        WHEN h.come_cold_date IS NOT NULL THEN h.come_cold_date
+        ELSE h.out_cold_date
+    END DESC
             OFFSET @offset ROWS
             FETCH NEXT @pageSize ROWS ONLY
         `;
 
-
             // Prepare requests
             const countRequest = pool.request();
             const mainRequest = pool.request();
-
 
             // Add parameters
             if (searchTerm) {
                 countRequest.input('searchTerm', `%${searchTerm}%`);
                 mainRequest.input('searchTerm', `%${searchTerm}%`);
             }
-
 
             // Add parameters for date range filtering
             if (startDate && endDate) {
@@ -5755,27 +5733,21 @@ WHERE
                 mainRequest.input('endDate', formattedEndDate);
             }
 
-
             mainRequest.input('offset', offset);
             mainRequest.input('pageSize', pageSizeNum); // Use converted value
-
 
             // Get total count
             const totalCountResult = await countRequest.query(countQuery);
             const totalCount = totalCountResult.recordset[0].total;
 
-
             console.log(`Found ${totalCount} total records matching criteria`);
-
 
             // Get data
             const result = await mainRequest.query(mainQuery);
 
-
             // Format data
             const formattedData = result.recordset.map(record => {
                 const newRecord = { ...record };
-
 
                 // Format date fields
                 const dateFields = [
@@ -5784,17 +5756,14 @@ WHERE
                     'exitColdTime1', 'exitColdTime2', 'exitColdTime3'
                 ];
 
-
                 dateFields.forEach(field => {
                     if (newRecord[field]) {
                         newRecord[field] = newRecord[field].replace('T', ' ');
                     }
                 });
 
-
                 // Create entry/exit history
                 newRecord.entryExitHistory = [];
-
 
                 // Add cold room entry history
                 [
@@ -5812,7 +5781,6 @@ WHERE
                     }
                 });
 
-
                 // Add cold room exit history
                 [
                     { time: 'exitColdTime1', seq: 1, nameField: 'exitOperator1' },
@@ -5829,33 +5797,26 @@ WHERE
                     }
                 });
 
-
                 // Sort history by time
                 newRecord.entryExitHistory.sort((a, b) => new Date(b.time) - new Date(a.time));
-
 
                 // Add summary fields
                 newRecord.latestStatus = newRecord.entryExitHistory.length > 0 ?
                     newRecord.entryExitHistory[0].type : '-';
 
-
                 newRecord.latestStatusTime = newRecord.entryExitHistory.length > 0 ?
                     newRecord.entryExitHistory[0].time : null;
-
 
                 // Add latest exit time field (used for filtering and display)
                 const lastExitHistory = newRecord.entryExitHistory.find(h => h.type === 'exitColdRoom');
                 newRecord.latestExitTime = lastExitHistory ? lastExitHistory.time : null;
 
-
                 // Add latest entry time field
                 const lastEnterHistory = newRecord.entryExitHistory.find(h => h.type === 'enterColdRoom');
                 newRecord.latestEnterTime = lastEnterHistory ? lastEnterHistory.time : null;
 
-
                 return newRecord;
             });
-
 
             // Send data with metadata
             return res.json({
@@ -5877,6 +5838,10 @@ WHERE
             });
         }
     });
+
+
+
+
 
 
 

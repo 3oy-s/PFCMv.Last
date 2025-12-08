@@ -13,6 +13,7 @@ import RequestRawmat from "./requestrawmat/RequestrawmatPage";
 import OrderRequestRawmat from "./OrderRequestrawmat/RequestrawmatPage";
 import ManageRequestOrder from "./ManageRequestOrder/ManagePage";
 import WorkplaceSelector from "../User/WorkplaceSelector.jsx";
+import CSCheckOutPage from "./CheckOut/CheckOutPage.jsx"
 
 function AppPack() {
   return (
@@ -41,6 +42,7 @@ function AppPack() {
         {/* เลือกสถานที่ไลน์ผลิต */}
         <Route path="/User/LineSelectWP" element={<LineSelectWP />} />
         <Route path="/PackTro/PackTroPage" element={<PackTroPage />} />
+        <Route path="/CheckOut" element={<CSCheckOutPage />} />
 
       </Routes>
     </div>

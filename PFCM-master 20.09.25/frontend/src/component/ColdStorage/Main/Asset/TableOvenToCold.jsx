@@ -511,6 +511,7 @@ const Row = ({
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>Batch</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>Material</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>รายชื่อวัตถุดิบ</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>เวลาเตรียม</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>ไลน์ผลิต</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>Level Eu</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>น้ำหนัก</TableCell>
@@ -546,6 +547,7 @@ const Row = ({
                           <TableCell align="center">{material.batch || material.batch_after || '-'}</TableCell>
                           <TableCell align="center">{material.mat || material.mix_code || '-'}</TableCell>
                           <TableCell align="center">{material.mat_name || `Mixed : ${material.mix_code}` || '-'}</TableCell>
+                         <TableCell align="center">{material.rmit_date || '-'}</TableCell>
                           <TableCell align="center">{material.production || '-'}</TableCell>
                           <TableCell align="center">{material.level_eu || '-'}</TableCell>
                           <TableCell align="center">{material.weight_RM || '-'}</TableCell>
@@ -574,6 +576,7 @@ const Row = ({
                       <TableCell align="center">{row.batch || row.batch_after || '-'}</TableCell>
                       <TableCell align="center">{row.mat || '-'}</TableCell>
                       <TableCell align="center">{row.mat_name || '-'}</TableCell>
+                      <TableCell align="center">{row.rmit_date || '-'}</TableCell>
                       <TableCell align="center">{row.level_eu || '-'}</TableCell>
                       <TableCell align="center">{row.weight_RM || '-'}</TableCell>
                       <TableCell align="center">{row.tray_count || '-'}</TableCell>
@@ -734,7 +737,7 @@ const TableOvenToCold = ({ handleOpenModal, handleOpenEditModal, handleOpenSucce
   };
 
   const mainColumns = [
-    "ป้ายทะเบียนรถเข็น", "แผนการผลิต", "น้ำหนักรถเข็น", "จำนวนถาด", "สถานะรถเข็น", "Action"
+    "ป้ายทะเบียนรถเข็น", "แผนการผลิต", "น้ำหนักรถเข็น", "จำนวนถาด", "สถานะรถเข็น","เวลาเตรียม", "Action"
   ];
 
   return (

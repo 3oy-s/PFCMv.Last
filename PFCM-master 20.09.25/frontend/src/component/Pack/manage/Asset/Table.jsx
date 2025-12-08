@@ -547,7 +547,7 @@ const TableMainPrep = ({
   const [openRowId, setOpenRowId] = useState(null);
 
   // กำหนดคอลัมน์ที่ต้องการแสดงเท่านั้น
-  const displayColumns = ['batch_after', 'mat', 'mat_name', 'production', 'weight_RM', 'level_eu'];
+  const displayColumns = ['batch_after', 'mat', 'mat_name', 'production','rmit_date', 'weight_RM', 'level_eu'];
 
   useEffect(() => {
     setFilteredRows(
@@ -582,6 +582,7 @@ const TableMainPrep = ({
     "batch_after": "Batch",
     "mat": "Material",
     "mat_name": "รายชื่อวัตถุดิบ",
+    "rmit_date": "เวลาเตรียมเสร็จ",
     "production": "แผนการผลิต",
     "weight_RM": "น้ำหนักวัตถุดิบ",
     "level_eu": "Level Eu"
@@ -590,6 +591,7 @@ const TableMainPrep = ({
   // กำหนดความกว้างคอลัมน์
   const getColumnWidth = (header) => {
     if (header === "mat_name") return "420px";
+    if (header === "rmit_date") return "420px";
     if (header === "production") return "150px";
     if (header === "tro_id") return "180px";
     if (["weight_RM", "level_eu"].includes(header)) return "90px";

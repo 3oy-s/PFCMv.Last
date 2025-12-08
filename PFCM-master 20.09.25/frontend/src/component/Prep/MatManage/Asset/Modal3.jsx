@@ -202,7 +202,7 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
       // สร้างข้อมูลสำหรับการพิมพ์
       const printData = {
         tro_id: tro_id,
-        batch_after: batchAfter || batchBefore,
+        batch_after: batchAfterArray.length > 0 ? batchAfterArray.map(item => item.batch_after).join(", ") : batchAfter || "",
         dest: input2?.deliveryLocation || "",
         mat_name: materialName,
         production: productionValue,

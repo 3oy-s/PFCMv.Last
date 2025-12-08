@@ -686,7 +686,7 @@ const Modal3 = ({ open, onClose, data, onEdit, dataForModal3 }) => {
 								margin: '2px 0',
 							},
 						}}>
-							วันที่/เวลา ออกจากห้องเย็นใหญ่ : {withdraw_date_formatted || "ไม่มีข้อมูล"}
+							วันที่/เวลา ออกจากห้องเย็นใหญ่ : {withdraw_date || "ไม่มีข้อมูล"}
 						</Typography>
 
 						<Typography variant="h6" className="print-text" sx={{
