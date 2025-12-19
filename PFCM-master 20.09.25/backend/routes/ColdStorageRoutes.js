@@ -982,7 +982,7 @@ module.exports = (io) => {
 
             // ดึงข้อมูลวัตถุดิบปกติ
             // แก้ไข JOIN กับ batch table ให้ใช้ subquery ที่รวม batch_after หลายค่าเข้าด้วยกัน
-const normalRawMatQuery = `
+            const normalRawMatQuery = `
 SELECT 
     rmm.mapping_id,
     rmm.tro_id,
@@ -1416,6 +1416,25 @@ WHERE
                             @remark_rework_cold, @edit_rework, @prepare_mor_night, GETDATE()
                         )
                     `);
+
+                    const sourceBatchResult = await new sql.Request(transaction)
+                        .input('source_mapping_id', sourceRecord.mapping_id)
+                        .query(`SELECT batch_after, batch_before FROM Batch WHERE mapping_id = @source_mapping_id`);
+
+                    if (sourceBatchResult.recordset.length > 0) {
+                        for (const batch of sourceBatchResult.recordset) {
+                            await new sql.Request(transaction)
+                                .input('mapping_id', destMappingId)
+                                .input('batch_after', batch.batch_after)
+                                .input('batch_before', batch.batch_before)
+                                .query(`
+                    INSERT INTO Batch (mapping_id, batch_after, batch_before)
+                    VALUES (@mapping_id, @batch_after, @batch_before)
+                `);
+                        }
+                        console.log(`✅ คัดลอก ${sourceBatchResult.recordset.length} batch records ไปยัง mapping ใหม่: ${destMappingId}`);
+                    }
+
                 }
 
                 // --- Comment ข้อ 4–8 ---
@@ -5328,6 +5347,43 @@ WHERE
               @remark_rework, @remark_rework_cold, @edit_rework
             )
           `);
+                }
+
+                // 9.3 คัดลอก Batch records จาก mapping เก่ามาที่ mapping ใหม่
+                const batchRecords = await t()
+                    .input("source_mapping_id", sourceMappingId)
+                    .query(`
+        SELECT 
+            batch_id, 
+            batch_after,
+            batch_before,
+            mapping_id
+        FROM Batch WITH (HOLDLOCK)
+        WHERE mapping_id = @source_mapping_id
+    `);
+
+                // ถ้ามี batch records ให้คัดลอกไปที่ mapping ใหม่
+                if (batchRecords.recordset.length > 0) {
+                    for (const batch of batchRecords.recordset) {
+                        await t()
+                            .input("mapping_id", destMappingId)
+                            .input("batch_after", batch.batch_after)
+                            .input("batch_before", batch.batch_before)
+                            .query(`
+                INSERT INTO Batch (
+                    mapping_id,
+                    batch_after,
+                    batch_before
+                )
+                VALUES (
+                    @mapping_id,
+                    @batch_after,
+                    @batch_before
+                )
+            `);
+                    }
+
+                    console.log(`✅ คัดลอก ${batchRecords.recordset.length} batch records ไปยัง mapping_id: ${destMappingId}`);
                 }
 
                 // 10) เช็คน้ำหนักรวมต้นทาง

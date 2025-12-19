@@ -2781,7 +2781,7 @@ module.exports = (io) => {
       const pool = await connectToDatabase();
       const bangkokTime = selectedDateTime;
 
-      
+
       const queryRawMaterials = `
       SELECT 
         rmm.mapping_id,
@@ -3117,25 +3117,34 @@ module.exports = (io) => {
 
 
 
- 
-router.put("/pack/mixed/trolley", async (req, res) => {
+
+  router.put("/pack/mixed/trolley", async (req, res) => {
     const { mapping_id, weights, tro_production_id } = req.body;
+
 
     if (!mapping_id || !Array.isArray(weights) || weights.length === 0 || !tro_production_id) {
       return res.status(400).json({ message: "mapping_id, weights และ tro_production_id จำเป็นต้องระบุ" });
     }
 
+
+    // ตรวจสอบว่า mapping_id และ weights มีจำนวนเท่ากัน
+    if (mapping_id.length !== weights.length) {
+      return res.status(400).json({ message: "จำนวน mapping_id และ weights ต้องเท่ากัน" });
+    }
+
+
     let transaction;
+
 
     try {
       const pool = await connectToDatabase();
 
-      // Query หลักไม่ JOIN กับ Batch
+
       const query = `
       SELECT DISTINCT
           rmm.mapping_id,
           rmm.rmfp_id,
-          rmm.batch_id, 
+          rmm.batch_id,
           rmm.tro_production_id,
           rmm.process_id,
           rmm.qc_id,
@@ -3159,7 +3168,9 @@ router.put("/pack/mixed/trolley", async (req, res) => {
           rmm.weight_RM,
           rmm.tray_count,
           rmm.tro_id,
+          rmm.mix_time,
           b.batch_after,
+          rfp.rm_group_id,
           htr.hist_id,
           htr.withdraw_date,
           htr.cooked_date,
@@ -3189,63 +3200,96 @@ router.put("/pack/mixed/trolley", async (req, res) => {
       FROM TrolleyRMMapping AS rmm
       JOIN History AS htr ON htr.mapping_id = rmm.mapping_id
       LEFT JOIN batch AS b ON b.mapping_id = rmm.mapping_id
+      LEFT JOIN RMForProd AS rfp ON rfp.rmfp_id = rmm.rmfp_id
       WHERE rmm.mapping_id IN (${mapping_id.map(id => `'${id}'`).join(',')})
     `;
 
+
       const result = await pool.request().query(query);
+
+
+      console.log('Query result count:', result.recordset.length);
+
 
       if (result.recordset.length === 0) {
         return res.status(404).json({ message: "ไม่พบวัตถุดิบในรถเข็นที่เลือก" });
       }
 
-      // Query แยกสำหรับดึงข้อมูล Batch ทั้งหมด
-      const batchQuery = `
-        SELECT batch_id, batch_before, batch_after, mapping_id
-        FROM Batch
-        WHERE mapping_id IN (${mapping_id.map(id => `'${id}'`).join(',')})
-      `;
-      
-      const batchResult = await pool.request().query(batchQuery);
-      
-      // จัดกลุ่ม Batch ตาม mapping_id
-      const batchByMappingId = {};
-      batchResult.recordset.forEach(batch => {
-        if (!batchByMappingId[batch.mapping_id]) {
-          batchByMappingId[batch.mapping_id] = [];
-        }
-        batchByMappingId[batch.mapping_id].push(batch);
-      });
+
+      // *** แก้ไขตรงนี้: สร้าง Map เพื่อจับคู่ mapping_id กับ weight ที่ถูกต้อง ***
+      const weightMap = {};
+      for (let i = 0; i < mapping_id.length; i++) {
+        weightMap[mapping_id[i]] = weights[i];
+      }
+
 
       const mixCode = Date.now() % 2147483647;
       const line_name = result.recordset[0].rmm_line_name;
+      const rm_group_id = result.recordset[0].rm_group_id;
+
       let total_weight = 0;
       let total_trays = 0;
+
 
       transaction = new sql.Transaction(pool);
       await transaction.begin();
 
+
       for (let i = 0; i < result.recordset.length; i++) {
         const record = result.recordset[i];
-        const weightToMove = weights[i];
+
+
+        // *** ดึง weight ที่ตรงกับ mapping_id นี้จาก Map ***
+        const weightToMoveRaw = weightMap[record.mapping_id];
+
+
+        if (weightToMoveRaw === undefined) {
+          await transaction.rollback();
+          return res.status(400).json({
+            message: `ไม่พบน้ำหนักสำหรับ mapping_id ${record.mapping_id}`
+          });
+        }
+
+
+        // ปัดน้ำหนักและถาดเป็น 2 ตำแหน่งทศนิยม
+        const weight_RM = Number((record.weight_RM ?? 0).toFixed(2));
+        const weightToMove = Number((weightToMoveRaw ?? 0).toFixed(2));
+        const weightPerTray = weight_RM / record.tray_count;
+        const traysUsed = weightToMove / weightPerTray;
+        const roundedTraysUsed = Number(traysUsed.toFixed(2));
+        const remainingWeight = Number((weight_RM - weightToMove).toFixed(2));
+        const tolerance = 0.05;
+
 
         // Log เพื่อ debug
         console.log(`Record ${i}:`, {
           mapping_id: record.mapping_id,
-          weight_RM: record.weight_RM,
+          weight_RM: weight_RM,
           tray_count: record.tray_count,
-          weightToMove: weightToMove
+          weightToMove: weightToMove,
+          remainingWeight: remainingWeight,
+          traysUsed: roundedTraysUsed
         });
 
-        // คำนวณน้ำหนักต่อถาด
-        const weightPerTray = record.weight_RM / record.tray_count;
 
-        // คำนวณจำนวนถาดที่ใช้
-        const traysUsed = weightToMove / weightPerTray;
-        const roundedTraysUsed = Math.round(traysUsed * 100) / 100;
+        // *** ตรวจสอบน้ำหนักก่อนดำเนินการ ***
+        if (weightToMove > weight_RM + tolerance) {
+          await transaction.rollback();
+          return res.status(400).json({
+            message: "น้ำหนักที่ต้องการย้ายมากกว่าน้ำหนักที่มีอยู่ในรถเข็น",
+            detail: {
+              mapping_id: record.mapping_id,
+              weight_RM: weight_RM,
+              weightToMove: weightToMove,
+              difference: Number((weightToMove - weight_RM).toFixed(2))
+            }
+          });
+        }
 
-        // รวมค่าน้ำหนักและจำนวนถาด
+
         total_weight += weightToMove;
         total_trays += roundedTraysUsed;
+
 
         // สร้าง mapping ใหม่สำหรับวัตถุดิบที่ถูกย้าย
         const saveRMMResult = await transaction.request()
@@ -3276,21 +3320,23 @@ router.put("/pack/mixed/trolley", async (req, res) => {
           .input(`rmm_line_name${i}`, sql.VarChar(20), record.rmm_line_name)
           .query(`
           INSERT INTO TrolleyRMMapping
-          (tro_id, rmfp_id, batch_id, tro_production_id, process_id, qc_id, 
+          (tro_id, rmfp_id, batch_id, tro_production_id, process_id, qc_id,
           tray_count, weight_RM, level_eu,
           prep_to_cold_time, cold_time, prep_to_pack_time, cold_to_pack_time, mix_time, rework_time,
           rm_status, rm_cold_status, stay_place, dest,
-          allocation_date, removal_date, status, production_batch, created_by, rmm_line_name,created_at)
+          allocation_date, removal_date, status, production_batch, created_by, rmm_line_name, created_at)
           OUTPUT INSERTED.mapping_id
           VALUES
           (@tro_id${i}, @rmfp_id${i}, @batch_id${i}, @tro_production_id${i}, @process_id${i}, @qc_id${i},
           @tray_count${i}, @weight_RM${i}, @level_eu${i},
           @prep_to_cold_time${i}, @cold_time${i}, @prep_to_pack_time${i}, @cold_to_pack_time${i}, @mix_time${i}, @rework_time${i},
           @rm_status${i}, @rm_cold_status${i}, @stay_place${i}, @dest${i},
-          @allocation_date${i}, @removal_date${i}, @status${i}, @production_batch${i}, @created_by${i}, @rmm_line_name${i},GETDATE())
+          @allocation_date${i}, @removal_date${i}, @status${i}, @production_batch${i}, @created_by${i}, @rmm_line_name${i}, GETDATE())
         `);
 
+
         const newMappingId = saveRMMResult.recordset[0].mapping_id;
+
 
         // สร้างประวัติใหม่
         await transaction.request()
@@ -3322,36 +3368,21 @@ router.put("/pack/mixed/trolley", async (req, res) => {
           .input(`edit_rework${i}`, sql.VarChar(50), record.edit_rework)
           .query(`
           INSERT INTO History
-          (mapping_id, withdraw_date, cooked_date, rmit_date, qc_date, 
+          (mapping_id, withdraw_date, cooked_date, rmit_date, qc_date,
           come_cold_date, out_cold_date, come_cold_date_two, out_cold_date_two,
           come_cold_date_three, out_cold_date_three, sc_pack_date, rework_date,
-          receiver, receiver_prep_two, receiver_qc, receiver_out_cold, 
-          receiver_out_cold_two, receiver_out_cold_three, receiver_oven_edit, 
-          receiver_pack_edit, remark_rework,remark_rework_cold, location,qccheck_cold,edit_rework,created_at)
+          receiver, receiver_prep_two, receiver_qc, receiver_out_cold,
+          receiver_out_cold_two, receiver_out_cold_three, receiver_oven_edit,
+          receiver_pack_edit, remark_rework, remark_rework_cold, location, qccheck_cold, edit_rework, created_at)
           VALUES
           (@mapping_id${i}, @withdraw_date${i}, @cooked_date${i}, @rmit_date${i}, @qc_date${i},
           @come_cold_date${i}, @out_cold_date${i}, @come_cold_date_two${i}, @out_cold_date_two${i},
           @come_cold_date_three${i}, @out_cold_date_three${i}, @sc_pack_date${i}, @rework_date${i},
           @receiver${i}, @receiver_prep_two${i}, @receiver_qc${i}, @receiver_out_cold${i},
           @receiver_out_cold_two${i}, @receiver_out_cold_three${i}, @receiver_oven_edit${i},
-          @receiver_pack_edit${i}, @remark_rework${i},@remark_rework_cold${i}, @location${i},@qccheck_cold${i},@edit_rework${i},GETDATE())
+          @receiver_pack_edit${i}, @remark_rework${i}, @remark_rework_cold${i}, @location${i}, @qccheck_cold${i}, @edit_rework${i}, GETDATE())
         `);
 
-        // Copy ทุกแถวจากตาราง Batch ที่เกี่ยวข้องกับ mapping_id เดิม
-        const batchRecords = batchByMappingId[record.mapping_id] || [];
-        for (let j = 0; j < batchRecords.length; j++) {
-          const batchRecord = batchRecords[j];
-          await transaction.request()
-            .input(`batch_before_${i}_${j}`, sql.VarChar(15), batchRecord.batch_before)
-            .input(`batch_after_${i}_${j}`, sql.VarChar(15), batchRecord.batch_after)
-            .input(`mapping_id_${i}_${j}`, sql.Int, newMappingId)
-            .query(`
-              INSERT INTO Batch
-              (mapping_id, batch_before, batch_after)
-              VALUES
-              (@mapping_id_${i}_${j}, @batch_before_${i}_${j}, @batch_after_${i}_${j})
-            `);
-        }
 
         // เพิ่มข้อมูลใน RM_mixed
         await transaction.request()
@@ -3369,82 +3400,70 @@ router.put("/pack/mixed/trolley", async (req, res) => {
           .input(`level_eu${i}`, sql.NVarChar, record.level_eu || null)
           .query(`
           INSERT INTO RM_Mixed
-          (mapping_id, batch_id, rmfp_id, mixed_code, tro_production_id, weight_per_tro, 
+          (mapping_id, batch_id, rmfp_id, mixed_code, tro_production_id, weight_per_tro,
           weight_ntray, ntray, process_id, qc_id, weight_RM, level_eu)
-          VALUES 
-          (@mapping_id${i}, @batch_id${i}, @rmfp_id${i}, @mixed_code${i}, @tro_production_id${i}, @weight_per_tro${i}, 
+          VALUES
+          (@mapping_id${i}, @batch_id${i}, @rmfp_id${i}, @mixed_code${i}, @tro_production_id${i}, @weight_per_tro${i},
           @weight_ntray${i}, @ntray${i}, @process_id${i}, @qc_id${i}, @weight_RM${i}, @level_eu${i})
         `);
 
-        // *** เพิ่มส่วนนี้: สร้างข้อมูลในตาราง batch สำหรับ mapping_id ใหม่ ***
+
+        // สร้างข้อมูลในตาราง batch สำหรับ mapping_id ใหม่
         if (record.batch_after !== null && record.batch_after !== undefined && record.batch_after !== '') {
           await transaction.request()
             .input(`new_mapping_id${i}`, sql.Int, newMappingId)
             .input(`batch_after${i}`, sql.VarChar, record.batch_after)
             .query(`
-                  INSERT INTO batch (mapping_id, batch_after)
-                  VALUES (@new_mapping_id${i}, @batch_after${i})
-                  `);
+            INSERT INTO batch (mapping_id, batch_after)
+            VALUES (@new_mapping_id${i}, @batch_after${i})
+          `);
         }
 
+
         // อัปเดตรายการวัตถุดิบในรถเข็นเดิม
-        // ปัดเศษเพื่อป้องกันความผิดพลาดจากทศนิยม
-        const roundedRemainingWeight = Math.round(remainingWeight * 100) / 100;
-        
-        if (roundedRemainingWeight > 0.01) {
-          const remainingTrays = Math.round((record.tray_count - roundedTraysUsed) * 100) / 100;
+        if (remainingWeight > tolerance) {
+          const remainingTrays = Number((record.tray_count - roundedTraysUsed).toFixed(2));
           await transaction.request()
             .input('remainingWeight', sql.Float, remainingWeight)
             .input('remainingTrays', sql.Float, remainingTrays)
             .input('mapping_id', sql.Int, record.mapping_id)
             .query(`
-                    UPDATE TrolleyRMMapping
-                    SET weight_RM = @remainingWeight,
-                        tray_count = @remainingTrays
-                    WHERE mapping_id = @mapping_id
-                    `);
-        } else if (roundedRemainingWeight >= -0.01 && roundedRemainingWeight <= 0.01) {
-          // ถือว่าเป็น 0 ถ้าอยู่ในช่วง -0.01 ถึง 0.01
+            UPDATE TrolleyRMMapping
+            SET weight_RM = @remainingWeight,
+                tray_count = @remainingTrays
+            WHERE mapping_id = @mapping_id
+          `);
+        } else if (remainingWeight >= -tolerance && remainingWeight <= tolerance) {
           await transaction.request()
             .input('mapping_id', sql.Int, record.mapping_id)
             .query(`
-                    UPDATE TrolleyRMMapping 
-                    SET stay_place = 'บรรจุเสร็จสิ้น', 
-                        dest = 'บรรจุเสร็จสิ้น', 
-                        rm_status = NULL,
-                        tray_count = 0,
-                        weight_RM = 0
-                    WHERE mapping_id = @mapping_id
-                    `);
-        } else {
-          await transaction.rollback();
-          return res.status(400).json({ 
-            message: "น้ำหนักที่ต้องการย้ายมากกว่าน้ำหนักที่มีอยู่ในรถเข็น",
-            detail: {
-              mapping_id: record.mapping_id,
-              weight_RM: record.weight_RM,
-              weightToMove: weightToMove,
-              remainingWeight: roundedRemainingWeight
-            }
-          });
+            UPDATE TrolleyRMMapping
+            SET stay_place = 'บรรจุเสร็จสิ้น',
+                dest = 'บรรจุเสร็จสิ้น',
+                rm_status = NULL,
+                tray_count = 0,
+                weight_RM = 0
+            WHERE mapping_id = @mapping_id
+          `);
         }
       }
 
+
       // สร้างรายการวัตถุดิบสำหรับการผลิตใหม่
-      const insertRMRequest = transaction.request();
-      const dataRM = await insertRMRequest
+      const dataRM = await transaction.request()
         .input('prod_rm_id', sql.Int, tro_production_id)
         .input('weight', sql.Float, total_weight)
+        .input('rm_group_id', sql.Int, rm_group_id)
         .query(`      
-        INSERT INTO RMForProd (prod_rm_id, weight) 
-        OUTPUT INSERTED.rmfp_id
-        VALUES (@prod_rm_id, @weight)
-      `);
+    INSERT INTO RMForProd (prod_rm_id, weight, rm_group_id)
+    OUTPUT INSERTED.rmfp_id
+    VALUES (@prod_rm_id, @weight, @rm_group_id)
+  `);
       const new_rmfp_id = dataRM.recordset[0].rmfp_id;
 
+
       // สร้าง TrolleyRMMapping ใหม่สำหรับรถเข็นที่ผสมแล้ว
-      const insertTrolleyRequest = transaction.request();
-      const insert_result = await insertTrolleyRequest
+      const insert_result = await transaction.request()
         .input('rmfp_id', sql.Int, new_rmfp_id)
         .input('prod_mix', sql.Int, tro_production_id)
         .input('mix_code', sql.Int, mixCode)
@@ -3456,28 +3475,32 @@ router.put("/pack/mixed/trolley", async (req, res) => {
         .input('rmm_line_name', sql.NVarChar, line_name)
         .query(`
         INSERT INTO TrolleyRMMapping
-        (rmfp_id, prod_mix, mix_code, weight_RM, tray_count, stay_place, dest, mix_time, rmm_line_name,created_at)
+        (rmfp_id, prod_mix, mix_code, weight_RM, tray_count, stay_place, dest, mix_time, rmm_line_name, created_at)
         OUTPUT INSERTED.mapping_id
         VALUES
-        (@rmfp_id, @prod_mix, @mix_code, @total_weight, @total_trays, @stay_place, @dest, @mix_time, @rmm_line_name,GETDATE())
+        (@rmfp_id, @prod_mix, @mix_code, @total_weight, @total_trays, @stay_place, @dest, @mix_time, @rmm_line_name, GETDATE())
       `);
+
 
       const newMixedMappingId = insert_result.recordset[0].mapping_id;
 
+
       // สร้างประวัติใหม่สำหรับรถเข็นที่ผสมแล้ว
-      const insertHistoryRequest = transaction.request();
-      await insertHistoryRequest
+      await transaction.request()
         .input('mapping_id', sql.Int, newMixedMappingId)
         .input('total_weight', sql.Float, total_weight)
         .input('total_trays', sql.Float, total_trays)
         .query(`
         INSERT INTO History
-        (mapping_id, mixed_date,weight_RM,tray_count,created_at)
+        (mapping_id, mixed_date, weight_RM, tray_count, created_at)
         VALUES
-        (@mapping_id, GETDATE(),@total_weight,@total_trays,GETDATE())
+        (@mapping_id, GETDATE(), @total_weight, @total_trays, GETDATE())
       `);
 
+
       io.to('PackMixRoom').emit('dataUpdated', 'gotUpdated');
+
+
       if (insert_result.rowsAffected[0] > 0) {
         await transaction.commit();
         return res.status(200).json({
@@ -3494,6 +3517,7 @@ router.put("/pack/mixed/trolley", async (req, res) => {
         return res.status(404).json({ message: "เพิ่มข้อมูลไม่สำเร็จ" });
       }
 
+
     } catch (error) {
       console.error("SQL error: ", error);
       if (transaction) await transaction.rollback();
@@ -3502,6 +3526,7 @@ router.put("/pack/mixed/trolley", async (req, res) => {
       await sql.close();
     }
   });
+
 
 
   router.put("/pack/mix/trolley", async (req, res) => {
@@ -3607,7 +3632,7 @@ router.put("/pack/mixed/trolley", async (req, res) => {
     }
   });
 
- router.get("/pack/mixed/trolley/head/:line_id", async (req, res) => {
+  router.get("/pack/mixed/trolley/head/:line_id", async (req, res) => {
     try {
       const { line_id } = req.params;
       const pool = await connectToDatabase();
@@ -3793,14 +3818,14 @@ router.put("/pack/mixed/trolley", async (req, res) => {
     }
   });
 
- router.get("/pack/history/All/:line_id", async (req, res) => {
-  try {
-    const { line_id } = req.params
-    const pool = await connectToDatabase();
-    const result = await pool
-      .request()
-      .input(`line_id`, sql.Int, parseInt(line_id, 10))
-      .query(`
+  router.get("/pack/history/All/:line_id", async (req, res) => {
+    try {
+      const { line_id } = req.params
+      const pool = await connectToDatabase();
+      const result = await pool
+        .request()
+        .input(`line_id`, sql.Int, parseInt(line_id, 10))
+        .query(`
     SELECT 
         rmit.mapping_id,
         his.tro_id,
@@ -3884,29 +3909,29 @@ router.put("/pack/mixed/trolley", async (req, res) => {
         AND li.line_id = @line_id
     ORDER BY his.sc_pack_date DESC, his.rework_date DESC, his.come_cold_date DESC, his.come_cold_date_two DESC, his.come_cold_date_three DESC
     `);
-    res.status(200).json({
-      success: true,
-      data: result.recordset,
-    });
+      res.status(200).json({
+        success: true,
+        data: result.recordset,
+      });
 
-  } catch (error) {
-    console.error("Error fetching history data:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-      error: error.message,
-    });
-  }
-});
+    } catch (error) {
+      console.error("Error fetching history data:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  });
 
   router.get("/pack/history/All/mix/:line_id", async (req, res) => {
-  try {
-    const { line_id } = req.params
-    const pool = await connectToDatabase();
-    const result = await pool
-      .request()
-      .input(`line_id`, sql.Int, parseInt(line_id, 10))
-      .query(`
+    try {
+      const { line_id } = req.params
+      const pool = await connectToDatabase();
+      const result = await pool
+        .request()
+        .input(`line_id`, sql.Int, parseInt(line_id, 10))
+        .query(`
         SELECT
           rmm.mapping_id,
           h.tro_id,
@@ -3994,20 +4019,20 @@ router.put("/pack/mixed/trolley", async (req, res) => {
         ORDER BY h.sc_pack_date DESC, h.rework_date DESC, h.come_cold_date DESC, h.come_cold_date_two DESC, h.come_cold_date_three DESC
       `);
 
-    res.status(200).json({
-      success: true,
-      data: result.recordset,
-    });
+      res.status(200).json({
+        success: true,
+        data: result.recordset,
+      });
 
-  } catch (error) {
-    console.error("Error fetching history data:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-      error: error.message,
-    });
-  }
-});
+    } catch (error) {
+      console.error("Error fetching history data:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  });
 
 
   router.put("/pack/export/to/rework/Trolley", async (req, res) => {
