@@ -266,7 +266,7 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
       mat: material_code,
       rmfpID: rmfp_id ? parseInt(rmfp_id, 10) : null,
       cold: formattedDelayTime,
-      ptc_time: ptc_time,
+      ptc_time: ptc_time, 
       ColdOut: ColdOut,
       dest: Location,
       operator: operator,
@@ -1452,24 +1452,64 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
 
       {/* Dialog ยืนยันการส่งออก */}
       {isConfirmProdOpen && (
-        <ConfirmProdDialog
+        <QcCheck
           open={isConfirmProdOpen}
-          onClose={() => {
-            setIsConfirmProdOpen(false);
-            showModal();
-          }}
-          onSuccess={() => {
-            setIsConfirmProdOpen(false);
-            onSuccess();
-          }}
-          data={{
-            ...data,
-            materials: processedMaterials,
-            operator,
-            Location
-          }}
-        />
-      )}
+    onClose={() => {
+      setIsConfirmProdOpen(false);
+      showModal();
+    }}
+    onSuccess={() => {
+      setIsConfirmProdOpen(false);
+      onSuccess();
+    }}
+    material_code={mat}
+    materialName={materialName}
+    ptc_time={ptc_time}
+    standard_ptc={standard_ptc}
+    cold={cold}
+    rm_cold_status={rm_cold_status}
+    rm_status={rm_status}
+    ComeColdDateTime={ComeColdDateTime}
+    slot_id={slot_id}
+    tro_id={tro_id}
+    batch={batch}
+    rmfp_id={rmfp_id}
+    Location={Location}
+    operator={operator}
+    level_eu={level_eu}
+    formattedDelayTime={formattedDelayTime}
+    latestComeColdDate={latestComeColdDate}
+    cooked_date={cooked_date}
+    rmit_date={rmit_date}
+    materials={processedMaterials}
+    qccheck={qccheck}
+    sq_remark={sq_remark}
+    mdcheck={mdcheck}
+    md_remark={md_remark}
+    defect_remark={defect_remark}
+    defectcheck={defectcheck}
+    machine_MD={machine_MD}
+    sq_acceptance={sq_acceptance}
+    defect_acceptance={defect_acceptance}
+    weight_RM={weight_RM}
+    tray_count={tray_count}
+    rmm_line_name={rmm_line_name}
+    withdraw_date={withdraw_date}
+    name_edit_prod_two={name_edit_prod_two}
+    name_edit_prod_three={name_edit_prod_three}
+    first_prod={first_prod}
+    two_prod={two_prod}
+    three_prod={three_prod}
+    qccheck_cold={qccheck_cold}
+    receiver_qc_cold={receiver_qc_cold}
+    approver={approver}
+    production={production}
+    remark_rework={remark_rework}
+    remark_rework_cold={remark_rework_cold}
+    edit_rework={edit_rework}
+    prepare_mor_night={prepare_mor_night}
+  />
+   )}
     </>
   );
 };

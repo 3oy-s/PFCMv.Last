@@ -1655,7 +1655,8 @@ WHERE
                 h.three_prod,
                 h.name_edit_prod_two,
                 h.name_edit_prod_three,
-                pr.process_name
+                pr.process_name,
+                q.general_remark
             FROM Trolley t
             JOIN TrolleyRMMapping rmm ON t.tro_id = rmm.tro_id
             JOIN RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id

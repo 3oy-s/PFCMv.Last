@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, TableContainer, TableHead, TableBody, TableRow, TableCell, Paper, Box, TextField, Collapse, TablePagination, Divider, Typography, styled } from '@mui/material';
 import { LiaShoppingCartSolid } from 'react-icons/lia';
+import { LiaFileInvoiceSolid } from 'react-icons/lia';
 import { InputAdornment } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/EditOutlined";
@@ -29,6 +30,7 @@ const Row = ({
   row,
   columnWidths,
   handleOpenModal,
+  handleOpenSlipModal, // ⬅️ เพิ่มบรรทัดนี้
   handleRowClick,
   handleOpenEditModal,
   handleOpenDeleteModal,
@@ -84,6 +86,14 @@ const Row = ({
             handleOpenModal(row);
           }}
           icon={<LiaShoppingCartSolid style={{ color: '#007BFF', fontSize: '25px' }} />}
+          backgroundColor={backgroundColor} // Add this
+        />
+        <SlipViewCell
+          onClick={(e) => {
+            e.stopPropagation();
+              handleOpenSlipModal(row);
+          }}
+          icon={<LiaFileInvoiceSolid style={{ color: '#828282ff', fontSize: '25px' }} />}
           backgroundColor={backgroundColor} // Add this
         />
         <CompleteActionCell
@@ -145,6 +155,46 @@ const CartActionCell = ({ width, onClick, icon, backgroundColor }) => {
       onTouchEnd={(e) => {
         e.currentTarget.style.backgroundColor = backgroundColor;
         e.currentTarget.querySelector('svg').style.color = '#007BFF';
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        {icon}
+      </div>
+    </TableCell>
+  );
+};
+
+const SlipViewCell = ({ width, onClick, icon, backgroundColor }) => {
+  return (
+    <TableCell
+      style={{
+        width,
+        textAlign: 'center',
+        borderTop: '1px solid #e0e0e0',
+        borderBottom: '1px solid #e0e0e0',
+        borderLeft: '1px solid #f2f2f2',
+        height: '40px',
+        padding: '0px',
+        cursor: 'pointer',
+        transition: 'background-color 0.2s ease-in-out',
+        backgroundColor: backgroundColor
+      }}
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = '#828282ff';
+        e.currentTarget.querySelector('svg').style.color = '#fff';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = backgroundColor;
+        e.currentTarget.querySelector('svg').style.color = '#828282ff';
+      }}
+      onTouchStart={(e) => {
+        e.currentTarget.style.backgroundColor = '#828282ff';
+        e.currentTarget.querySelector('svg').style.color = '#fff';
+      }}
+      onTouchEnd={(e) => {
+        e.currentTarget.style.backgroundColor = backgroundColor;
+        e.currentTarget.querySelector('svg').style.color = '#828282ff';
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -239,7 +289,7 @@ const EditActionCell = ({ width, onClick, icon, backgroundColor }) => {
 };
 
 
-const TableMainPrep = ({ handleOpenModal, data, handleRowClick, handleOpenEditModal, handleOpenSuccess, handleOpenDeleteModal }) => {
+const TableMainPrep = ({ handleOpenModal,handleOpenSlipModal, data, handleRowClick, handleOpenEditModal, handleOpenSuccess, handleOpenDeleteModal }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredRows, setFilteredRows] = useState(data);
   const [page, setPage] = useState(0);
@@ -368,6 +418,9 @@ const TableMainPrep = ({ handleOpenModal, data, handleRowClick, handleOpenEditMo
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>รถเข็น</Box>
               </TableCell>
               <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderLeft: "0px solid ", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>สลิป</Box>
+              </TableCell>
+              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderLeft: "0px solid ", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>เสร็จสิ้น</Box>
               </TableCell>
 
@@ -385,6 +438,7 @@ const TableMainPrep = ({ handleOpenModal, data, handleRowClick, handleOpenEditMo
                   row={row}
                   columnWidths={columnWidths}
                   handleOpenModal={handleOpenModal}
+                  handleOpenSlipModal={handleOpenSlipModal}// ⬅️ เพิ่มบรรทัดนี้
                   handleRowClick={handleRowClick}
                   handleOpenEditModal={handleOpenEditModal}
                   handleOpenDeleteModal={handleOpenDeleteModal}
