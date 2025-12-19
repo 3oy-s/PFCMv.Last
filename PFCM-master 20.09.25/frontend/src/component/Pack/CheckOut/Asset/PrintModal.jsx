@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Button, Typography, Dialog, Divider, CircularProgress } from '@mui/material';
 import axios from "axios";
-axios.defaults.withCredentials = true;
+axios.defaults.withCredentials = true; 
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -78,7 +78,7 @@ const PrintModal = ({ open, onClose, data }) => {
                 // If there are multiple materials, fetch history for each
                 if (data.materials && data.materials.length > 0) {
                     const historyPromises = data.materials.map(item =>
-                        axios.get(`${API_URL}/api/coldstorage/history/test/${item.mapping_id}`)
+                        axios.get(`${API_URL}/api/coldstorage/history/${item.mapping_id}`)
                     );
 
                     const results = await Promise.all(historyPromises);
@@ -90,9 +90,7 @@ const PrintModal = ({ open, onClose, data }) => {
                         rework_time: result.data.rework_time,
                         mix_time: result.data.mix_time,
                         cold_to_pack_time: result.data.cold_to_pack_time,
-                        cold_to_pack: result.data.cold_to_pack,
-                        come_cold_date_latest: result.data.come_cold_date_latest,
-                        rmit_date: result.data.rmit_date
+                        cold_to_pack: result.data.cold_to_pack
                     }));
 
                     setColdHistory(historiesWithIndex);
@@ -107,9 +105,7 @@ const PrintModal = ({ open, onClose, data }) => {
                         rework_time: response.data.rework_time,
                         mix_time: response.data.mix_time,
                         cold_to_pack_time: response.data.cold_to_pack_time,
-                        cold_to_pack: response.data.cold_to_pack,
-                        come_cold_date_latest: response.data.come_cold_date_latest,
-                        rmit_date: response.data.rmit_date
+                        cold_to_pack: response.data.cold_to_pack
                     }]);
                 }
 
@@ -122,8 +118,6 @@ const PrintModal = ({ open, onClose, data }) => {
 
         fetchColdHistory();
     }, [open, data]);
-
-
 
     // Format date for display in Thai format
     const formatThaiDateTime = (utcDateTimeStr) => {
@@ -186,25 +180,6 @@ const PrintModal = ({ open, onClose, data }) => {
         }
     };
 
-    const calculateDBSFromDate = (startDate, endDate) => {
-        if (!startDate || !endDate) return "-";
-
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) return "-";
-
-        const diffMs = end - start;
-        if (diffMs < 0) return "-";
-
-        const totalMinutes = Math.floor(diffMs / (1000 * 60));
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
-
-        return `${hours} ชม. ${minutes} นาที`;
-    };
-
-
     // Calculate DBS (duration between processing and cold storage)
     const calculateDBS = (standardPtc, ptcTime) => {
         if (!standardPtc || !ptcTime) return "-";
@@ -252,7 +227,7 @@ const PrintModal = ({ open, onClose, data }) => {
     const {
         material_code, materialName, rm_cold_status, rm_status,
         ComeColdDateTime, slot_id, tro_id, batch, rmfp_id,
-        Location, operator, level_eu, cooked_date, rmit_date, rmm_line_name, name_prod_edit_two, name_prod_edit_three, first_prod, two_prod, three_prod, materials, prepare_mor_night, production
+        Location, operator, level_eu, cooked_date, rmit_date, rmm_line_name, name_prod_edit_two,name_prod_edit_three, first_prod, two_prod,three_prod, materials, prepare_mor_night,production
     } = data || {};
 
     // Define grid gap for consistent use throughout the component
@@ -521,17 +496,18 @@ const PrintModal = ({ open, onClose, data }) => {
 
                     {materials && materials.length > 0 ? (
                         materials.map((item, index) => {
-                            const historyData = coldHistory.find(
+                            // Find history for this material item
+                            const materialHistory = coldHistory.find(
                                 hist => hist.materialIndex === index
-                            );
+                            )?.history || [];
 
-                            const materialHistory = historyData?.history || [];
-                            const qcDate = historyData?.qc_date;
-                            const reworkDate = historyData?.rework_date;
-                            const reworkTime = historyData?.rework_time;
-                            const mixTime = historyData?.mix_time;
-                            const coldToPackTime = historyData?.cold_to_pack_time;
-                            const coldToPack = historyData?.cold_to_pack;
+                            // Get qc_date and rework_time from coldHistory
+                            const qcDate = coldHistory.find(hist => hist.materialIndex === index)?.qc_date;
+                            const reworkDate = coldHistory.find(hist => hist.materialIndex === index)?.rework_date;
+                            const reworkTime = coldHistory.find(hist => hist.materialIndex === index)?.rework_time;
+                            const mixTime = coldHistory.find(hist => hist.materialIndex === index)?.mix_time;
+                            const coldToPackTime = coldHistory.find(hist => hist.materialIndex === index)?.cold_to_pack_time;
+                            const coldToPack = coldHistory.find(hist => hist.materialIndex === index)?.cold_to_pack;
 
                             return (
                                 <MaterialItem
@@ -539,8 +515,6 @@ const PrintModal = ({ open, onClose, data }) => {
                                     index={index}
                                     item={{
                                         ...item,
-                                        rmit_date: historyData?.rmit_date,
-                                        come_cold_date_latest: historyData?.come_cold_date_latest,
                                         mix_time: mixTime,
                                         cold_to_pack_time: coldToPackTime,
                                         cold_to_pack: coldToPack
@@ -551,7 +525,6 @@ const PrintModal = ({ open, onClose, data }) => {
                                     reworkTime={reworkTime}
                                     totalItems={materials.length}
                                     calculateDBS={calculateDBS}
-                                    calculateDBSFromDate={calculateDBSFromDate}
                                     calculateDCS={calculateDCS}
                                     calculateCorrectedDBS={calculateCorrectedDBS}
                                     formatThaiDateTime={formatThaiDateTime}
@@ -563,7 +536,6 @@ const PrintModal = ({ open, onClose, data }) => {
                                 />
                             );
                         })
-
                     ) : (
                         <MaterialItem
                             index={0}
@@ -583,7 +555,7 @@ const PrintModal = ({ open, onClose, data }) => {
                                 first_prod: first_prod,
                                 two_prod: two_prod,
                                 three_prod: three_prod
-
+                                
                             }}
                             history={coldHistory[0]?.history || []}
                             qcDate={coldHistory[0]?.qc_date}
@@ -591,7 +563,6 @@ const PrintModal = ({ open, onClose, data }) => {
                             reworkTime={coldHistory[0]?.rework_time}
                             totalItems={1}
                             calculateDBS={calculateDBS}
-                            calculateDBSFromDate={calculateDBSFromDate}
                             calculateDCS={calculateDCS}
                             calculateCorrectedDBS={calculateCorrectedDBS}
                             formatThaiDateTime={formatThaiDateTime}
@@ -624,8 +595,7 @@ const MaterialItem = ({
     gridGapScreen,
     gridGapPrint,
     fontSizes,
-    Location,
-    calculateDBSFromDate
+    Location
 }) => {
     const calculatePackagingDeadline = (history, mix_time, rework_time, cold_to_pack_time, cold_to_pack) => {
         if (!history || history.length === 0) {
@@ -887,7 +857,7 @@ const MaterialItem = ({
                     </Box>
 
                     {/* DBS - Time from cooking to cold storage */}
-                    {item.rmit_date && item.come_cold_date_latest && (
+                    {item.cooked_date && (history?.[0]?.come_date || item.come_cold_date) && (
                         <Box sx={{
                             mb: 2,
                             '@media print': {
@@ -898,14 +868,11 @@ const MaterialItem = ({
                         }}>
                             <InlineInfoItem
                                 label="DBS เตรียม - เข้าห้องเย็น (ช่วงที่ 1) "
-                                value={calculateDBSFromDate(
-                                    item.rmit_date,
-                                    item.come_cold_date_latest
-                                )}
+                                value={calculateDBS(
+                                    item.standard_ptc, item.ptc_time
+                                ) || "-"}
                                 fontSizes={fontSizes}
                             />
-
-
 
                             {/* Rework Information */}
                             {reworkTime && (
@@ -1113,33 +1080,33 @@ const MaterialItem = ({
                             <span style={{ color: '#666' }}>ชื่อผู้อนุมัติ ครั้งที่ 2:</span> {item.name_edit_prod_two}
                         </Box>
 
-                        {item.three_prod && (
+                        {item.three_prod &&(
                             <>
-                                <Box sx={{
-                                    mb: 0.5,
-                                    fontSize: fontSizes.value.screen,
-                                    '@media print': {
-                                        marginBottom: '1px',
-                                        fontSize: fontSizes.value.print,
-                                    },
-                                }}>
-                                    <span style={{ color: '#666' }}>แผนการผลิต ครั้งที่ 3:</span> {item.three_prod || '-'}
-                                </Box>
+                            <Box sx={{
+                            mb: 0.5,
+                            fontSize: fontSizes.value.screen,
+                            '@media print': {
+                                marginBottom: '1px',
+                                fontSize: fontSizes.value.print,
+                            },
+                        }}>
+                            <span style={{ color: '#666' }}>แผนการผลิต ครั้งที่ 3:</span> {item.three_prod || '-'}
+                        </Box>
 
-                                <Box sx={{
-                                    mb: 0.5,
-                                    fontSize: fontSizes.value.screen,
-                                    '@media print': {
-                                        marginBottom: '1px',
-                                        fontSize: fontSizes.value.print,
-                                    },
-                                }}>
-                                    <span style={{ color: '#666' }}>ชื่อผู้อนุมัติ ครั้งที่ 3:</span> {item.name_edit_prod_three}
-                                </Box>
+                        <Box sx={{
+                            mb: 0.5,
+                            fontSize: fontSizes.value.screen,
+                            '@media print': {
+                                marginBottom: '1px',
+                                fontSize: fontSizes.value.print,
+                            },
+                        }}>
+                            <span style={{ color: '#666' }}>ชื่อผู้อนุมัติ ครั้งที่ 3:</span> {item.name_edit_prod_three}
+                        </Box>
                             </>
                         )}
 
-
+                        
                     </>
                 )}
 
@@ -1282,7 +1249,7 @@ const MaterialItem = ({
                         <span style={{ color: '#666', wordBreak: 'break-word', whiteSpace: 'pre-line' }}>หมายเหตุแก้ไข-บรรจุ :</span> {item.remark_rework}
                     </Box>
                 )}
-
+                
                 {item.edit_rework && (
                     <Box sx={{
                         mb: 0.5,
@@ -1300,16 +1267,16 @@ const MaterialItem = ({
             </Box>
 
             {item.prepare_mor_night && (
-                <Box sx={{
-                    mb: 0.5,
-                    fontSize: fontSizes.value.screen,
-                    '@media print': {
-                        marginBottom: '1px',
-                        fontSize: fontSizes.value.print,
-                    },
-                }}>
-                    <span style={{ color: '#666' }}>เตรียมงานให้กะ:</span> {item.prepare_mor_night}
-                </Box>
+            <Box sx={{
+                mb: 0.5,
+                fontSize: fontSizes.value.screen,
+                '@media print': {
+                    marginBottom: '1px',
+                    fontSize: fontSizes.value.print,
+                },
+            }}>
+                <span style={{ color: '#666' }}>เตรียมงานให้กะ:</span> {item.prepare_mor_night}
+            </Box>
             )}
         </Box>
     );

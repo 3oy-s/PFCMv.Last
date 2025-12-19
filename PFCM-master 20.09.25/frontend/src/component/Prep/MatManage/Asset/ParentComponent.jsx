@@ -6,6 +6,10 @@ import Modal3 from './Modal3';
 import ModalEditPD from './ModalEditPD';
 import ModalSuccess from './ModalSuccess';
 import ModalDelete from './ModalDelete';
+import ModalSlip from './ModalSlip'; 
+import ModalSlip2 from './ModalSlip2';
+import ModalSlip3 from './ModalSlip3';
+import ModalSlipPrint from './ModalSlipPrint';
 import axios from "axios";
 axios.defaults.withCredentials = true; 
 import io from 'socket.io-client';
@@ -27,6 +31,14 @@ const ParentComponent = () => {
   const [dataForDeleteModal, setDataForDeleteModal] = useState(null);
   const [tableData, setTableData] = useState([]);
   const [isFetching, setIsFetching] = useState(false);
+  const [openSlipModal, setOpenSlipModal] = useState(false);
+  const [dataForSlipModal, setDataForSlipModal] = useState(null);
+  const [openSlipModal2, setOpenSlipModal2] = useState(false);
+  const [dataForSlipModal2, setDataForSlipModal2] = useState(null);
+  const [openSlipModal3, setOpenSlipModal3] = useState(false);
+  const [dataForSlipModal3, setDataForSlipModal3] = useState(null);
+  const [openSlipPrintModal, setOpenSlipPrintModal] = useState(false);
+  const [dataForSlipPrintModal, setDataForSlipPrintModal] = useState(null);
 
   const fetchTimeoutRef = useRef(null);
   const socketRef = useRef(null);
@@ -218,8 +230,136 @@ useEffect(() => {
   setOpenModal2(true);
   setOpenModal1(false);
 };
+//----------------------------------------------------------------------------------
+const handleOpenSlipModal = (data) => {
+  if (!data) {
+    console.error("Data for SlipModal is null");
+    return;
+  }
 
+  const formattedData = {
+    batch: data.batch,
+    batchArray: data.batchArray || [],
+    rm_type_id: data.rm_type_id,
+    mat: data.mat,
+    mat_name: data.mat_name,
+    production: data.production,
+    rmfp_id: data.rmfp_id,
+    CookedDateTime: data.CookedDateTime || "",
+    withdraw_date: data.withdraw_date || "",
+    level_eu: data.level_eu || "",  // ✅ เพิ่มบรรทัดนี้
+  };
 
+  setDataForSlipModal(formattedData);
+  setOpenSlipModal(true);
+};
+
+const handleConfirmSlip = async (batchAfterArray) => {
+  console.log("Batch After Array:", batchAfterArray);
+  
+ try {
+    // สร้างข้อมูลสำหรับ ModalSlip2 โดยรวม batchAfterArray เข้าไป
+    const updatedData = {
+      ...dataForSlipModal, // ข้อมูลจาก ModalSlip
+      batchAfterArray: batchAfterArray, // batch ที่เปลี่ยนแล้ว
+      CookedDateTime: dataForSlipModal?.CookedDateTime || "",
+      level_eu: dataForSlipModal?.level_eu || "",  // ✅ เพิ่มบรรทัดนี้
+    };
+
+    console.log("Opening ModalSlip2 with data:", updatedData);
+    
+    setDataForSlipModal2(updatedData);
+    setOpenSlipModal(false); // ปิด ModalSlip
+    setOpenSlipModal2(true); // เปิด ModalSlip2
+    
+  } catch (error) {
+    console.error("Error updating batch:", error);
+  }
+};
+//-------------------------------------------------------------------------------------
+// 3. แก้ไข function สำหรับ ModalSlip2 เมื่อกดยืนยัน
+const handleConfirmSlip2 = async (data) => {
+  console.log("Data from ModalSlip2:", data);
+  
+  try {
+    // เตรียมข้อมูลสำหรับ ModalSlip3
+    const updatedData = {
+      ...data,
+      mat_name: dataForSlipModal?.mat_name || data?.mat_name,
+      withdraw_date: dataForSlipModal?.withdraw_date || data?.withdraw_date,
+      production: dataForSlipModal?.production || data?.production,
+      mat: dataForSlipModal?.mat || data?.mat,
+      level_eu: dataForSlipModal?.level_eu || data?.level_eu || "",  // ✅ เพิ่มบรรทัดนี้
+    };
+
+    console.log("Opening ModalSlip3 with data:", updatedData);
+    
+    setDataForSlipModal3(updatedData);
+    setOpenSlipModal2(false); // ปิด ModalSlip2
+    setOpenSlipModal3(true);  // เปิด ModalSlip3
+    
+  } catch (error) {
+    console.error("Error preparing data for ModalSlip3:", error);
+  }
+};
+//---------------------------------------------------------------------------------------
+// ✅ เพิ่มฟังก์ชันใหม่สำหรับจัดการหลังกดยืนยันใน ModalSlip3
+  const handleConfirmSlip3 = async (data) => {
+   console.log("✅ Confirmed from ModalSlip3");
+   console.log("📦 Data from ModalSlip3:", data);
+   console.log("📦 dataForSlipModal:", dataForSlipModal);
+   console.log("📦 dataForSlipModal2:", dataForSlipModal2);
+    
+    try {
+      // ✅ รวมข้อมูลจากทุก state ให้ครบถ้วน
+      const completeData = {
+        // ข้อมูลจาก ModalSlip3 (data ที่ส่งมา)
+        ...data,
+        
+        // ข้อมูลจาก ModalSlip (รอบแรก)
+        mat: data?.mat || dataForSlipModal?.mat,
+        mat_name: data?.mat_name || dataForSlipModal?.mat_name,
+        production: data?.production || dataForSlipModal?.production,
+        withdraw_date: data?.withdraw_date || dataForSlipModal?.withdraw_date,
+        level_eu: data?.level_eu || dataForSlipModal?.level_eu,
+        CookedDateTime: data?.CookedDateTime || dataForSlipModal?.CookedDateTime,
+        rmfp_id: data?.rmfp_id || dataForSlipModal?.rmfp_id,
+        rm_type_id: data?.rm_type_id || dataForSlipModal?.rm_type_id,
+        
+        // ข้อมูล Batch
+        batchArray: data?.batchArray || dataForSlipModal?.batchArray || [],
+        batchAfterArray: data?.batchAfterArray || dataForSlipModal2?.batchAfterArray || [],
+        
+        // ข้อมูลจากฟอร์ม input2
+        input2: data?.input2 || {},
+        
+        // เวลาต่างๆ
+        cookedDateTimeNew: data?.cookedDateTimeNew,
+        preparedDateTimeNew: data?.preparedDateTimeNew,
+      };
+
+      console.log("📄 Complete data for print slip:", completeData);
+      
+      // ✅ ตรวจสอบว่าข้อมูลครบหรือไม่
+      if (!completeData.mat_name) {
+        console.error("❌ Missing mat_name!");
+      }
+      if (!completeData.input2?.weightPerCart) {
+        console.error("❌ Missing weightPerCart!");
+      }
+      
+      // เก็บข้อมูลสำหรับแสดงในสลิป (✅ เปลี่ยนจาก data เป็น completeData)
+      setDataForSlipPrintModal(completeData);
+      setOpenSlipModal3(false);
+      
+      // เปิดสลิปพิมพ์ (✅ ลบ setTimeout ออก - ไม่จำเป็น)
+      setOpenSlipPrintModal(true);
+      
+    } catch (error) {
+      console.error("Error showing print slip:", error);
+    }
+  };
+//-------------------------------------------------------------------------------------
     const handleOpenModal3 = (data) => {
       if (!data) {
         console.error("Data for Modal3 is null");
@@ -329,6 +469,7 @@ useEffect(() => {
       <div>
         <TableMainPrep
           handleOpenModal={handleOpenModal1}
+           handleOpenSlipModal={handleOpenSlipModal} // ⬅️ เพิ่ม prop
           handleOpenEditModal={handleOpenEditModal}
           handleOpenDeleteModal={handleOpenDeleteModal}
           handleOpenSuccess={handleOpenSuccess}
@@ -445,6 +586,57 @@ useEffect(() => {
             onSuccess={fetchData}
           />
         )}
+        {dataForSlipModal && (
+         <ModalSlip
+           open={openSlipModal}
+           onClose={() => setOpenSlipModal(false)}
+           onConfirm={handleConfirmSlip}
+           oldBatch={dataForSlipModal.batch || ""}
+           batchArray={dataForSlipModal.batchArray || []}
+           rm_type_id={dataForSlipModal.rm_type_id || 3}
+         />
+        )}
+
+        {dataForSlipModal2 && (
+         <ModalSlip2
+           open={openSlipModal2}
+           onClose={() => setOpenSlipModal2(false)}
+           onNext={handleConfirmSlip2}
+           data={dataForSlipModal2}
+           CookedDateTime={dataForSlipModal2?.CookedDateTime || ""}
+           batchAfterArray={dataForSlipModal2?.batchAfterArray || []}
+           batchArray={dataForSlipModal2?.batchArray || []}
+           rm_type_id={dataForSlipModal2?.rm_type_id || 3}
+          />
+          )}
+
+          {dataForSlipModal3 && (
+          <ModalSlip3
+           open={openSlipModal3}
+           onClose={() => setOpenSlipModal3(false)}
+           onConfirm={handleConfirmSlip3}  
+           data={dataForSlipModal3}
+           mat_name={dataForSlipModal3?.mat_name}
+           withdraw_date={dataForSlipModal3?.withdraw_date}
+           production={dataForSlipModal3?.production}
+           mat={dataForSlipModal3?.mat}
+           onEdit={() => {
+           setOpenSlipModal2(true);
+           setOpenSlipModal3(false);
+          }}
+        />
+        )}
+        
+        {dataForSlipPrintModal && (
+        <ModalSlipPrint
+          open={openSlipPrintModal}
+          onClose={() => {
+            setOpenSlipPrintModal(false);
+            setDataForSlipPrintModal(null);
+          }}
+          data={dataForSlipPrintModal}
+        />
+      )}
       </div>
     );
   };

@@ -987,7 +987,7 @@ SELECT
     rmm.mapping_id,
     rmm.tro_id,
     rmm.rmfp_id,
-    b.batch_combined AS batch,  -- เปลี่ยนจาก batch_after เป็น batch_combined
+    b.batch_combined AS batch,
     rm.mat_name,
     rm.mat,
     CONCAT(p.doc_no, '(', rmm.rmm_line_name, ')') AS production,
@@ -1010,40 +1010,31 @@ SELECT
     0 AS isMixed
 FROM 
     TrolleyRMMapping rmm
-JOIN 
+LEFT JOIN 
     RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
-JOIN 
+LEFT JOIN 
     ProdRawMat prm ON prm.prod_rm_id = rmm.tro_production_id
-JOIN 
+LEFT JOIN 
     RawMat rm ON rm.mat = prm.mat
-JOIN (
-    -- Subquery ที่รวม batch_after หลายค่าเข้าด้วยกันด้วย STRING_AGG
+LEFT JOIN (
     SELECT 
         mapping_id,
         STRING_AGG(batch_after, ', ') AS batch_combined
-    FROM 
-        batch
-    GROUP BY 
-        mapping_id
+    FROM batch
+    GROUP BY mapping_id
 ) b ON rmm.mapping_id = b.mapping_id
-JOIN
-    Qc q ON rmm.qc_id = q.qc_id
-JOIN 
-    Production p ON p.prod_id = prm.prod_id
-JOIN
-    RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
-JOIN
-    History h ON rmm.mapping_id = h.mapping_id
-JOIN
-    Slot s ON rmm.tro_id = s.tro_id
-JOIN
-    ColdStorage cs ON s.cs_id = cs.cs_id
+LEFT JOIN Qc q ON rmm.qc_id = q.qc_id
+LEFT JOIN Production p ON p.prod_id = prm.prod_id
+LEFT JOIN RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
+LEFT JOIN History h ON rmm.mapping_id = h.mapping_id
+LEFT JOIN Slot s ON rmm.tro_id = s.tro_id
+LEFT JOIN ColdStorage cs ON s.cs_id = cs.cs_id
 WHERE
     rmm.tro_id != @current_tro_id
     AND rmm.dest = 'ห้องเย็น'
     AND rmm.stay_place = 'เข้าห้องเย็น'
     AND rmm.weight_RM > 0
-    AND rmm.tro_id IS NOT NULL
+    AND rmm.tro_id IS NOT NULL;
 `;
 
             // ดึงข้อมูลวัตถุดิบผสม
@@ -1480,7 +1471,7 @@ WHERE
                         .query(`UPDATE Slot SET tro_id = NULL ,status ='1428' WHERE tro_id = @source_tro_id`);
                     await new sql.Request(transaction)
                         .input('source_tro_id', source_tro_id)
-                        .query(`UPDATE Trolley SET tro_status = 1,status = '1.7' WHERE tro_id = @source_tro_id`);
+                        .query(`UPDATE Trolley SET tro_status = '1' ,status = '1.7' WHERE tro_id = @source_tro_id`);
                 }
 
                 // Commit transaction
@@ -1683,7 +1674,8 @@ WHERE
                 h.three_prod,
                 h.name_edit_prod_two,
                 h.name_edit_prod_three,
-                pr.process_name
+                pr.process_name,
+                q.general_remark
             FROM Trolley t
             JOIN TrolleyRMMapping rmm ON t.tro_id = rmm.tro_id
             JOIN RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
@@ -2263,6 +2255,111 @@ WHERE
                 console.log("send body mix_time:", historyData.mix_time);
                 console.log("send body cold_to_pack_time:", historyData.cold_to_pack_time);
                 console.log("send body cold_to_pack:", historyData.cold_to_pack);
+            } else {
+                res.status(404).json({ err: "History not found" });
+            }
+        } catch (err) {
+            console.error("Error:", err);
+            res.status(500).json({ error: "An error occurred while fetching history." });
+        }
+    });
+
+     router.get("/coldstorage/history/test/:mapping_id", async (req, res) => {
+        try {
+            const { mapping_id } = req.params;
+            const pool = await connectToDatabase();
+
+            // Get history data and time values
+            const result = await pool.request()
+                .input("mapping_id", mapping_id)
+                .query(`SELECT
+                        CONVERT(VARCHAR, h.come_cold_date, 120) AS come_cold_date,
+                        CONVERT(VARCHAR, h.out_cold_date, 120) AS out_cold_date,
+                        CONVERT(VARCHAR, h.come_cold_date_two, 120) AS come_cold_date_two,
+                        CONVERT(VARCHAR, h.out_cold_date_two, 120) AS out_cold_date_two,
+                        CONVERT(VARCHAR, h.come_cold_date_three, 120) AS come_cold_date_three,
+                        CONVERT(VARCHAR, h.out_cold_date_three, 120) AS out_cold_date_three,
+                        CONVERT(VARCHAR, h.qc_date, 120) AS qc_date,
+                        CONVERT(VARCHAR, h.rmit_date, 120) AS rmit_date,
+                        CONVERT(VARCHAR, h.rework_date, 120) AS rework_date,
+                        CONVERT(VARCHAR,
+                                COALESCE(
+                                    h.come_cold_date_three,
+                                    h.come_cold_date_two,
+                                    h.come_cold_date
+                                ),
+                                120
+                        ) AS come_cold_date_latest,
+                        h.receiver_out_cold,
+                        h.receiver_out_cold_two,
+                        h.receiver_out_cold_three,
+                        rmm.rework_time,
+                        rmm.mix_time,
+                        rmm.cold_to_pack_time,
+                        rmg.cold_to_pack
+                       
+    
+                    FROM History h
+                    JOIN TrolleyRMMapping rmm ON h.mapping_id = rmm.mapping_id
+                    JOIN RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
+                    JOIN RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
+                    WHERE h.mapping_id = @mapping_id
+                `);
+
+            if (result.recordset.length > 0) {
+                const historyData = result.recordset[0];
+                const historyEntries = [];
+
+                if (historyData.come_cold_date) {
+                    historyEntries.push({
+                        round: 1,
+                        come_date: historyData.come_cold_date,
+                        out_date: historyData.out_cold_date,
+                        come_operator: historyData.receiver_come_cold,
+                        out_operator: historyData.receiver_out_cold
+                    });
+                }
+
+                if (historyData.come_cold_date_two) {
+                    historyEntries.push({
+                        round: 2,
+                        come_date: historyData.come_cold_date_two,
+                        out_date: historyData.out_cold_date_two,
+                        come_operator: historyData.receiver_come_cold_two,
+                        out_operator: historyData.receiver_out_cold_two
+                    });
+                }
+
+                if (historyData.come_cold_date_three) {
+                    historyEntries.push({
+                        round: 3,
+                        come_date: historyData.come_cold_date_three,
+                        out_date: historyData.out_cold_date_three,
+                        come_operator: historyData.receiver_come_cold_three,
+                        out_operator: historyData.receiver_out_cold_three
+                    });
+                }
+
+                res.status(200).json({
+                    history: historyEntries,
+                    qc_date: historyData.qc_date,
+                    rework_date: historyData.rework_date,
+                    rework_time: historyData.rework_time,
+                    mix_time: historyData.mix_time,
+                    cold_to_pack_time: historyData.cold_to_pack_time,
+                    cold_to_pack: historyData.cold_to_pack,
+                    come_cold_date_latest: historyData.come_cold_date_latest,
+                    rmit_date: historyData.rmit_date
+                });
+
+                console.log("send body history:", historyEntries);
+                console.log("send body qc_date:", historyData.qc_date);
+                console.log("send body rework_time:", historyData.rework_time);
+                console.log("send body mix_time:", historyData.mix_time);
+                console.log("send body cold_to_pack_time:", historyData.cold_to_pack_time);
+                console.log("send body cold_to_pack:", historyData.cold_to_pack);
+                console.log("send body come_cold_date_latest:", historyData.come_cold_date_latest);
+                console.log("send body rmit_date:", historyData.rmit_date);
             } else {
                 res.status(404).json({ err: "History not found" });
             }
@@ -5539,44 +5636,36 @@ WHERE
             status = ''
         } = req.query;
 
-
         // Convert page and pageSize to numbers
         const pageNum = parseInt(page, 10) || 1;
         const pageSizeNum = parseInt(pageSize, 10) || 100;
-
 
         try {
             const pool = await connectToDatabase();
             // Use converted variables for page and pageSize
             const offset = (pageNum - 1) * pageSizeNum;
 
-
             // Format dates to cover the entire day
             let formattedStartDate = startDate;
             let formattedEndDate = endDate;
-
 
             // If format is YYYY-MM-DD (without time), add time
             if (formattedStartDate.length === 10) {
                 formattedStartDate += ' 00:00:00';
             }
 
-
             if (formattedEndDate.length === 10) {
                 formattedEndDate += ' 23:59:59';
             }
 
-
             // Create additional conditions for WHERE clause
             let additionalWhereConditions = '';
-
 
             console.log('Filtering params:', {
                 startDate: formattedStartDate,
                 endDate: formattedEndDate,
                 filterType
             });
-
 
             // Add condition: filter only entries with cold room entry or exit
             additionalWhereConditions += `
@@ -5590,12 +5679,10 @@ WHERE
                 )
             `;
 
-
             // Add search condition
             if (searchTerm) {
                 additionalWhereConditions += ` AND (rm.mat_name LIKE @searchTerm OR rm.mat LIKE @searchTerm)`;
             }
-
 
             // Add status condition
             if (status) {
@@ -5625,7 +5712,6 @@ WHERE
                 `;
                 }
             }
-
 
             // Add date range filter condition
             if (startDate && endDate) {
@@ -5684,7 +5770,6 @@ WHERE
                 }
             }
 
-
             // Count total query
             const countQuery = `
             SELECT COUNT(*) AS total
@@ -5698,7 +5783,6 @@ WHERE
             WHERE 1=1
             ${additionalWhereConditions}
         `;
-
 
             // Main query
             const mainQuery = `
@@ -5781,27 +5865,27 @@ WHERE
                 Slot s ON rmm.tro_id = s.tro_id
             ${additionalWhereConditions}
             ORDER BY
-                COALESCE(
-                    h.come_cold_date_three, h.out_cold_date_three,
-                    h.come_cold_date_two, h.out_cold_date_two,
-                    h.come_cold_date, h.out_cold_date
-                ) DESC
+    CASE
+        WHEN h.come_cold_date_three IS NOT NULL THEN h.come_cold_date_three
+        WHEN h.out_cold_date_three IS NOT NULL THEN h.out_cold_date_three
+        WHEN h.come_cold_date_two IS NOT NULL THEN h.come_cold_date_two
+        WHEN h.out_cold_date_two IS NOT NULL THEN h.out_cold_date_two
+        WHEN h.come_cold_date IS NOT NULL THEN h.come_cold_date
+        ELSE h.out_cold_date
+    END DESC
             OFFSET @offset ROWS
             FETCH NEXT @pageSize ROWS ONLY
         `;
 
-
             // Prepare requests
             const countRequest = pool.request();
             const mainRequest = pool.request();
-
 
             // Add parameters
             if (searchTerm) {
                 countRequest.input('searchTerm', `%${searchTerm}%`);
                 mainRequest.input('searchTerm', `%${searchTerm}%`);
             }
-
 
             // Add parameters for date range filtering
             if (startDate && endDate) {
@@ -5811,27 +5895,21 @@ WHERE
                 mainRequest.input('endDate', formattedEndDate);
             }
 
-
             mainRequest.input('offset', offset);
             mainRequest.input('pageSize', pageSizeNum); // Use converted value
-
 
             // Get total count
             const totalCountResult = await countRequest.query(countQuery);
             const totalCount = totalCountResult.recordset[0].total;
 
-
             console.log(`Found ${totalCount} total records matching criteria`);
-
 
             // Get data
             const result = await mainRequest.query(mainQuery);
 
-
             // Format data
             const formattedData = result.recordset.map(record => {
                 const newRecord = { ...record };
-
 
                 // Format date fields
                 const dateFields = [
@@ -5840,17 +5918,14 @@ WHERE
                     'exitColdTime1', 'exitColdTime2', 'exitColdTime3'
                 ];
 
-
                 dateFields.forEach(field => {
                     if (newRecord[field]) {
                         newRecord[field] = newRecord[field].replace('T', ' ');
                     }
                 });
 
-
                 // Create entry/exit history
                 newRecord.entryExitHistory = [];
-
 
                 // Add cold room entry history
                 [
@@ -5868,7 +5943,6 @@ WHERE
                     }
                 });
 
-
                 // Add cold room exit history
                 [
                     { time: 'exitColdTime1', seq: 1, nameField: 'exitOperator1' },
@@ -5885,33 +5959,26 @@ WHERE
                     }
                 });
 
-
                 // Sort history by time
                 newRecord.entryExitHistory.sort((a, b) => new Date(b.time) - new Date(a.time));
-
 
                 // Add summary fields
                 newRecord.latestStatus = newRecord.entryExitHistory.length > 0 ?
                     newRecord.entryExitHistory[0].type : '-';
 
-
                 newRecord.latestStatusTime = newRecord.entryExitHistory.length > 0 ?
                     newRecord.entryExitHistory[0].time : null;
-
 
                 // Add latest exit time field (used for filtering and display)
                 const lastExitHistory = newRecord.entryExitHistory.find(h => h.type === 'exitColdRoom');
                 newRecord.latestExitTime = lastExitHistory ? lastExitHistory.time : null;
 
-
                 // Add latest entry time field
                 const lastEnterHistory = newRecord.entryExitHistory.find(h => h.type === 'enterColdRoom');
                 newRecord.latestEnterTime = lastEnterHistory ? lastEnterHistory.time : null;
 
-
                 return newRecord;
             });
-
 
             // Send data with metadata
             return res.json({
@@ -5933,6 +6000,10 @@ WHERE
             });
         }
     });
+
+
+
+
 
 
 

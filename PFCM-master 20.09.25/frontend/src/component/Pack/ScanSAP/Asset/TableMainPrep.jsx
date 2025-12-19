@@ -1,58 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { Table, TableContainer, TableHead, TableBody, TableRow, TableCell, Paper, Box, TextField, Collapse, TablePagination, Divider, Typography, styled } from '@mui/material';
 import { LiaShoppingCartSolid } from 'react-icons/lia';
-import { LiaFileInvoiceSolid } from 'react-icons/lia';
 import { InputAdornment } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import { SlClose } from "react-icons/sl";
 import { FaRegCircle, FaRegCheckCircle } from "react-icons/fa";
-import DeleteIcon from "@mui/icons-material/Delete";
-import { io } from "socket.io-client";
-const API_URL = import.meta.env.VITE_API_URL;
-const socket = io(API_URL, {
-  transports: ["websocket"],
-  reconnectionAttempts: 5, // จำนวนครั้งที่ลอง reconnect
-  reconnectionDelay: 1000, // หน่วงเวลา 1 วินาทีระหว่างการ reconnect
-  autoConnect: true
-});
 
 const CUSTOM_COLUMN_WIDTHS = {
   delayTime: '180px',
   cart: '70px',
   complete: '70px',
-  edit: '70px',
-  delete: '70px'
-
+  edit: '70px'
 };
 
 const Row = ({
   row,
   columnWidths,
   handleOpenModal,
-  handleOpenSlipModal, // ⬅️ เพิ่มบรรทัดนี้
   handleRowClick,
   handleOpenEditModal,
-  handleOpenDeleteModal,
   handleOpenSuccess,
   selectedColor,
   openRowId,
   setOpenRowId,
-  index // เปลี่ยนสีจาราง ขาว เทา 
+  index // เปลี่ยนสีจาราง ขาว เทา
 }) => {
 
 
   const isOpen = openRowId === row.rmfp_id;
-  //ซ่อนคอลัม
-  const { rmfp_id, oven_to_pack, dest,batchArray, raw_or_cooked, cooked_group, prep_to_cold, rm_type_id, cold, withdraw_date, ...displayRow } = row;
+  const { rmfp_id, dest, stay_place, cooked_date, CookedDateTime, oven_to_cold, rm_type_id, mapping_id, sap_re_id, rm_status, ...displayRow } = row;
   const backgroundColor = index % 2 === 0 ? '#ffffff' : "hsl(210, 100.00%, 88%)"; // เปลี่ยนสีจาราง ขาว เทา
+
   return (
     <>
       <TableRow >
         <TableCell style={{ height: "7px", padding: "0px", border: "0px solid" }}>
         </TableCell>
       </TableRow>
-      <TableRow >
+      <TableRow onClick={() => {
+        setOpenRowId(isOpen ? null : row.rmfp_id);
+        handleRowClick(row.rmfp_id);
+      }}>
 
         {Object.values(displayRow).map((value, idx) => (
           <TableCell
@@ -75,41 +64,21 @@ const Row = ({
               borderTopLeftRadius: idx === 0 ? "8px" : "0px",
               borderBottomLeftRadius: idx === 0 ? "8px" : "0px",
               backgroundColor: backgroundColor // เปลี่ยนสีจาราง ขาว เทา
+
             }}
           >
             {value || '-'}
           </TableCell>
         ))}
-        <CartActionCell
-          onClick={(e) => {
-            e.stopPropagation();
-            handleOpenModal(row);
-          }}
-          icon={<LiaShoppingCartSolid style={{ color: '#007BFF', fontSize: '25px' }} />}
-          backgroundColor={backgroundColor} // Add this
-        />
-        <SlipViewCell
-          onClick={(e) => {
-            e.stopPropagation();
-              handleOpenSlipModal(row);
-          }}
-          icon={<LiaFileInvoiceSolid style={{ color: '#828282ff', fontSize: '25px' }} />}
-          backgroundColor={backgroundColor} // Add this
-        />
+
         <CompleteActionCell
+          // width={CUSTOM_COLUMN_WIDTHS.complete}
+           
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // ป้องกันไม่ให้ trigger การเปิด row
             handleOpenSuccess(row);
           }}
-          icon={<FaRegCheckCircle style={{ color: '#26c200', fontSize: '20px' }} />}
-          backgroundColor={backgroundColor} // Add this
-        />
-        <EditActionCell
-          onClick={(e) => {
-            e.stopPropagation();
-            handleOpenEditModal(row);
-          }}
-          icon={<EditIcon style={{ color: '#edc026', fontSize: '22px' }} />}
+          icon={<SlClose style={{ color: "#c20000ff", fontSize: "18px" }} />}
           backgroundColor={backgroundColor} // Add this
         />
 
@@ -124,7 +93,7 @@ const Row = ({
   );
 };
 
-const CartActionCell = ({ width, onClick, icon, backgroundColor }) => {
+const CartActionCell = ({ width, onClick, icon }) => {
   return (
     <TableCell
       style={{
@@ -136,8 +105,7 @@ const CartActionCell = ({ width, onClick, icon, backgroundColor }) => {
         height: '40px',
         padding: '0px',
         cursor: 'pointer',
-        transition: 'background-color 0.2s ease-in-out',
-        backgroundColor: backgroundColor
+        transition: 'background-color 0.2s ease-in-out'
       }}
       onClick={onClick}
       onMouseEnter={(e) => {
@@ -145,7 +113,7 @@ const CartActionCell = ({ width, onClick, icon, backgroundColor }) => {
         e.currentTarget.querySelector('svg').style.color = '#fff';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = backgroundColor;
+        e.currentTarget.style.backgroundColor = '';
         e.currentTarget.querySelector('svg').style.color = '#007BFF';
       }}
       onTouchStart={(e) => {
@@ -153,48 +121,8 @@ const CartActionCell = ({ width, onClick, icon, backgroundColor }) => {
         e.currentTarget.querySelector('svg').style.color = '#fff';
       }}
       onTouchEnd={(e) => {
-        e.currentTarget.style.backgroundColor = backgroundColor;
+        e.currentTarget.style.backgroundColor = '';
         e.currentTarget.querySelector('svg').style.color = '#007BFF';
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        {icon}
-      </div>
-    </TableCell>
-  );
-};
-
-const SlipViewCell = ({ width, onClick, icon, backgroundColor }) => {
-  return (
-    <TableCell
-      style={{
-        width,
-        textAlign: 'center',
-        borderTop: '1px solid #e0e0e0',
-        borderBottom: '1px solid #e0e0e0',
-        borderLeft: '1px solid #f2f2f2',
-        height: '40px',
-        padding: '0px',
-        cursor: 'pointer',
-        transition: 'background-color 0.2s ease-in-out',
-        backgroundColor: backgroundColor
-      }}
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = '#828282ff';
-        e.currentTarget.querySelector('svg').style.color = '#fff';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = backgroundColor;
-        e.currentTarget.querySelector('svg').style.color = '#828282ff';
-      }}
-      onTouchStart={(e) => {
-        e.currentTarget.style.backgroundColor = '#828282ff';
-        e.currentTarget.querySelector('svg').style.color = '#fff';
-      }}
-      onTouchEnd={(e) => {
-        e.currentTarget.style.backgroundColor = backgroundColor;
-        e.currentTarget.querySelector('svg').style.color = '#828282ff';
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -213,46 +141,6 @@ const CompleteActionCell = ({ width, onClick, icon, backgroundColor }) => {
         borderTop: '1px solid #e0e0e0',
         borderBottom: '1px solid #e0e0e0',
         borderLeft: '1px solid #f2f2f2',
-        height: '40px',
-        padding: '0px',
-        cursor: 'pointer',
-        transition: 'background-color 0.2s ease-in-out',
-        backgroundColor: backgroundColor
-      }}
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = '#54e032';
-        e.currentTarget.querySelector('svg').style.color = '#fff';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = backgroundColor;
-        e.currentTarget.querySelector('svg').style.color = '#26c200';
-      }}
-      onTouchStart={(e) => {
-        e.currentTarget.style.backgroundColor = '#54e032';
-        e.currentTarget.querySelector('svg').style.color = '#fff';
-      }}
-      onTouchEnd={(e) => {
-        e.currentTarget.style.backgroundColor = backgroundColor;
-        e.currentTarget.querySelector('svg').style.color = '#26c200';
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        {icon}
-      </div>
-    </TableCell>
-  );
-};
-
-const EditActionCell = ({ width, onClick, icon, backgroundColor }) => {
-  return (
-    <TableCell
-      style={{
-        width,
-        textAlign: 'center',
-        borderTop: '1px solid #e0e0e0',
-        borderBottom: '1px solid #e0e0e0',
-        borderLeft: '1px solid #f2f2f2',
         borderRight: '1px solid #e0e0e0',
         borderTopRightRadius: "8px",
         borderBottomRightRadius: "8px",
@@ -261,24 +149,65 @@ const EditActionCell = ({ width, onClick, icon, backgroundColor }) => {
         cursor: 'pointer',
         transition: 'background-color 0.2s ease-in-out',
         backgroundColor: backgroundColor
+      }}
+         onClick={onClick}
+         onMouseEnter={(e) => {
+           e.currentTarget.style.backgroundColor = '#c20000ff';
+           e.currentTarget.querySelector('svg').style.color = '#fff';
+         }}
+         onMouseLeave={(e) => {
+           e.currentTarget.style.backgroundColor = backgroundColor;
+           e.currentTarget.querySelector('svg').style.color = '#c20000ff';
+         }}
+         onTouchStart={(e) => {
+           e.currentTarget.style.backgroundColor = '#c20000ff';
+           e.currentTarget.querySelector('svg').style.color = '#fff';
+         }}
+         onTouchEnd={(e) => {
+           e.currentTarget.style.backgroundColor = backgroundColor;
+           e.currentTarget.querySelector('svg').style.color = '#c20000ff';
+         }}
+       >
+         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+           {icon}
+         </div>
+       </TableCell>
+     );
+   };
 
+const EditActionCell = ({ width, onClick, icon }) => {
+  return (
+    <TableCell
+      style={{
+        width,
+        textAlign: 'center',
+        borderTop: '1px solid #e0e0e0',
+        borderBottom: '1px solid #e0e0e0',
+        borderLeft: '1px solid #f2f2f2',
+        height: '40px',
+        padding: '0px',
+        borderRight: "1px solid #e0e0e0",
+        cursor: 'pointer',
+        transition: 'background-color 0.2s ease-in-out',
+        borderTopRightRadius: "8px",
+        borderBottomRightRadius: "8px"
       }}
       onClick={onClick}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = '#edc026';
+        e.currentTarget.style.backgroundColor = '#c20000ff';
         e.currentTarget.querySelector('svg').style.color = '#fff';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = backgroundColor;
-        e.currentTarget.querySelector('svg').style.color = '#edc026';
+        e.currentTarget.style.backgroundColor = '';
+        e.currentTarget.querySelector('svg').style.color = '#c20000ff';
       }}
       onTouchStart={(e) => {
-        e.currentTarget.style.backgroundColor = '#edc026';
+        e.currentTarget.style.backgroundColor = '#c20000ff';
         e.currentTarget.querySelector('svg').style.color = '#fff';
       }}
       onTouchEnd={(e) => {
-        e.currentTarget.style.backgroundColor = backgroundColor;
-        e.currentTarget.querySelector('svg').style.color = '#edc026';
+        e.currentTarget.style.backgroundColor = '';
+        e.currentTarget.querySelector('svg').style.color = '#c20000ff';
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -288,28 +217,13 @@ const EditActionCell = ({ width, onClick, icon, backgroundColor }) => {
   );
 };
 
-
-const TableMainPrep = ({ handleOpenModal,handleOpenSlipModal, data, handleRowClick, handleOpenEditModal, handleOpenSuccess, handleOpenDeleteModal }) => {
+const TableMainPrep = ({ handleOpenModal, data, handleRowClick, handleOpenEditModal, handleOpenSuccess }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredRows, setFilteredRows] = useState(data);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [selectedColor, setSelectedColor] = useState('');
   const [openRowId, setOpenRowId] = useState(null);
-
-  const [rows, setRows] = useState(data);
-
-  useEffect(() => {
-    socket.on("dataUpdated", (updatedData) => {
-      setRows(updatedData);
-    });
-
-    // ให้แน่ใจว่าทำการยกเลิกการเชื่อมต่อเมื่อคอมโพเนนต์ถูกยกเลิก
-    return () => {
-      socket.off("dataUpdated");
-    };
-  }, []); // ใช้ [] เพื่อให้ทำงานแค่ครั้งเดียวเมื่อคอมโพเนนต์ถูก mount
-
 
   useEffect(() => {
     setFilteredRows(
@@ -320,8 +234,6 @@ const TableMainPrep = ({ handleOpenModal,handleOpenSlipModal, data, handleRowCli
       )
     );
   }, [searchTerm, data]);
-
-
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -337,8 +249,7 @@ const TableMainPrep = ({ handleOpenModal,handleOpenSlipModal, data, handleRowCli
     setSelectedColor(color === selectedColor ? '' : color);
   };
 
-  //
-  const columns = Object.keys(data[0] || {}).filter(key => key !== 'rmfp_id' && key !== 'oven_to_pack');
+  const columns = Object.keys(data[0] || {}).filter(key => key !== 'rmfp_id' && key !== 'oven_to_cold');
   const totalCustomWidth = Object.values(CUSTOM_COLUMN_WIDTHS).reduce((sum, width) => sum + parseInt(width), 0);
   const remainingWidth = `calc((100% - ${totalCustomWidth}px) / ${columns.length})`;
   const columnWidths = Array(columns.length).fill(remainingWidth);
@@ -396,36 +307,15 @@ const TableMainPrep = ({ handleOpenModal,handleOpenSlipModal, data, handleRowCli
               <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "200px" }}>
                 <Box style={{ fontSize: '16px', color: '#ffffff' }}>Material</Box> {/* mat_name */}
               </TableCell>
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "400px" }}>
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>รายชื่อวัตถุดิบ</Box> {/* mat_name */}
+              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "200px" }}>
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>HU</Box> {/* mat_name */}
+              </TableCell>
+              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "200px" }}>
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>เวลาส่งจากห้องเย็นใหญ่</Box> {/* mat_name */}
               </TableCell>
 
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "100px" }}>
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>แผนการผลิต</Box> {/* production */}
-              </TableCell>
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "150px" }}>
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>กลุ่มการผลิต</Box> {/* production */}
-              </TableCell>
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "100px" }}>
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>level Eu</Box> {/* production */}
-              </TableCell>
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "150px" }}>
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>เวลาต้ม/อบเสร็จ</Box> {/* CookedDateTime */}
-              </TableCell>
-
-
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderLeft: "0px solid ", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>รถเข็น</Box>
-              </TableCell>
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderLeft: "0px solid ", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>สลิป</Box>
-              </TableCell>
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderLeft: "0px solid ", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #f2f2f2", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>เสร็จสิ้น</Box>
-              </TableCell>
-
-              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTopRightRadius: "8px", borderBottomRightRadius: "8px", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #e0e0e0", fontSize: '12px', color: '#787878', padding: '5px', width: "80px" }}>
-                <Box style={{ fontSize: '16px', color: '#ffffff' }}>เปลี่ยนแผนการผลิต</Box>
+              <TableCell align="center" style={{ backgroundColor: "hsl(210, 100%, 60%)", borderTopRightRadius: "8px", borderBottomRightRadius: "8px", borderTop: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0", borderRight: "1px solid #e0e0e0", fontSize: '12px', color: '#787878', padding: '5px', width: "150px" }}>
+                <Box style={{ fontSize: '16px', color: '#ffffff' }}>ลบ</Box>
               </TableCell>
             </TableRow>
           </TableHead>
@@ -438,14 +328,12 @@ const TableMainPrep = ({ handleOpenModal,handleOpenSlipModal, data, handleRowCli
                   row={row}
                   columnWidths={columnWidths}
                   handleOpenModal={handleOpenModal}
-                  handleOpenSlipModal={handleOpenSlipModal}// ⬅️ เพิ่มบรรทัดนี้
                   handleRowClick={handleRowClick}
                   handleOpenEditModal={handleOpenEditModal}
-                  handleOpenDeleteModal={handleOpenDeleteModal}
                   handleOpenSuccess={handleOpenSuccess}
                   selectedColor={selectedColor}
                   openRowId={openRowId}
-                  index={index} // เปลี่ยนสีจาราง ขาว เทา
+                  index={index}
                   setOpenRowId={setOpenRowId}
                 />
               ))
@@ -555,6 +443,5 @@ const FilterButton = ({ color, selectedColor, onClick }) => {
     </div>
   );
 };
-
 
 export default TableMainPrep;

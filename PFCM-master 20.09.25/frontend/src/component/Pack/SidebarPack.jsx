@@ -10,7 +10,10 @@ const showWorkplaceSelector = allowedPositions.includes(pos_id);
 const SIDEBAR_ITEMS = [
 	{ name: "จัดการ (วัตถุดิบไม่ผสม)", icon: BarChart2, href: "/packaging/manage/ManagePage" },
 	{ name: "จัดการ (วัตถุดิบผสม)", icon: BarChart2, href: "/packaging/Mixed/Trolley" },
+	{ name: "ดึงข้อมูลวัตถุดิบ", icon: BarChart2, href: "/packaging/CheckOut" },
 	{ name: "จัดการรถเข็น", icon: BarChart2, href: "/packaging/PackTro/PackTroPage" },
+	{ name: "รายงาน Delay", icon: BarChart2, href: "/packaging/ManageRawmatPack" },
+	{ name: "Report", icon: BarChart2, href: "/packaging/ReportRawmatPack" },
 	{ name: "ขอวัตถุดิบ", icon: BarChart2, href: "/packaging/Request/Rawmat" },
 	{ name: "รายการส่งคำขอ", icon: BarChart2, href: "/packaging/Order/Request/Rawmat" },
 	{ name: "รายการคำขอ", icon: BarChart2, href: "/packaging/manage/Order/Request/Rawmat" },
@@ -236,3 +239,4 @@ const SidebarPack = () => {
 };
 
 export default SidebarPack;
+//test

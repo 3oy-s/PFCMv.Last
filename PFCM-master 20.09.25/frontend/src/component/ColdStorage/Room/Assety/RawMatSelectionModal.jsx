@@ -59,6 +59,7 @@ const RawMatSelectionModal = ({ open, onClose, onAdd, currentTroId, onSelectionC
                 params: { current_tro_id: currentTroId }
             });
 
+            console.log("✅ Raw materials fetched:", response.data.data);
             if (response.data.success) {
                 setRawMaterials(response.data.data);
             }
@@ -254,15 +255,16 @@ const RawMatSelectionModal = ({ open, onClose, onAdd, currentTroId, onSelectionC
     };
 
     const filteredMaterials = rawMaterials.filter(material => {
-    const searchTermLower = searchTerm.toLowerCase();
-    return (
-        (material.mat_name && String(material.mat_name).toLowerCase().includes(searchTermLower)) ||
-        (material.mat && String(material.mat).toLowerCase().includes(searchTermLower)) ||
-        (material.batch && String(material.batch).toLowerCase().includes(searchTermLower)) ||
-        (material.tro_id && String(material.tro_id).includes(searchTerm)) ||
-        (material.production && String(material.production).toLowerCase().includes(searchTermLower))
-    );
-});
+        const searchTermLower = searchTerm.trim().toLowerCase();
+
+        return (
+            (material.mat_name && String(material.mat_name).toLowerCase().includes(searchTermLower)) ||
+            (material.mat && String(material.mat).toLowerCase().includes(searchTermLower)) ||
+            (material.batch && String(material.batch).toLowerCase().includes(searchTermLower)) ||
+            (material.tro_id && String(material.tro_id).includes(searchTerm)) ||
+            (material.production && String(material.production).toLowerCase().includes(searchTermLower))
+        );
+    });
 
     return (
         <Modal
@@ -274,7 +276,7 @@ const RawMatSelectionModal = ({ open, onClose, onAdd, currentTroId, onSelectionC
             <Box sx={style}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                     <Typography variant="h6" component="h2">
-                        เลือกวัตถุดิบจากห้องเย็น.
+                        เลือกวัตถุดิบจากห้องเย็น
                     </Typography>
                     <IconButton onClick={onClose}>
                         <CloseIcon />

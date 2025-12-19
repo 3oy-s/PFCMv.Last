@@ -13,6 +13,10 @@ import RequestRawmat from "./requestrawmat/RequestrawmatPage";
 import OrderRequestRawmat from "./OrderRequestrawmat/RequestrawmatPage";
 import ManageRequestOrder from "./ManageRequestOrder/ManagePage";
 import WorkplaceSelector from "../User/WorkplaceSelector.jsx";
+import CSCheckOutPage from "./CheckOut/CheckOutPage.jsx"
+import ScanBarcodePage from "./ScanSAP/ScanBatcodePage.jsx"
+import ManageRawmatPack from "./manage copy/ManagePage.jsx"
+import ReportRawmatPack from "./manage copy 2/ManagePage.jsx"
 
 function AppPack() {
   return (
@@ -41,6 +45,10 @@ function AppPack() {
         {/* เลือกสถานที่ไลน์ผลิต */}
         <Route path="/User/LineSelectWP" element={<LineSelectWP />} />
         <Route path="/PackTro/PackTroPage" element={<PackTroPage />} />
+        <Route path="/CheckOut" element={<CSCheckOutPage />} />
+        <Route path="/ScanBarcodePage" element={<ScanBarcodePage />} />
+        <Route path="/ManageRawmatPack" element={<ManageRawmatPack />} />
+        <Route path="/ReportRawmatPack" element={<ReportRawmatPack />} />
 
       </Routes>
     </div>
