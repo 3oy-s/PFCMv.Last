@@ -6211,50 +6211,166 @@ ORDER BY
     }
   });
 
-  router.get("/prep/EditDataTrolley/fetchAllTrolleys", async (req, res) => {
-    try {
-      const pool = await connectToDatabase();
-
-      // ✅ รับค่า rm_type_id จาก query
-      const { rm_type_id } = req.query;
-
-      // ✅ ถ้าไม่มีค่า rm_type_id → ไม่อนุญาต
-      if (!rm_type_id || rm_type_id === "undefined" || rm_type_id === "null") {
-        return res.status(403).json({
-          success: false,
-          message: "Access denied: missing rm_type_id",
-        });
-      }
+  // router.get("/prep/EditDataTrolley/fetchAllTrolleys", async (req, res) => {
+  //   try {
+  //     const pool = await connectToDatabase();
+  //     const { rm_type_id } = req.query;
+  //     if (!rm_type_id || rm_type_id === "undefined" || rm_type_id === "null") {
+  //       return res.status(403).json({
+  //         success: false,
+  //         message: "Access denied: missing rm_type_id",
+  //       });
+  //     }
 
 
-      // 🚚 ดึงข้อมูลรถเข็นว่าง
-      const emptyTrolleysResult = await pool.request().query(`
-      SELECT 
-          t.tro_id as trolley_number,
-          'รถเข็นว่าง (ห้องเย็น)' as trolley_status,
-          'อยู่ในห้องเย็น' as trolley_location,
-          cs.cs_name,
-          s.slot_id,
-          'empty' as trolley_type
-      FROM 
-          Trolley t 
-      JOIN 
-          Slot s ON t.tro_id = s.tro_id
-      LEFT JOIN 
-          TrolleyRMMapping rmm ON t.tro_id = rmm.tro_id 
-      JOIN 
-          ColdStorage cs ON s.cs_id = cs.cs_id
-      WHERE 
-          t.tro_status = '0' 
-      AND 
-          rmm.mapping_id IS NULL
-      AND 
-          s.slot_id IS NOT NULL 
-      ORDER BY t.tro_id
-    `);
+    
+  //     let occupiedQuery = `
+  //     SELECT 
+  //         rmm.mapping_id,
+  //         rmm.tro_id AS trolley_number,
+  //         'มีวัตถุดิบ' AS trolley_status,
+  //         rmm.dest,
+  //         rmm.stay_place,
+  //         rmm.rmm_line_name,
+  //         rmm.rm_status,
+  //         rmm.tray_count,
+  //         rmm.weight_RM,
+  //         rm.mat,
+  //         rm.mat_name,
+  //         STRING_AGG(b.batch_after, ',') AS batch,
+  //         CONCAT(pdt.doc_no, '(', rmm.rmm_line_name, ')') AS production,
+  //         CONVERT(VARCHAR, htr.cooked_date, 120) AS cooked_date,
+  //         CONVERT(VARCHAR, htr.rmit_date, 120) AS rmit_date,
+  //         htr.location,
+  //         'occupied' AS trolley_type,
+  //         CASE 
+  //             WHEN (rmm.dest = 'เข้าห้องเย็น' OR rmm.dest = 'ไปบรรจุ') AND rmm.rm_status = 'รอQCตรวจสอบ' 
+  //                 THEN CONCAT('รอQC ตรวจสอบ ณ ', ISNULL(htr.location, '-'))
+  //             WHEN (rmm.dest = 'บรรจุ') 
+  //                   THEN CONCAT('รอบรรจุทำรายการรับเข้า ', 
+  //                   COALESCE(MAX(htr.three_prod), MAX(htr.two_prod), MAX(htr.first_prod), '-'))
+  //             WHEN rmm.dest = 'เข้าห้องเย็น' AND (rmm.rm_status IN 
+  //                   ('QcCheck', 'QcCheck รอกลับมาเตรียม', 'QcCheck รอ MD', 'รอกลับมาเตรียม', 'รอแก้ไข', 'เหลือจากไลน์ผลิต')) 
+  //                 THEN 'รอห้องเย็นรับเข้า'
+  //             WHEN (rmm.dest IN ('ไปบรรจุ', 'บรรจุ')) AND rmm.rm_status = 'QcCheck' 
+  //                 THEN CONCAT('รอบรรจุรับ (', ISNULL(rmm.rmm_line_name, '-'), ')')
+  //             WHEN (rmm.dest IN ('เข้าห้องเย็น', 'จุดเตรียม')) AND rmm.rm_status = 'QcCheck รอแก้ไข' 
+  //                 THEN CONCAT('QC ส่งกลับมาแก้ไข ณ ', ISNULL(htr.location, '-'))
+  //             WHEN rmm.dest = 'หม้ออบ' AND rmm.rm_status = 'ปกติ' 
+  //                 THEN 'รออบเสร็จ'
+  //             WHEN rmm.dest = 'จุดเตรียม' AND (rmm.rm_status IN ('รอแก้ไข', 'รับฝาก-รอแก้ไข')) 
+  //                 THEN CONCAT('รอแก้ไข ณ ', ISNULL(htr.location, '-'))
+  //             WHEN rmm.dest = 'หม้ออบ' AND rmm.rm_status = 'รอแก้ไข' 
+  //                 THEN CONCAT('รอแก้ไข ณ ', ISNULL(htr.location, '-'))
+  //             WHEN rmm.dest = 'จุดเตรียม' AND (rmm.rm_status IN ('รอกลับมาเตรียม', 'QcCheck รอ MD')) 
+  //                 THEN CONCAT('รอกลับมาเตรียม ณ ', ISNULL(htr.location, '-'))
+  //             WHEN rmm.dest = 'ห้องเย็น' AND (rmm.rm_status IN 
+  //                   ('รอแก้ไข', 'รอQCตรวจสอบ', 'QcCheck', 'QcCheck รอ MD', 'รอกลับมาเตรียม', 'เหลือจากไลน์ผลิต')) 
+  //                 THEN 'อยู่ในห้องเย็น'
+  //             ELSE '-'
+  //         END AS trolley_location
+  //     FROM 
+  //         TrolleyRMMapping rmm
+  //     JOIN 
+  //         History htr ON rmm.mapping_id = htr.mapping_id
+  //     JOIN 
+  //         RMForProd rmfp ON rmm.rmfp_id = rmfp.rmfp_id
+  //     JOIN 
+  //         ProdRawMat prod ON rmfp.prod_rm_id = prod.prod_rm_id
+  //     JOIN 
+  //         RawMat rm ON prod.mat = rm.mat
+  //     JOIN 
+  //         Production pdt ON prod.prod_id = pdt.prod_id
+  //     JOIN 
+  //         Batch b ON rmm.mapping_id = b.mapping_id
+  //     JOIN
+  //         RawMatGroup rmg ON rmfp.rm_group_id = rmg.rm_group_id
+  //     JOIN
+  //         RawMatType rmt ON rmg.rm_type_id = rmt.rm_type_id    
+  //     WHERE 
+  //         rmm.tro_id IS NOT NULL
+  //         AND rmg.rm_type_id = @rm_type_id
+  //         AND NOT (rmm.rm_status = 'QcCheck' AND rmm.dest IN ('ไปบรรจุ', 'บรรจุ'))
+  //         AND NOT (rmm.stay_place = 'เข้าห้องเย็น' and rmm.dest = 'ห้องเย็น')
+  //     GROUP BY 
+  //         rmm.mapping_id, rmm.tro_id, rmm.dest, rmm.stay_place, rmm.rmm_line_name, 
+  //         rmm.rm_status,rmm.tray_count,rmm.weight_RM, rm.mat, rm.mat_name, pdt.doc_no, 
+  //         htr.cooked_date, htr.rmit_date, htr.location
+  //     ORDER BY 
+  //         rmm.tro_id;
+  //   `;
 
-      // 🧾 ดึงข้อมูลรถเข็นที่มีวัตถุดิบ
-      let occupiedQuery = `
+  //     const occupiedRequest = pool.request();
+  //     occupiedRequest.input("rm_type_id", sql.Int, parseInt(rm_type_id));
+  //     const occupiedTrolleysResult = await occupiedRequest.query(occupiedQuery);
+
+  //     const allTrolleys = [
+  //       ...occupiedTrolleysResult.recordset,
+  //     ];
+
+  //     allTrolleys.sort((a, b) => (parseInt(a.trolley_number) || 0) - (parseInt(b.trolley_number) || 0));
+
+  //     res.json({
+  //       success: true,
+  //       data: {
+  //         trolleys: allTrolleys,
+  //         summary: {
+  //           totalOccupied: occupiedTrolleysResult.recordset.length,
+  //           totalTrolleys: allTrolleys.length,
+  //         },
+  //       },
+  //     });
+
+  //   } catch (err) {
+  //     console.error("SQL error", err);
+  //     res.status(500).json({ success: false, error: err.message });
+  //   }
+  // });
+
+router.get("/prep/EditDataTrolley/fetchAllTrolleys", async (req, res) => {
+  try {
+    const pool = await connectToDatabase();
+
+    let { rm_type_id } = req.query;
+
+    // ---------------------------
+    // 1) แปลง rm_type_id ให้เป็น array ของตัวเลข
+    // ---------------------------
+    if (!rm_type_id) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: missing rm_type_id",
+      });
+    }
+
+    // ถ้าเป็น array อยู่แล้ว เช่น rm_type_id[]=1&rm_type_id[]=2
+    if (Array.isArray(rm_type_id)) {
+      rm_type_id = rm_type_id.flatMap((v) =>
+        v.split(",").map((n) => parseInt(n.trim()))
+      );
+    } else {
+      // ถ้าเป็นแบบ rm_type_id=1,2,3
+      rm_type_id = rm_type_id.split(",").map((n) => parseInt(n.trim()));
+    }
+
+    // ลบค่าที่ไม่ใช่ตัวเลข
+    rm_type_id = rm_type_id.filter((n) => !isNaN(n));
+
+    if (rm_type_id.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: invalid rm_type_id",
+      });
+    }
+
+    // สร้าง string สำหรับ SQL เช่น "1,2,3"
+    const rm_type_in_sql = rm_type_id.join(",");
+
+    // ---------------------------
+    // 2) SQL Query (เพิ่ม IN (...))
+    // ---------------------------
+
+    let occupiedQuery = `
       SELECT 
           rmm.mapping_id,
           rmm.tro_id AS trolley_number,
@@ -6319,62 +6435,41 @@ ORDER BY
           RawMatType rmt ON rmg.rm_type_id = rmt.rm_type_id    
       WHERE 
           rmm.tro_id IS NOT NULL
-          AND rmg.rm_type_id = @rm_type_id
+          AND rmg.rm_type_id IN (${rm_type_in_sql})
           AND NOT (rmm.rm_status = 'QcCheck' AND rmm.dest IN ('ไปบรรจุ', 'บรรจุ'))
+          AND NOT (rmm.stay_place = 'เข้าห้องเย็น' and rmm.dest = 'ห้องเย็น')
       GROUP BY 
           rmm.mapping_id, rmm.tro_id, rmm.dest, rmm.stay_place, rmm.rmm_line_name, 
-          rmm.rm_status,rmm.tray_count,rmm.weight_RM, rm.mat, rm.mat_name, pdt.doc_no, 
+          rmm.rm_status, rmm.tray_count, rmm.weight_RM, rm.mat, rm.mat_name, pdt.doc_no, 
           htr.cooked_date, htr.rmit_date, htr.location
       ORDER BY 
           rmm.tro_id;
     `;
 
-      const occupiedRequest = pool.request();
-      occupiedRequest.input("rm_type_id", sql.Int, parseInt(rm_type_id));
-      const occupiedTrolleysResult = await occupiedRequest.query(occupiedQuery);
+    const occupiedTrolleysResult = await pool.request().query(occupiedQuery);
 
-      // 📦 ดึงข้อมูลรถเข็นรอจัดส่ง
-      const packingTrolleysResult = await pool.request().query(`
-      SELECT 
-          pt.tro_id as trolley_number,
-          'รอบรรจุจัดส่ง' as trolley_status,
-          l.line_name as trolley_location,
-          'packing' as trolley_type
-      FROM 
-          PackTrolley pt
-      LEFT JOIN
-          Line l ON pt.line_tro = l.line_id
-      ORDER BY pt.tro_id
-    `);
+    const allTrolleys = [...occupiedTrolleysResult.recordset];
 
-      // 🧩 รวมข้อมูลทั้งหมด
-      const allTrolleys = [
-        ...emptyTrolleysResult.recordset,
-        ...occupiedTrolleysResult.recordset,
-        ...packingTrolleysResult.recordset,
-      ];
+    // sort
+    allTrolleys.sort(
+      (a, b) => (parseInt(a.trolley_number) || 0) - (parseInt(b.trolley_number) || 0)
+    );
 
-      allTrolleys.sort((a, b) => (parseInt(a.trolley_number) || 0) - (parseInt(b.trolley_number) || 0));
-
-      res.json({
-        success: true,
-        data: {
-          trolleys: allTrolleys,
-          summary: {
-            totalEmpty: emptyTrolleysResult.recordset.length,
-            totalOccupied: occupiedTrolleysResult.recordset.length,
-            totalPacking: packingTrolleysResult.recordset.length,
-            totalTrolleys: allTrolleys.length,
-          },
+    res.json({
+      success: true,
+      data: {
+        trolleys: allTrolleys,
+        summary: {
+          totalOccupied: occupiedTrolleysResult.recordset.length,
+          totalTrolleys: allTrolleys.length,
         },
-      });
-
-    } catch (err) {
-      console.error("SQL error", err);
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
+      },
+    });
+  } catch (err) {
+    console.error("SQL error", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 
 

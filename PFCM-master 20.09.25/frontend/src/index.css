@@ -59,3 +59,7 @@ input, textarea, select, button {
     margin: 10px 0px;
   }
 }
+
+input[type="datetime-local"]::-webkit-datetime-edit-ampm-field {
+  display: none;
+}

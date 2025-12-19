@@ -1,21 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import TableMainPrep from './TableOvenToCold';
-import Modal1 from './Modal1';
-import Modal2 from './Modal2';
-import Modal3 from './Modal3';
 import ModalEditPD from './ModalEditPD';
 import ModalSuccess from './ModalSuccess';
 import axios from "axios";
-axios.defaults.withCredentials = true;
 import io from 'socket.io-client';
+
+axios.defaults.withCredentials = true;
 const API_URL = import.meta.env.VITE_API_URL;
 
 const ParentComponent = () => {
   const [openEditModal, setOpenEditModal] = useState(false);
   const [openSuccessModal, setOpenSuccessModal] = useState(false);
-  const [dataForModal1, setDataForModal1] = useState(null);
-  const [dataForModal2, setDataForModal2] = useState(null);
-  const [dataForModal3, setDataForModal3] = useState(null);
   const [dataForEditModal, setDataForEditModal] = useState(null);
   const [dataForSuccessModal, setDataForSuccessModal] = useState(null);
   const [tableData, setTableData] = useState({
@@ -26,19 +21,49 @@ const ParentComponent = () => {
       totalTrolleys: 0
     }
   });
+  
   const fetchTimeoutRef = useRef(null);
   const socketRef = useRef(null);
 
-  const [socket, setSocket] = useState(null);
+  // Parse rmTypeId from localStorage once on mount
+  const [rmTypeId, setRmTypeId] = useState(() => {
+    const rmTypeIdRaw = localStorage.getItem("rm_type_id");
+    if (!rmTypeIdRaw) return [];
+    
+    try {
+      // Handle both comma-separated string and JSON array
+      if (rmTypeIdRaw.startsWith('[')) {
+        return JSON.parse(rmTypeIdRaw);
+      }
+      return rmTypeIdRaw.split(',').map(id => id.trim()).filter(Boolean);
+    } catch (error) {
+      console.error("Error parsing rm_type_id:", error);
+      return [];
+    }
+  });
 
-  const rmTypeIdRaw = localStorage.getItem("rm_type_id");
-  const rmTypeId = Array.isArray(rmTypeIdRaw)
-    ? rmTypeIdRaw[0]
-    : JSON.parse(rmTypeIdRaw)?.[0] ?? rmTypeIdRaw;
+  // Fetch data from API
+  const fetchData = useCallback(async () => {
+    if (rmTypeId.length === 0) return;
 
-  console.log("rmTypeId (final):", rmTypeId);
+    try {
+      const rmTypeParam = rmTypeId.join(",");
+      const response = await axios.get(
+        `${API_URL}/api/prep/EditDataTrolley/fetchAllTrolleys?rm_type_id=${rmTypeParam}`
+      );
 
-
+      setTableData(response.data.success ? response.data.data : {
+        trolleys: [],
+        summary: { totalEmpty: 0, totalOccupied: 0, totalTrolleys: 0 }
+      });
+    } catch (error) {
+      console.error("Error fetching trolley data:", error);
+      setTableData({
+        trolleys: [],
+        summary: { totalEmpty: 0, totalOccupied: 0, totalTrolleys: 0 }
+      });
+    }
+  }, [rmTypeId]);
 
   // Debounced fetchData
   const fetchDataDebounced = useCallback(() => {
@@ -48,26 +73,13 @@ const ParentComponent = () => {
     fetchTimeoutRef.current = setTimeout(() => {
       fetchData();
     }, 300);
-  }, []);
+  }, [fetchData]);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const response = await axios.get(`${API_URL}/api/prep/EditDataTrolley/fetchAllTrolleys?rm_type_id=${rmTypeId}`);
-      console.log("Trolley data fetched:", response.data);
-      setTableData(response.data.success ? response.data.data : {
-        trolleys: [],
-        summary: {
-          totalEmpty: 0,
-          totalOccupied: 0,
-          totalTrolleys: 0
-        }
-      });
-    } catch (error) {
-      console.error("Error fetching trolley data:", error);
-    }
-  }, []);
-
+  // Initialize socket connection and fetch data
   useEffect(() => {
+    // Wait for rmTypeId to be loaded
+    if (rmTypeId.length === 0) return;
+
     // Initialize socket connection only once
     if (!socketRef.current) {
       const newSocket = io(API_URL, {
@@ -112,28 +124,9 @@ const ParentComponent = () => {
         clearTimeout(fetchTimeoutRef.current);
       }
     };
-  }, [fetchData, fetchDataDebounced]);
+  }, [rmTypeId, fetchData, fetchDataDebounced]);
 
-  // const fetchData = async () => {
-  //   try {
-  //     const response = await axios.get(`${API_URL}/api/prep/main/fetchRMForProd`);
-  //     console.log("Data fetched:", response.data);
-  //     setTableData(response.data.success ? response.data.data : []);
-  //   } catch (error) {
-  //     console.error("Error fetching data:", error);
-  //   }
-  // };
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const clearData = () => {
-    setDataForModal1(null);
-    setDataForModal2(null);
-    setDataForModal3(null);
-  };
-
-
+  // Modal handlers
   const handleOpenEditModal = (data) => {
     setDataForEditModal({
       mapping_id: data.mapping_id,
@@ -141,10 +134,10 @@ const ParentComponent = () => {
       mat: data.mat,
       mat_name: data.mat_name,
       production: data.production,
-      line_name: data.line_name,        // เพิ่ม
-      weight_RM: data.weight_RM || 0,         // เพิ่ม น้ำหนักปัจจุบัน
-      trolley_number: data.trolley_number,  // เพิ่ม (ถ้ามี)
-      tro_id: data.tro_id                     // เพิ่ม tro_id
+      line_name: data.line_name,
+      weight_RM: data.weight_RM || 0,
+      trolley_number: data.trolley_number,
+      tro_id: data.tro_id
     });
     setOpenEditModal(true);
   };
@@ -164,38 +157,46 @@ const ParentComponent = () => {
     setOpenSuccessModal(true);
   };
 
-  const handleRowClick = (rowData) => {
-    console.log("Row clicked:", rowData);
-    // Add any logic to handle the row click event
+  const handleCloseEditModal = () => {
+    setOpenEditModal(false);
+    setDataForEditModal(null);
   };
 
+  const handleCloseSuccessModal = () => {
+    setOpenSuccessModal(false);
+    setDataForSuccessModal(null);
+  };
 
   return (
     <div>
-
       <TableMainPrep
         handleOpenEditModal={handleOpenEditModal}
         handleOpenSuccess={handleOpenSuccess}
         data={tableData}
       />
+      
       <ModalEditPD
         open={openEditModal}
-        onClose={() => setOpenEditModal(false)}
-        onNext={() => setOpenEditModal(false)}
+        onClose={handleCloseEditModal}
+        onNext={handleCloseEditModal}
         data={dataForEditModal}
         onSuccess={fetchData}
       />
-      {/* <ModalSuccess
+      
+      <ModalSuccess
         open={openSuccessModal}
-        onClose={() => setOpenSuccessModal(false)}
+        onClose={handleCloseSuccessModal}
         mat={dataForSuccessModal?.mat}
         mat_name={dataForSuccessModal?.mat_name}
         batch={dataForSuccessModal?.batch}
         production={dataForSuccessModal?.production}
-        rmfp_id={dataForSuccessModal?.rmfp_id}
-        selectedPlans={dataForSuccessModal?.selectedPlans}
+        line_name={dataForSuccessModal?.line_name}
+        weight_RM={dataForSuccessModal?.weight_RM}
+        trolley_number={dataForSuccessModal?.trolley_number}
+        tro_id={dataForSuccessModal?.tro_id}
+        mapping_id={dataForSuccessModal?.mapping_id}
         onSuccess={fetchData}
-      /> */}
+      />
     </div>
   );
 };
