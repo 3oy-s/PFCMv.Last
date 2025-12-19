@@ -24,7 +24,7 @@ import InputAdornment from "@mui/material/InputAdornment";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-const Modal3 = ({ open, onClose, data, onEdit, dataForModal3 }) => {
+const Modal3 = ({ open, onClose, data, onEdit, dataForModal3, coldDates, hasBothDates, hasBothDates2, hasBothDates3 }) => {
 	const [qcDateTime, setQcDateTime] = useState("");
 	const [qcDate, setQcDate] = useState("");
 	const [qcTime, setQcTime] = useState("");
@@ -700,6 +700,128 @@ const Modal3 = ({ open, onClose, data, onEdit, dataForModal3 }) => {
 						}}>
 							วันที่/เวลา เตรียมเสร็จ : {rmit_date || "ไม่มีข้อมูล"}
 						</Typography>
+
+						{hasBothDates ? (
+							<>
+								<Typography variant="h6" className="print-text" sx={{
+									color: "#464646",
+									fontSize: "22px",
+									margin: "10px",
+									'@media print': {
+										fontSize: '10px',
+										margin: '2px 0',
+										marginBottom: '10px',
+									},
+								}}>
+									วันที่เข้าห้องเย็น (ครั้งที่ 1) : {coldDates?.come_cold_date_formatted || "ไม่มีข้อมูล"}
+								</Typography>
+
+								<Typography variant="h6" className="print-text" sx={{
+									color: "#464646",
+									fontSize: "22px",
+									margin: "10px",
+									'@media print': {
+										fontSize: '10px',
+										margin: '2px 0',
+										marginBottom: '10px',
+									},
+								}}>
+									วันที่ออกจากห้องเย็น (ครั้งที่ 1) : {coldDates?.out_cold_date_formatted || "ไม่มีข้อมูล"}
+								</Typography>
+							</>
+						) : (
+							<>
+								<Typography variant="h6" className="print-text" sx={{
+									color: "#464646",
+									fontSize: "22px",
+									margin: "10px",
+									'@media print': {
+										fontSize: '10px',
+										margin: '2px 0',
+										marginBottom: '10px',
+									},
+								}}>
+									วันที่เข้าห้องเย็น : ______/______/___________
+								</Typography>
+
+								<Typography variant="h6" className="print-text" sx={{
+									color: "#464646",
+									fontSize: "22px",
+									margin: "10px",
+									marginLeft: '110px',
+									'@media print': {
+										fontSize: '10px',
+										margin: '2px 0',
+										marginBottom: '10px',
+										marginLeft: '45px',
+									},
+								}}>
+									เวลา : _______:_______ น.
+								</Typography>
+							</>
+						)}
+
+						{/* 🆕 เพิ่ม: Cold Dates ครั้งที่ 2 */}
+						{hasBothDates2 && (
+							<>
+								<Typography variant="h6" className="print-text" sx={{
+									color: "#464646",
+									fontSize: "22px",
+									margin: "10px",
+									'@media print': {
+										fontSize: '10px',
+										margin: '2px 0',
+										marginBottom: '10px',
+									},
+								}}>
+									วันที่เข้าห้องเย็น (ครั้งที่ 2) : {coldDates?.come_cold_date2_two_formatted || "ไม่มีข้อมูล"}
+								</Typography>
+
+								<Typography variant="h6" className="print-text" sx={{
+									color: "#464646",
+									fontSize: "22px",
+									margin: "10px",
+									'@media print': {
+										fontSize: '10px',
+										margin: '2px 0',
+										marginBottom: '10px',
+									},
+								}}>
+									วันที่ออกจากห้องเย็น (ครั้งที่ 2) : {coldDates?.out_cold_date_two_formatted || "ไม่มีข้อมูล"}
+								</Typography>
+							</>
+						)}
+
+						{/* 🆕 เพิ่ม: Cold Dates ครั้งที่ 3 */}
+						{hasBothDates3 && (
+							<>
+								<Typography variant="h6" className="print-text" sx={{
+									color: "#464646",
+									fontSize: "22px",
+									margin: "10px",
+									'@media print': {
+										fontSize: '10px',
+										margin: '2px 0',
+										marginBottom: '10px',
+									},
+								}}>
+									วันที่เข้าห้องเย็น (ครั้งที่ 3) : {coldDates?.come_cold_date_three_formatted || "ไม่มีข้อมูล"}
+								</Typography>
+
+								<Typography variant="h6" className="print-text" sx={{
+									color: "#464646",
+									fontSize: "22px",
+									margin: "10px",
+									'@media print': {
+										fontSize: '10px',
+										margin: '2px 0',
+										marginBottom: '10px',
+									},
+								}}>
+									วันที่ออกจากห้องเย็น (ครั้งที่ 3) : {coldDates?.out_cold_date_three_formatted || "ไม่มีข้อมูล"}
+								</Typography>
+							</>
+						)}
 
 						{dest === 'ไปบรรจุ' && qcData?.rm_status !== 'QcCheck รอแก้ไข' && (
 							<Box sx={{

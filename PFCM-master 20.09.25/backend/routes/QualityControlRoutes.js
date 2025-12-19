@@ -596,7 +596,88 @@ module.exports = (io) => {
 	});
 
 
+	router.get("/history/cold-dates", async (req, res) => {
+  try {
+    const { mapping_id } = req.query;
+    
+    console.log('📥 Received mapping_id:', mapping_id);
+    
+    if (!mapping_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'mapping_id is required'
+      });
+    }
 
+    const sql = require("mssql");
+    const pool = await connectToDatabase();
+
+    console.log('🔍 Executing query for mapping_id:', mapping_id);
+
+    const result = await pool.request()
+      .input("mapping_id", sql.Int, mapping_id)
+      .query(`
+        SELECT 
+          come_cold_date,
+          out_cold_date,
+          come_cold_date_two,      -- 🆕 เพิ่ม
+          out_cold_date_two,       -- 🆕 เพิ่ม
+          come_cold_date_three,      -- 🆕 เพิ่ม
+          out_cold_date_three,       -- 🆕 เพิ่ม
+          mapping_id,
+          CONVERT(varchar(16), come_cold_date, 120) AS come_cold_date_formatted,
+          CONVERT(varchar(16), out_cold_date, 120) AS out_cold_date_formatted,
+          CONVERT(varchar(16), come_cold_date_two, 120) AS come_cold_date_two_formatted,    -- 🆕 เพิ่ม
+          CONVERT(varchar(16), out_cold_date_two, 120) AS out_cold_date_two_formatted,      -- 🆕 เพิ่ม
+          CONVERT(varchar(16), come_cold_date_three, 120) AS come_cold_date_three_formatted,    -- 🆕 เพิ่ม
+          CONVERT(varchar(16), out_cold_date_three, 120) AS out_cold_date_three_formatted       -- 🆕 เพิ่ม
+        FROM History
+        WHERE mapping_id = @mapping_id
+      `);
+
+    console.log('✅ Query results:', result.recordset);
+
+    if (result.recordset.length > 0) {
+      const data = result.recordset[0];
+      
+      // 🆕 เพิ่มการตรวจสอบทุกคู่
+      const hasBothDates = data.come_cold_date && data.out_cold_date;
+      const hasBothDates2 = data.come_cold_date_two && data.out_cold_date_two;
+      const hasBothDates3 = data.come_cold_date_three && data.out_cold_date_three;
+      
+      console.log('✅ Data found:', { 
+        data, 
+        hasBothDates, 
+        hasBothDates2, 
+        hasBothDates3 
+      });
+      
+      return res.json({
+        success: true,
+        data: data,
+        hasBothDates: hasBothDates,
+        hasBothDates2: hasBothDates2,    
+        hasBothDates3: hasBothDates3      
+      });
+    } else {
+      console.log('⚠️ No data found for mapping_id:', mapping_id);
+      
+      return res.json({
+        success: false,
+        data: null,
+        message: 'No cold date records found'
+      });
+    }
+  } catch (err) {
+    console.error('❌ Error fetching cold dates:', err);
+    console.error('❌ Error message:', err.message);
+    
+    return res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
 
 
 	router.get("/qc/print/status", async (req, res) => {

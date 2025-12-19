@@ -3309,407 +3309,20 @@ module.exports = (io) => {
 
 
 
-
-  // router.put("/pack/mixed/trolley", async (req, res) => {
-  //   const { mapping_id, weights, tro_production_id } = req.body;
-
-  //   if (!mapping_id || !Array.isArray(weights) || weights.length === 0 || !tro_production_id) {
-  //     return res.status(400).json({ message: "mapping_id, weights และ tro_production_id จำเป็นต้องระบุ" });
-  //   }
-
-  //   // ตรวจสอบว่า mapping_id และ weights มีจำนวนเท่ากัน
-  //   if (mapping_id.length !== weights.length) {
-  //     return res.status(400).json({ message: "จำนวน mapping_id และ weights ต้องเท่ากัน" });
-  //   }
-
-  //   let transaction;
-
-  //   try {
-  //     const pool = await connectToDatabase();
-
-  //     const query = `
-  //       SELECT  
-  //           rmm.mapping_id,
-  //           rmm.rmfp_id,
-  //           rmm.batch_id,
-  //           rmm.tro_production_id,
-  //           rmm.process_id,
-  //           rmm.qc_id,
-  //           rmm.level_eu,
-  //           rmm.prep_to_cold_time,
-  //           rmm.cold_time,
-  //           rmm.prep_to_pack_time,
-  //           rmm.cold_to_pack_time,
-  //           rmm.rework_time,
-  //           rmm.rm_status,
-  //           rmm.rm_cold_status,
-  //           rmm.stay_place,
-  //           rmm.allocation_date,
-  //           rmm.removal_date,
-  //           rmm.status,
-  //           rmm.production_batch,
-  //           rmm.created_by,
-  //           rmm.created_at,
-  //           rmm.updated_at,
-  //           rmm.rmm_line_name,
-  //           rmm.weight_RM,
-  //           rmm.tray_count,
-  //           rmm.tro_id,
-  //           htr.hist_id,
-  //           htr.withdraw_date,
-  //           htr.cooked_date,
-  //           htr.rmit_date,
-  //           htr.qc_date,
-  //           htr.come_cold_date,
-  //           htr.out_cold_date,
-  //           htr.come_cold_date_two,
-  //           htr.out_cold_date_two,
-  //           htr.come_cold_date_three,
-  //           htr.out_cold_date_three,
-  //           htr.sc_pack_date,
-  //           htr.rework_date,
-  //           htr.receiver,
-  //           htr.receiver_prep_two,
-  //           htr.receiver_qc,
-  //           htr.receiver_out_cold,
-  //           htr.receiver_out_cold_two,
-  //           htr.receiver_out_cold_three,
-  //           htr.receiver_oven_edit,
-  //           htr.receiver_pack_edit,
-  //           htr.remark_rework,
-  //           htr.remark_rework_cold,
-  //           htr.qccheck_cold,
-  //           htr.edit_rework,
-  //           htr.location
-  //       FROM TrolleyRMMapping AS rmm
-  //       JOIN History AS htr ON htr.mapping_id = rmm.mapping_id
-  //       WHERE rmm.mapping_id IN (${mapping_id.map(id => `'${id}'`).join(',')})
-  //       `;
-
-  //     const result = await pool.request().query(query);
-
-  //     console.log('Query result count:', result.recordset.length);
-
-  //     if (result.recordset.length === 0) {
-  //       return res.status(404).json({ message: "ไม่พบวัตถุดิบในรถเข็นที่เลือก" });
-  //     }
-
-  //     // *** แก้ไขตรงนี้: สร้าง Map เพื่อจับคู่ mapping_id กับ weight ที่ถูกต้อง ***
-  //     const weightMap = {};
-  //     for (let i = 0; i < mapping_id.length; i++) {
-  //       weightMap[mapping_id[i]] = weights[i];
-  //     }
-
-  //     const mixCode = Date.now() % 2147483647;
-  //     const line_name = result.recordset[0].rmm_line_name;
-  //     let total_weight = 0;
-  //     let total_trays = 0;
-
-  //     transaction = new sql.Transaction(pool);
-  //     await transaction.begin();
-
-  //     for (let i = 0; i < result.recordset.length; i++) {
-  //       const record = result.recordset[i];
-  //       const weightToMove = weights[i];
-
-  //       // ปัดน้ำหนักและถาดเป็น 2 ตำแหน่งทศนิยม
-  //       const weight_RM = Number((record.weight_RM ?? 0).toFixed(2));
-  //       const weightToMove = Number((weightToMoveRaw ?? 0).toFixed(2));
-  //       const weightPerTray = weight_RM / record.tray_count;
-  //       const traysUsed = weightToMove / weightPerTray;
-  //       const roundedTraysUsed = Number(traysUsed.toFixed(2));
-  //       const remainingWeight = Number((weight_RM - weightToMove).toFixed(2));
-  //       const tolerance = 0.05;
-
-  //       // Log เพื่อ debug
-  //       console.log(`Record ${i}:`, {
-  //         mapping_id: record.mapping_id,
-  //         weight_RM: weight_RM,
-  //         tray_count: record.tray_count,
-  //         weightToMove: weightToMove,
-  //         remainingWeight: remainingWeight,
-  //         traysUsed: roundedTraysUsed
-  //       });
-
-  //       // *** ตรวจสอบน้ำหนักก่อนดำเนินการ ***
-  //       if (weightToMove > weight_RM + tolerance) {
-  //         await transaction.rollback();
-  //         return res.status(400).json({
-  //           message: "น้ำหนักที่ต้องการย้ายมากกว่าน้ำหนักที่มีอยู่ในรถเข็น",
-  //           detail: {
-  //             mapping_id: record.mapping_id,
-  //             weight_RM: weight_RM,
-  //             weightToMove: weightToMove,
-  //             difference: Number((weightToMove - weight_RM).toFixed(2))
-  //           }
-  //         });
-  //       }
-
-  //       total_weight += weightToMove;
-  //       total_trays += roundedTraysUsed;
-
-  //       // สร้าง mapping ใหม่สำหรับวัตถุดิบที่ถูกย้าย
-  //       const saveRMMResult = await transaction.request()
-  //         .input(`batch_id${i}`, sql.Int, record.batch_id)
-  //         .input(`rmfp_id${i}`, sql.Int, record.rmfp_id)
-  //         .input(`tro_id${i}`, sql.VarChar(4), record.tro_id)
-  //         .input(`tro_production_id${i}`, sql.Int, tro_production_id)
-  //         .input(`process_id${i}`, sql.Int, record.process_id)
-  //         .input(`qc_id${i}`, sql.Int, record.qc_id)
-  //         .input(`weight_RM${i}`, sql.Float, weightToMove)
-  //         .input(`tray_count${i}`, sql.Float, roundedTraysUsed)
-  //         .input(`level_eu${i}`, sql.VarChar(5), record.level_eu)
-  //         .input(`prep_to_cold_time${i}`, sql.Float, record.prep_to_cold_time)
-  //         .input(`cold_time${i}`, sql.Float, record.cold_time)
-  //         .input(`prep_to_pack_time${i}`, sql.Float, record.prep_to_pack_time)
-  //         .input(`cold_to_pack_time${i}`, sql.Float, record.cold_to_pack_time)
-  //         .input(`mix_time${i}`, sql.Float, record.mix_time)
-  //         .input(`rework_time${i}`, sql.Float, record.rework_time)
-  //         .input(`rm_status${i}`, sql.VarChar(25), record.rm_status)
-  //         .input(`rm_cold_status${i}`, sql.VarChar(25), record.rm_cold_status || null)
-  //         .input(`stay_place${i}`, sql.VarChar(25), record.stay_place)
-  //         .input(`dest${i}`, sql.VarChar(25), "จุดผสมวัตถุดิบ")
-  //         .input(`allocation_date${i}`, sql.DateTime, record.allocation_date)
-  //         .input(`removal_date${i}`, sql.DateTime, record.removal_date)
-  //         .input(`status${i}`, sql.VarChar(25), record.status)
-  //         .input(`production_batch${i}`, sql.VarChar(25), record.production_batch)
-  //         .input(`created_by${i}`, sql.VarChar(50), record.created_by)
-  //         .input(`rmm_line_name${i}`, sql.VarChar(20), record.rmm_line_name)
-  //         .query(`
-  //               INSERT INTO TrolleyRMMapping
-  //               (tro_id, rmfp_id, batch_id, tro_production_id, process_id, qc_id, 
-  //               tray_count, weight_RM, level_eu,
-  //               prep_to_cold_time, cold_time, prep_to_pack_time, cold_to_pack_time, mix_time, rework_time,
-  //               rm_status, rm_cold_status, stay_place, dest,
-  //               allocation_date, removal_date, status, production_batch, created_by, rmm_line_name,created_at)
-  //               OUTPUT INSERTED.mapping_id
-  //               VALUES
-  //               (@tro_id${i}, @rmfp_id${i}, @batch_id${i}, @tro_production_id${i}, @process_id${i}, @qc_id${i},
-  //               @tray_count${i}, @weight_RM${i}, @level_eu${i},
-  //               @prep_to_cold_time${i}, @cold_time${i}, @prep_to_pack_time${i}, @cold_to_pack_time${i}, @mix_time${i}, @rework_time${i},
-  //               @rm_status${i}, @rm_cold_status${i}, @stay_place${i}, @dest${i},
-  //               @allocation_date${i}, @removal_date${i}, @status${i}, @production_batch${i}, @created_by${i}, @rmm_line_name${i},GETDATE())
-  //               `);
-
-  //       const newMappingId = saveRMMResult.recordset[0].mapping_id;
-
-  //       // สร้างประวัติใหม่
-  //       await transaction.request()
-  //         .input(`mapping_id${i}`, sql.Int, newMappingId)
-  //         .input(`withdraw_date${i}`, sql.VarChar(25), record.withdraw_date)
-  //         .input(`cooked_date${i}`, sql.DateTime, record.cooked_date)
-  //         .input(`rmit_date${i}`, sql.DateTime, record.rmit_date)
-  //         .input(`qc_date${i}`, sql.DateTime, record.qc_date)
-  //         .input(`come_cold_date${i}`, sql.DateTime, record.come_cold_date)
-  //         .input(`out_cold_date${i}`, sql.DateTime, record.out_cold_date)
-  //         .input(`come_cold_date_two${i}`, sql.DateTime, record.come_cold_date_two)
-  //         .input(`out_cold_date_two${i}`, sql.DateTime, record.out_cold_date_two)
-  //         .input(`come_cold_date_three${i}`, sql.DateTime, record.come_cold_date_three)
-  //         .input(`out_cold_date_three${i}`, sql.DateTime, record.out_cold_date_three)
-  //         .input(`sc_pack_date${i}`, sql.DateTime, record.sc_pack_date)
-  //         .input(`rework_date${i}`, sql.DateTime, record.rework_date)
-  //         .input(`receiver${i}`, sql.VarChar(25), record.receiver)
-  //         .input(`receiver_prep_two${i}`, sql.VarChar(25), record.receiver_prep_two)
-  //         .input(`receiver_qc${i}`, sql.VarChar(25), record.receiver_qc)
-  //         .input(`receiver_out_cold${i}`, sql.VarChar(25), record.receiver_out_cold)
-  //         .input(`receiver_out_cold_two${i}`, sql.VarChar(25), record.receiver_out_cold_two)
-  //         .input(`receiver_out_cold_three${i}`, sql.VarChar(25), record.receiver_out_cold_three)
-  //         .input(`receiver_oven_edit${i}`, sql.VarChar(25), record.receiver_oven_edit)
-  //         .input(`receiver_pack_edit${i}`, sql.VarChar(25), record.receiver_pack_edit)
-  //         .input(`remark_rework${i}`, sql.VarChar(255), record.remark_rework)
-  //         .input(`remark_rework_cold${i}`, sql.VarChar(255), record.remark_rework_cold)
-  //         .input(`location${i}`, sql.VarChar(30), record.location)
-  //         .input(`qccheck_cold${i}`, sql.VarChar(10), record.qccheck_cold)
-  //         .input(`edit_rework${i}`, sql.VarChar(50), record.edit_rework)
-  //         .query(`
-  //               INSERT INTO History
-  //               (mapping_id, withdraw_date, cooked_date, rmit_date, qc_date, 
-  //               come_cold_date, out_cold_date, come_cold_date_two, out_cold_date_two,
-  //               come_cold_date_three, out_cold_date_three, sc_pack_date, rework_date,
-  //               receiver, receiver_prep_two, receiver_qc, receiver_out_cold, 
-  //               receiver_out_cold_two, receiver_out_cold_three, receiver_oven_edit, 
-  //               receiver_pack_edit, remark_rework,remark_rework_cold, location,qccheck_cold,edit_rework,created_at)
-  //               VALUES
-  //               (@mapping_id${i}, @withdraw_date${i}, @cooked_date${i}, @rmit_date${i}, @qc_date${i},
-  //               @come_cold_date${i}, @out_cold_date${i}, @come_cold_date_two${i}, @out_cold_date_two${i},
-  //               @come_cold_date_three${i}, @out_cold_date_three${i}, @sc_pack_date${i}, @rework_date${i},
-  //               @receiver${i}, @receiver_prep_two${i}, @receiver_qc${i}, @receiver_out_cold${i},
-  //               @receiver_out_cold_two${i}, @receiver_out_cold_three${i}, @receiver_oven_edit${i},
-  //               @receiver_pack_edit${i}, @remark_rework${i},@remark_rework_cold${i}, @location${i},@qccheck_cold${i},@edit_rework${i},GETDATE())
-  //               `);
-
-  //       // Copy ทุกแถวจากตาราง Batch ที่เกี่ยวข้องกับ mapping_id เดิม
-  //       const batchRecords = batchByMappingId[record.mapping_id] || [];
-  //       for (let j = 0; j < batchRecords.length; j++) {
-  //         const batchRecord = batchRecords[j];
-  //         await transaction.request()
-  //           .input(`batch_before_${i}_${j}`, sql.VarChar(15), batchRecord.batch_before)
-  //           .input(`batch_after_${i}_${j}`, sql.VarChar(15), batchRecord.batch_after)
-  //           .input(`mapping_id_${i}_${j}`, sql.Int, newMappingId)
-  //           .query(`
-  //             INSERT INTO Batch
-  //             (mapping_id, batch_before, batch_after)
-  //             VALUES
-  //             (@mapping_id_${i}_${j}, @batch_before_${i}_${j}, @batch_after_${i}_${j})
-  //           `);
-  //       }
-
-  //       // เพิ่มข้อมูลใน RM_mixed
-  //       await transaction.request()
-  //         .input(`mapping_id${i}`, sql.Int, newMappingId)
-  //         .input(`batch_id${i}`, sql.Int, record.batch_id)
-  //         .input(`rmfp_id${i}`, sql.Int, record.rmfp_id)
-  //         .input(`mixed_code${i}`, sql.Int, mixCode)
-  //         .input(`tro_production_id${i}`, sql.Int, record.tro_production_id)
-  //         .input(`weight_per_tro${i}`, sql.Float, weightToMove)
-  //         .input(`weight_ntray${i}`, sql.Float, weightPerTray)
-  //         .input(`ntray${i}`, sql.Float, roundedTraysUsed)
-  //         .input(`process_id${i}`, sql.Int, record.process_id)
-  //         .input(`qc_id${i}`, sql.Int, record.qc_id)
-  //         .input(`weight_RM${i}`, sql.Float, weightToMove)
-  //         .input(`level_eu${i}`, sql.NVarChar, record.level_eu || null)
-  //         .query(`
-  //               INSERT INTO RM_Mixed
-  //               (mapping_id, batch_id, rmfp_id, mixed_code, tro_production_id, weight_per_tro, 
-  //               weight_ntray, ntray, process_id, qc_id, weight_RM, level_eu)
-  //               VALUES 
-  //               (@mapping_id${i}, @batch_id${i}, @rmfp_id${i}, @mixed_code${i}, @tro_production_id${i}, @weight_per_tro${i}, 
-  //               @weight_ntray${i}, @ntray${i}, @process_id${i}, @qc_id${i}, @weight_RM${i}, @level_eu${i})
-  //               `);
-
-  //       // อัปเดตรายการวัตถุดิบในรถเข็นเดิม
-  //       if (remainingWeight > 0) {
-  //         const remainingTrays = record.tray_count - roundedTraysUsed;
-  //         await transaction.request()
-  //           .input('remainingWeight', sql.Float, remainingWeight)
-  //           .input('remainingTrays', sql.Float, remainingTrays)
-  //           .input('mapping_id', sql.Int, record.mapping_id)
-  //           .query(`
-  //                   UPDATE TrolleyRMMapping
-  //                   SET weight_RM = @remainingWeight,
-  //                       tray_count = @remainingTrays
-  //                   WHERE mapping_id = @mapping_id
-  //                   `);
-  //       } else if (remainingWeight === 0) {
-  //         await transaction.request()
-  //           .input('mapping_id', sql.Int, record.mapping_id)
-  //           .query(`
-  //                   UPDATE TrolleyRMMapping 
-  //                   SET stay_place = 'บรรจุเสร็จสิ้น', 
-  //                       dest = 'บรรจุเสร็จสิ้น', 
-  //                       rm_status = NULL,
-  //                       tray_count = 0
-  //                   WHERE mapping_id = @mapping_id
-  //                   `);
-  //       } else {
-  //         await transaction.rollback();
-  //         return res.status(400).json({ message: "น้ำหนักที่ต้องการย้ายมากกว่าน้ำหนักที่มีอยู่ในรถเข็น" });
-  //       }
-  //     }
-
-  //     // สร้างรายการวัตถุดิบสำหรับการผลิตใหม่
-  //     const dataRM = await transaction.request()
-  //       .input('prod_rm_id', sql.Int, tro_production_id)
-  //       .input('weight', sql.Float, total_weight)
-  //       .query(`      
-  //           INSERT INTO RMForProd (prod_rm_id, weight) 
-  //           OUTPUT INSERTED.rmfp_id
-  //           VALUES (@prod_rm_id, @weight)
-  //           `);
-  //     const new_rmfp_id = dataRM.recordset[0].rmfp_id;
-
-  //     // สร้าง TrolleyRMMapping ใหม่สำหรับรถเข็นที่ผสมแล้ว
-  //     const insert_result = await transaction.request()
-  //       .input('rmfp_id', sql.Int, new_rmfp_id)
-  //       .input('prod_mix', sql.Int, tro_production_id)
-  //       .input('mix_code', sql.Int, mixCode)
-  //       .input('total_weight', sql.Float, total_weight)
-  //       .input('total_trays', sql.Float, total_trays)
-  //       .input('stay_place', sql.NVarChar, 'บรรจุรับเข้า')
-  //       .input('dest', sql.NVarChar, 'บรรจุ')
-  //       .input('mix_time', sql.Float, 2.00)
-  //       .input('rmm_line_name', sql.NVarChar, line_name)
-  //       .query(`
-  //           INSERT INTO TrolleyRMMapping
-  //           (rmfp_id, prod_mix, mix_code, weight_RM, tray_count, stay_place, dest, mix_time, rmm_line_name,created_at)
-  //           OUTPUT INSERTED.mapping_id
-  //           VALUES
-  //           (@rmfp_id, @prod_mix, @mix_code, @total_weight, @total_trays, @stay_place, @dest, @mix_time, @rmm_line_name,GETDATE())
-  //           `);
-
-  //     const newMixedMappingId = insert_result.recordset[0].mapping_id;
-
-  //     // สร้างประวัติใหม่สำหรับรถเข็นที่ผสมแล้ว
-  //     await transaction.request()
-  //       .input('mapping_id', sql.Int, newMixedMappingId)
-  //       .input('total_weight', sql.Float, total_weight)
-  //       .input('total_trays', sql.Float, total_trays)
-  //       .query(`
-  //           INSERT INTO History
-  //           (mapping_id, mixed_date,weight_RM,tray_count,created_at)
-  //           VALUES
-  //           (@mapping_id, GETDATE(),@total_weight,@total_trays,GETDATE())
-  //           `);
-
-  //     io.to('PackMixRoom').emit('dataUpdated', 'gotUpdated');
-
-  //     if (insert_result.rowsAffected[0] > 0) {
-  //       await transaction.commit();
-  //       return res.status(200).json({
-  //         message: "เพิ่มข้อมูลสำเร็จ",
-  //         data: {
-  //           mix_code: mixCode,
-  //           total_weight: total_weight,
-  //           total_trays: total_trays,
-  //           new_mapping_id: newMixedMappingId
-  //         }
-  //       });
-  //     } else {
-  //       await transaction.rollback();
-  //       return res.status(404).json({ message: "เพิ่มข้อมูลไม่สำเร็จ" });
-  //     }
-
-  //   } catch (error) {
-  //     console.error("SQL error: ", error);
-  //     if (transaction) await transaction.rollback();
-  //     res.status(500).json({ message: "เกิดข้อผิดพลาดในการดึงข้อมูล", error: error.message });
-  //   } finally {
-  //     await sql.close();
-  //   }
-  // });
-
-  router.put("/pack/mixed/trolley", async (req, res) => {
+ 
+router.put("/pack/mixed/trolley", async (req, res) => {
     const { mapping_id, weights, tro_production_id } = req.body;
-
-
-
 
     if (!mapping_id || !Array.isArray(weights) || weights.length === 0 || !tro_production_id) {
       return res.status(400).json({ message: "mapping_id, weights และ tro_production_id จำเป็นต้องระบุ" });
     }
 
-
-
-
-    // ตรวจสอบว่า mapping_id และ weights มีจำนวนเท่ากัน
-    if (mapping_id.length !== weights.length) {
-      return res.status(400).json({ message: "จำนวน mapping_id และ weights ต้องเท่ากัน" });
-    }
-
-
-
-
     let transaction;
-
-
-
 
     try {
       const pool = await connectToDatabase();
 
-
-
-
+      // Query หลักไม่ JOIN กับ Batch
       const query = `
       SELECT DISTINCT
           rmm.mapping_id,
@@ -3774,121 +3387,60 @@ module.exports = (io) => {
       WHERE rmm.mapping_id IN (${mapping_id.map(id => `'${id}'`).join(',')})
     `;
 
-
-
-
       const result = await pool.request().query(query);
-
-
-
-
-      console.log('Query result count:', result.recordset.length);
-
-
-
 
       if (result.recordset.length === 0) {
         return res.status(404).json({ message: "ไม่พบวัตถุดิบในรถเข็นที่เลือก" });
       }
 
-
-
-
-      // *** แก้ไขตรงนี้: สร้าง Map เพื่อจับคู่ mapping_id กับ weight ที่ถูกต้อง ***
-      const weightMap = {};
-      for (let i = 0; i < mapping_id.length; i++) {
-        weightMap[mapping_id[i]] = weights[i];
-      }
-
-
-
+      // Query แยกสำหรับดึงข้อมูล Batch ทั้งหมด
+      const batchQuery = `
+        SELECT batch_id, batch_before, batch_after, mapping_id
+        FROM Batch
+        WHERE mapping_id IN (${mapping_id.map(id => `'${id}'`).join(',')})
+      `;
+      
+      const batchResult = await pool.request().query(batchQuery);
+      
+      // จัดกลุ่ม Batch ตาม mapping_id
+      const batchByMappingId = {};
+      batchResult.recordset.forEach(batch => {
+        if (!batchByMappingId[batch.mapping_id]) {
+          batchByMappingId[batch.mapping_id] = [];
+        }
+        batchByMappingId[batch.mapping_id].push(batch);
+      });
 
       const mixCode = Date.now() % 2147483647;
       const line_name = result.recordset[0].rmm_line_name;
-      const rm_group_id = result.recordset[0].rm_group_id;
-
-
       let total_weight = 0;
       let total_trays = 0;
-
-
-
 
       transaction = new sql.Transaction(pool);
       await transaction.begin();
 
-
-
-
       for (let i = 0; i < result.recordset.length; i++) {
         const record = result.recordset[i];
-
-
-
-
-        // *** ดึง weight ที่ตรงกับ mapping_id นี้จาก Map ***
-        const weightToMoveRaw = weightMap[record.mapping_id];
-
-
-
-
-        if (weightToMoveRaw === undefined) {
-          await transaction.rollback();
-          return res.status(400).json({
-            message: `ไม่พบน้ำหนักสำหรับ mapping_id ${record.mapping_id}`
-          });
-        }
-
-
-
-
-        // ปัดน้ำหนักและถาดเป็น 2 ตำแหน่งทศนิยม
-        const weight_RM = Number((record.weight_RM ?? 0).toFixed(2));
-        const weightToMove = Number((weightToMoveRaw ?? 0).toFixed(2));
-        const weightPerTray = weight_RM / record.tray_count;
-        const traysUsed = weightToMove / weightPerTray;
-        const roundedTraysUsed = Number(traysUsed.toFixed(2));
-        const remainingWeight = Number((weight_RM - weightToMove).toFixed(2));
-        const tolerance = 0.05;
-
-
-
+        const weightToMove = weights[i];
 
         // Log เพื่อ debug
         console.log(`Record ${i}:`, {
           mapping_id: record.mapping_id,
           weight_RM: weight_RM,
           tray_count: record.tray_count,
-          weightToMove: weightToMove,
-          remainingWeight: remainingWeight,
-          traysUsed: roundedTraysUsed
+          weightToMove: weightToMove
         });
 
+        // คำนวณน้ำหนักต่อถาด
+        const weightPerTray = record.weight_RM / record.tray_count;
 
+        // คำนวณจำนวนถาดที่ใช้
+        const traysUsed = weightToMove / weightPerTray;
+        const roundedTraysUsed = Math.round(traysUsed * 100) / 100;
 
-
-        // *** ตรวจสอบน้ำหนักก่อนดำเนินการ ***
-        if (weightToMove > weight_RM + tolerance) {
-          await transaction.rollback();
-          return res.status(400).json({
-            message: "น้ำหนักที่ต้องการย้ายมากกว่าน้ำหนักที่มีอยู่ในรถเข็น",
-            detail: {
-              mapping_id: record.mapping_id,
-              weight_RM: weight_RM,
-              weightToMove: weightToMove,
-              difference: Number((weightToMove - weight_RM).toFixed(2))
-            }
-          });
-        }
-
-
-
-
+        // รวมค่าน้ำหนักและจำนวนถาด
         total_weight += weightToMove;
         total_trays += roundedTraysUsed;
-
-
-
 
         // สร้าง mapping ใหม่สำหรับวัตถุดิบที่ถูกย้าย
         const saveRMMResult = await transaction.request()
@@ -3933,13 +3485,7 @@ module.exports = (io) => {
           @allocation_date${i}, @removal_date${i}, @status${i}, @production_batch${i}, @created_by${i}, @rmm_line_name${i}, GETDATE())
         `);
 
-
-
-
         const newMappingId = saveRMMResult.recordset[0].mapping_id;
-
-
-
 
         // สร้างประวัติใหม่
         await transaction.request()
@@ -3986,8 +3532,21 @@ module.exports = (io) => {
           @receiver_pack_edit${i}, @remark_rework${i}, @remark_rework_cold${i}, @location${i}, @qccheck_cold${i}, @edit_rework${i}, GETDATE())
         `);
 
-
-
+        // Copy ทุกแถวจากตาราง Batch ที่เกี่ยวข้องกับ mapping_id เดิม
+        const batchRecords = batchByMappingId[record.mapping_id] || [];
+        for (let j = 0; j < batchRecords.length; j++) {
+          const batchRecord = batchRecords[j];
+          await transaction.request()
+            .input(`batch_before_${i}_${j}`, sql.VarChar(15), batchRecord.batch_before)
+            .input(`batch_after_${i}_${j}`, sql.VarChar(15), batchRecord.batch_after)
+            .input(`mapping_id_${i}_${j}`, sql.Int, newMappingId)
+            .query(`
+              INSERT INTO Batch
+              (mapping_id, batch_before, batch_after)
+              VALUES
+              (@mapping_id_${i}_${j}, @batch_before_${i}_${j}, @batch_after_${i}_${j})
+            `);
+        }
 
         // เพิ่มข้อมูลใน RM_mixed
         await transaction.request()
@@ -4012,10 +3571,7 @@ module.exports = (io) => {
           @weight_ntray${i}, @ntray${i}, @process_id${i}, @qc_id${i}, @weight_RM${i}, @level_eu${i})
         `);
 
-
-
-
-        // สร้างข้อมูลในตาราง batch สำหรับ mapping_id ใหม่
+        // *** เพิ่มส่วนนี้: สร้างข้อมูลในตาราง batch สำหรับ mapping_id ใหม่ ***
         if (record.batch_after !== null && record.batch_after !== undefined && record.batch_after !== '') {
           await transaction.request()
             .input(`new_mapping_id${i}`, sql.Int, newMappingId)
@@ -4026,12 +3582,12 @@ module.exports = (io) => {
           `);
         }
 
-
-
-
         // อัปเดตรายการวัตถุดิบในรถเข็นเดิม
-        if (remainingWeight > tolerance) {
-          const remainingTrays = Number((record.tray_count - roundedTraysUsed).toFixed(2));
+        // ปัดเศษเพื่อป้องกันความผิดพลาดจากทศนิยม
+        const roundedRemainingWeight = Math.round(remainingWeight * 100) / 100;
+        
+        if (roundedRemainingWeight > 0.01) {
+          const remainingTrays = Math.round((record.tray_count - roundedTraysUsed) * 100) / 100;
           await transaction.request()
             .input('remainingWeight', sql.Float, remainingWeight)
             .input('remainingTrays', sql.Float, remainingTrays)
@@ -4057,15 +3613,18 @@ module.exports = (io) => {
         }
       }
 
-
-
-
       // สร้างรายการวัตถุดิบสำหรับการผลิตใหม่
+      const dataRM = await transaction.request()
       const dataRM = await transaction.request()
         .input('prod_rm_id', sql.Int, tro_production_id)
         .input('weight', sql.Float, total_weight)
         .input('rm_group_id', sql.Int, rm_group_id)
+        .input('rm_group_id', sql.Int, rm_group_id)
         .query(`      
+    INSERT INTO RMForProd (prod_rm_id, weight, rm_group_id)
+    OUTPUT INSERTED.rmfp_id
+    VALUES (@prod_rm_id, @weight, @rm_group_id)
+  `);
     INSERT INTO RMForProd (prod_rm_id, weight, rm_group_id)
     OUTPUT INSERTED.rmfp_id
     VALUES (@prod_rm_id, @weight, @rm_group_id)
@@ -4073,9 +3632,8 @@ module.exports = (io) => {
       const new_rmfp_id = dataRM.recordset[0].rmfp_id;
 
 
-
-
       // สร้าง TrolleyRMMapping ใหม่สำหรับรถเข็นที่ผสมแล้ว
+      const insert_result = await transaction.request()
       const insert_result = await transaction.request()
         .input('rmfp_id', sql.Int, new_rmfp_id)
         .input('prod_mix', sql.Int, tro_production_id)
@@ -4089,20 +3647,19 @@ module.exports = (io) => {
         .query(`
         INSERT INTO TrolleyRMMapping
         (rmfp_id, prod_mix, mix_code, weight_RM, tray_count, stay_place, dest, mix_time, rmm_line_name, created_at)
+        (rmfp_id, prod_mix, mix_code, weight_RM, tray_count, stay_place, dest, mix_time, rmm_line_name, created_at)
         OUTPUT INSERTED.mapping_id
         VALUES
         (@rmfp_id, @prod_mix, @mix_code, @total_weight, @total_trays, @stay_place, @dest, @mix_time, @rmm_line_name, GETDATE())
+        (@rmfp_id, @prod_mix, @mix_code, @total_weight, @total_trays, @stay_place, @dest, @mix_time, @rmm_line_name, GETDATE())
       `);
-
-
 
 
       const newMixedMappingId = insert_result.recordset[0].mapping_id;
 
 
-
-
       // สร้างประวัติใหม่สำหรับรถเข็นที่ผสมแล้ว
+      await transaction.request()
       await transaction.request()
         .input('mapping_id', sql.Int, newMixedMappingId)
         .input('total_weight', sql.Float, total_weight)
@@ -4110,18 +3667,13 @@ module.exports = (io) => {
         .query(`
         INSERT INTO History
         (mapping_id, mixed_date, weight_RM, tray_count, created_at)
+        (mapping_id, mixed_date, weight_RM, tray_count, created_at)
         VALUES
+        (@mapping_id, GETDATE(), @total_weight, @total_trays, GETDATE())
         (@mapping_id, GETDATE(), @total_weight, @total_trays, GETDATE())
       `);
 
-
-
-
       io.to('PackMixRoom').emit('dataUpdated', 'gotUpdated');
-
-
-
-
       if (insert_result.rowsAffected[0] > 0) {
         await transaction.commit();
         return res.status(200).json({
@@ -4138,9 +3690,6 @@ module.exports = (io) => {
         return res.status(404).json({ message: "เพิ่มข้อมูลไม่สำเร็จ" });
       }
 
-
-
-
     } catch (error) {
       console.error("SQL error: ", error);
       if (transaction) await transaction.rollback();
@@ -4149,10 +3698,6 @@ module.exports = (io) => {
       await sql.close();
     }
   });
-
-
-
-
 
 
   router.put("/pack/mix/trolley", async (req, res) => {
