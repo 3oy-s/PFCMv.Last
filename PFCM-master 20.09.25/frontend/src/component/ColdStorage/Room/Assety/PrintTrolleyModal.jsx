@@ -977,6 +977,20 @@ const MaterialItem = ({
             )}
           </Box>
 
+  {/* ⭐ เพิ่มส่วนนี้ - แสดง general_remark -------------------------------------------------------------------------------------------*/}
+          {/* ทดสอบแบบบังคับให้แสดง */}
+          <Box sx={{
+          mb: 0.5,
+          fontSize: fontSizes.value.screen,
+          '@media print': {
+           marginBottom: '1px',
+          fontSize: fontSizes.value.print,
+            },
+           }}>
+          <span style={{ color: '#666' }}>หมายเหตุทั่วไป:</span> 
+         {item.general_remark || ' - '}
+          </Box>
+    {/* ⭐ เพิ่มส่วนนี้ - แสดง general_remark -------------------------------------------------------------------------------------------*/}
           {item.machine_MD && (
             <Box sx={{
               mb: 0.5,
