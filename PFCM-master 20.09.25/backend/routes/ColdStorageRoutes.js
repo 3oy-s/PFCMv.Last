@@ -1452,7 +1452,7 @@ WHERE
                         .query(`UPDATE Slot SET tro_id = NULL ,status ='1428' WHERE tro_id = @source_tro_id`);
                     await new sql.Request(transaction)
                         .input('source_tro_id', source_tro_id)
-                        .query(`UPDATE Trolley SET tro_status = 1,status = '1.7' WHERE tro_id = @source_tro_id`);
+                        .query(`UPDATE Trolley SET tro_status = '1' ,status = '1.7' WHERE tro_id = @source_tro_id`);
                 }
 
                 // Commit transaction
@@ -2236,6 +2236,111 @@ WHERE
                 console.log("send body mix_time:", historyData.mix_time);
                 console.log("send body cold_to_pack_time:", historyData.cold_to_pack_time);
                 console.log("send body cold_to_pack:", historyData.cold_to_pack);
+            } else {
+                res.status(404).json({ err: "History not found" });
+            }
+        } catch (err) {
+            console.error("Error:", err);
+            res.status(500).json({ error: "An error occurred while fetching history." });
+        }
+    });
+
+     router.get("/coldstorage/history/test/:mapping_id", async (req, res) => {
+        try {
+            const { mapping_id } = req.params;
+            const pool = await connectToDatabase();
+
+            // Get history data and time values
+            const result = await pool.request()
+                .input("mapping_id", mapping_id)
+                .query(`SELECT
+                        CONVERT(VARCHAR, h.come_cold_date, 120) AS come_cold_date,
+                        CONVERT(VARCHAR, h.out_cold_date, 120) AS out_cold_date,
+                        CONVERT(VARCHAR, h.come_cold_date_two, 120) AS come_cold_date_two,
+                        CONVERT(VARCHAR, h.out_cold_date_two, 120) AS out_cold_date_two,
+                        CONVERT(VARCHAR, h.come_cold_date_three, 120) AS come_cold_date_three,
+                        CONVERT(VARCHAR, h.out_cold_date_three, 120) AS out_cold_date_three,
+                        CONVERT(VARCHAR, h.qc_date, 120) AS qc_date,
+                        CONVERT(VARCHAR, h.rmit_date, 120) AS rmit_date,
+                        CONVERT(VARCHAR, h.rework_date, 120) AS rework_date,
+                        CONVERT(VARCHAR,
+                                COALESCE(
+                                    h.come_cold_date_three,
+                                    h.come_cold_date_two,
+                                    h.come_cold_date
+                                ),
+                                120
+                        ) AS come_cold_date_latest,
+                        h.receiver_out_cold,
+                        h.receiver_out_cold_two,
+                        h.receiver_out_cold_three,
+                        rmm.rework_time,
+                        rmm.mix_time,
+                        rmm.cold_to_pack_time,
+                        rmg.cold_to_pack
+                       
+    
+                    FROM History h
+                    JOIN TrolleyRMMapping rmm ON h.mapping_id = rmm.mapping_id
+                    JOIN RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
+                    JOIN RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
+                    WHERE h.mapping_id = @mapping_id
+                `);
+
+            if (result.recordset.length > 0) {
+                const historyData = result.recordset[0];
+                const historyEntries = [];
+
+                if (historyData.come_cold_date) {
+                    historyEntries.push({
+                        round: 1,
+                        come_date: historyData.come_cold_date,
+                        out_date: historyData.out_cold_date,
+                        come_operator: historyData.receiver_come_cold,
+                        out_operator: historyData.receiver_out_cold
+                    });
+                }
+
+                if (historyData.come_cold_date_two) {
+                    historyEntries.push({
+                        round: 2,
+                        come_date: historyData.come_cold_date_two,
+                        out_date: historyData.out_cold_date_two,
+                        come_operator: historyData.receiver_come_cold_two,
+                        out_operator: historyData.receiver_out_cold_two
+                    });
+                }
+
+                if (historyData.come_cold_date_three) {
+                    historyEntries.push({
+                        round: 3,
+                        come_date: historyData.come_cold_date_three,
+                        out_date: historyData.out_cold_date_three,
+                        come_operator: historyData.receiver_come_cold_three,
+                        out_operator: historyData.receiver_out_cold_three
+                    });
+                }
+
+                res.status(200).json({
+                    history: historyEntries,
+                    qc_date: historyData.qc_date,
+                    rework_date: historyData.rework_date,
+                    rework_time: historyData.rework_time,
+                    mix_time: historyData.mix_time,
+                    cold_to_pack_time: historyData.cold_to_pack_time,
+                    cold_to_pack: historyData.cold_to_pack,
+                    come_cold_date_latest: historyData.come_cold_date_latest,
+                    rmit_date: historyData.rmit_date
+                });
+
+                console.log("send body history:", historyEntries);
+                console.log("send body qc_date:", historyData.qc_date);
+                console.log("send body rework_time:", historyData.rework_time);
+                console.log("send body mix_time:", historyData.mix_time);
+                console.log("send body cold_to_pack_time:", historyData.cold_to_pack_time);
+                console.log("send body cold_to_pack:", historyData.cold_to_pack);
+                console.log("send body come_cold_date_latest:", historyData.come_cold_date_latest);
+                console.log("send body rmit_date:", historyData.rmit_date);
             } else {
                 res.status(404).json({ err: "History not found" });
             }
