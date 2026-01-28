@@ -5,7 +5,7 @@ import ModalEditPD from './ModalEditPD';
 import ModalSuccess from './ModalSuccess';
 import ModalDelete from './ModalDelete';
 import axios from "axios";
-axios.defaults.withCredentials = true; 
+axios.defaults.withCredentials = true;
 import io from 'socket.io-client';
 import { Percent } from '@mui/icons-material';
 
@@ -100,8 +100,8 @@ const ParentComponent = () => {
     try {
       const response = await axios.get(`${API_URL}/api/qc/fetchRMForProd`, {
         params: {
-        rm_type_ids: rmTypeIds.join(',') // ส่งเป็น string คั่นด้วย comma
-      }
+          rm_type_ids: rmTypeIds.join(',') // ส่งเป็น string คั่นด้วย comma
+        }
       });
 
       // No need to filter on frontend - backend handles it
@@ -244,6 +244,14 @@ const ParentComponent = () => {
         params: { mapping_id },
       });
 
+      //-----------------------------------------------------------------------------------------------------------------
+      const coldDateResponse = await axios.get(`${API_URL}/api/history/cold-dates`, {
+        params: { mapping_id },
+      });
+
+      console.log("Cold Date response:", coldDateResponse.data);
+      //-----------------------------------------------------------------------------------------------------------------
+
       console.log("API response:", response.data); // log แค่ response.data เพื่ออ่านง่าย
 
       if (response.data.success) {
@@ -251,9 +259,16 @@ const ParentComponent = () => {
         const updatedDataForModal3 = {
           ...dataForEditModal,
           qcData: response.data.data,
+          coldDates: coldDateResponse.data.success ? coldDateResponse.data.data : null,
+          hasBothDates: coldDateResponse.data.hasBothDates,
+          hasBothDates2: coldDateResponse.data.hasBothDates2,
+          hasBothDates3: coldDateResponse.data.hasBothDates3
+          // hasColdDates: coldDateResponse.data.success &&
+          //   coldDateResponse.data.data?.come_cold_date &&
+          //   coldDateResponse.data.data?.out_cold_date
         };
 
-        console.log("Updated dataForModal3:", updatedDataForModal3);
+        console.log("Updated dataForModal3 with cold dates:", updatedDataForModal3);
 
         setDataForModal3(updatedDataForModal3);
 
@@ -299,6 +314,10 @@ const ParentComponent = () => {
           setOpenModal3(false);
         }}
         clearData={clearData}
+        coldDates={dataForModal3?.coldDates}
+        hasBothDates={dataForModal3?.hasBothDates}
+        hasBothDates2={dataForModal3?.hasBothDates2}   
+        hasBothDates3={dataForModal3?.hasBothDates3}     
       />
 
       <ModalEditPD
