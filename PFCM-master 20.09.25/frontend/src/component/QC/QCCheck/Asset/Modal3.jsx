@@ -729,37 +729,7 @@ const Modal3 = ({ open, onClose, data, onEdit, dataForModal3, coldDates, hasBoth
 									วันที่ออกจากห้องเย็น (ครั้งที่ 1) : {coldDates?.out_cold_date_formatted || "ไม่มีข้อมูล"}
 								</Typography>
 							</>
-						) : (
-							<>
-								<Typography variant="h6" className="print-text" sx={{
-									color: "#464646",
-									fontSize: "22px",
-									margin: "10px",
-									'@media print': {
-										fontSize: '10px',
-										margin: '2px 0',
-										marginBottom: '10px',
-									},
-								}}>
-									วันที่เข้าห้องเย็น : ______/______/___________
-								</Typography>
-
-								<Typography variant="h6" className="print-text" sx={{
-									color: "#464646",
-									fontSize: "22px",
-									margin: "10px",
-									marginLeft: '110px',
-									'@media print': {
-										fontSize: '10px',
-										margin: '2px 0',
-										marginBottom: '10px',
-										marginLeft: '45px',
-									},
-								}}>
-									เวลา : _______:_______ น.
-								</Typography>
-							</>
-						)}
+						) : null}
 
 						{/* 🆕 เพิ่ม: Cold Dates ครั้งที่ 2 */}
 						{hasBothDates2 && (

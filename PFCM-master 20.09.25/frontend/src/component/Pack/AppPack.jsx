@@ -17,6 +17,7 @@ import CSCheckOutPage from "./CheckOut/CheckOutPage.jsx"
 import ScanBarcodePage from "./ScanSAP/ScanBatcodePage.jsx"
 import ManageRawmatPack from "./manage copy/ManagePage.jsx"
 import ReportRawmatPack from "./manage copy 2/ManagePage.jsx"
+import TrackTroPage from "./TrackTrolley/TrackTroPage.jsx";
 
 function AppPack() {
   return (
@@ -32,6 +33,7 @@ function AppPack() {
         
 
         <Route path="/CheckStatus/CheckStatusPage" element={<CheckStatusPage />} />
+        <Route path="/TrackTro" element={<TrackTroPage />} />
         <Route path="/" element={<ManagePack />} />
         <Route path="/manage/ManagePage" element={<ManagePack />} />
         <Route path="/History/HistoryPage" element={<HistoryPage />} />

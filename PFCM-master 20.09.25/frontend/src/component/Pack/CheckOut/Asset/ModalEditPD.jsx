@@ -27,6 +27,8 @@ import {
   TableCell,
   TableBody,
   CircularProgress,
+  TableBody,
+  CircularProgress
 } from "@mui/material";
 import KeyboardIcon from "@mui/icons-material/Keyboard";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
@@ -149,6 +151,62 @@ const QcCheck = ({
         console.error("Failed to load Html5Qrcode script");
         setIsLoadingLibrary(false);
         reject(new Error("ไม่สามารถโหลด QR Scanner Library ได้"));
+      };
+
+      document.head.appendChild(script);
+    });
+  };
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
+
+
+
+  const loadHtml5QrcodeScript = () => {
+    return new Promise((resolve, reject) => {
+      setIsLoadingLibrary(true);
+
+      if (window.Html5Qrcode) {
+        console.log('Html5Qrcode already loaded');
+        setIsLoadingLibrary(false);
+        resolve();
+        return;
+      }
+
+      const existingScript = document.querySelector('script[src*="html5-qrcode"]');
+      if (existingScript) {
+        console.log('Script tag exists, waiting for load...');
+        existingScript.addEventListener('load', () => {
+          console.log('Html5Qrcode loaded from existing script');
+          setIsLoadingLibrary(false);
+          resolve();
+        });
+        existingScript.addEventListener('error', () => {
+          setIsLoadingLibrary(false);
+          reject(new Error('Failed to load script'));
+        });
+        return;
+      }
+
+      console.log('Loading Html5Qrcode script...');
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+      script.async = true;
+
+      script.onload = () => {
+        console.log('Html5Qrcode script loaded successfully');
+        setTimeout(() => {
+          setIsLoadingLibrary(false);
+          if (window.Html5Qrcode) {
+            resolve();
+          } else {
+            reject(new Error('Html5Qrcode not available after script load'));
+          }
+        }, 100);
+      };
+
+      script.onerror = () => {
+        console.error('Failed to load Html5Qrcode script');
+        setIsLoadingLibrary(false);
+        reject(new Error('ไม่สามารถโหลด QR Scanner Library ได้'));
       };
 
       document.head.appendChild(script);
@@ -380,6 +438,7 @@ const QcCheck = ({
       mat: material_code,
       rmfpID: rmfp_id ? parseInt(rmfp_id, 10) : null,
       cold: formattedDelayTime,
+      ptc_time: ptc_time,
       ptc_time: ptc_time,
       ColdOut: ColdOut,
       dest: Location,
@@ -1075,6 +1134,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
     onClose();
   };
 
+
   const fetchUserDataFromLocalStorage = () => {
     try {
       const firstName = localStorage.getItem("first_name") || "";
@@ -1091,46 +1151,44 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
     return new Promise((resolve, reject) => {
       // เช็คว่าโหลดไว้แล้วหรือยัง
       if (window.Html5Qrcode) {
-        console.log("Html5Qrcode already loaded");
+        console.log('Html5Qrcode already loaded');
         resolve();
         return;
       }
 
       // เช็คว่ามี script tag อยู่แล้วหรือยัง
-      const existingScript = document.querySelector(
-        'script[src*="html5-qrcode"]'
-      );
+      const existingScript = document.querySelector('script[src*="html5-qrcode"]');
       if (existingScript) {
-        console.log("Script tag exists, waiting for load...");
-        existingScript.addEventListener("load", () => {
-          console.log("Html5Qrcode loaded from existing script");
+        console.log('Script tag exists, waiting for load...');
+        existingScript.addEventListener('load', () => {
+          console.log('Html5Qrcode loaded from existing script');
           resolve();
         });
-        existingScript.addEventListener("error", reject);
+        existingScript.addEventListener('error', reject);
         return;
       }
 
       // สร้าง script tag ใหม่
-      console.log("Loading Html5Qrcode script...");
-      const script = document.createElement("script");
-      script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+      console.log('Loading Html5Qrcode script...');
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
       script.async = true;
 
       script.onload = () => {
-        console.log("Html5Qrcode script loaded successfully");
+        console.log('Html5Qrcode script loaded successfully');
         // รอสักครู่ให้แน่ใจว่า library พร้อมใช้งาน
         setTimeout(() => {
           if (window.Html5Qrcode) {
             resolve();
           } else {
-            reject(new Error("Html5Qrcode not available after script load"));
+            reject(new Error('Html5Qrcode not available after script load'));
           }
         }, 100);
       };
 
       script.onerror = () => {
-        console.error("Failed to load Html5Qrcode script");
-        reject(new Error("ไม่สามารถโหลด QR Scanner Library ได้"));
+        console.error('Failed to load Html5Qrcode script');
+        reject(new Error('ไม่สามารถโหลด QR Scanner Library ได้'));
       };
 
       document.head.appendChild(script);
@@ -1142,41 +1200,32 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         return {
           hasPermission: false,
-          error: "Browser ไม่รองรับการใช้กล้อง",
+          error: 'Browser ไม่รองรับการใช้กล้อง'
         };
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { facingMode: "environment" }
       });
 
-      stream.getTracks().forEach((track) => track.stop());
+      stream.getTracks().forEach(track => track.stop());
 
       return { hasPermission: true, error: null };
     } catch (error) {
-      console.error("Camera permission error:", error);
+      console.error('Camera permission error:', error);
 
-      let errorMessage = "ไม่สามารถเข้าถึงกล้องได้";
+      let errorMessage = 'ไม่สามารถเข้าถึงกล้องได้';
 
-      if (
-        error.name === "NotAllowedError" ||
-        error.name === "PermissionDeniedError"
-      ) {
-        errorMessage = "กรุณาอนุญาตให้เข้าถึงกล้องในการตั้งค่า Browser";
-      } else if (
-        error.name === "NotFoundError" ||
-        error.name === "DevicesNotFoundError"
-      ) {
-        errorMessage = "ไม่พบกล้องในอุปกรณ์";
-      } else if (
-        error.name === "NotReadableError" ||
-        error.name === "TrackStartError"
-      ) {
-        errorMessage = "กล้องถูกใช้งานโดยแอปอื่นอยู่";
-      } else if (error.name === "OverconstrainedError") {
-        errorMessage = "ไม่สามารถเข้าถึงกล้องหลังได้";
-      } else if (error.name === "SecurityError") {
-        errorMessage = "ต้องใช้ HTTPS เพื่อเข้าถึงกล้อง";
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        errorMessage = 'กรุณาอนุญาตให้เข้าถึงกล้องในการตั้งค่า Browser';
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        errorMessage = 'ไม่พบกล้องในอุปกรณ์';
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        errorMessage = 'กล้องถูกใช้งานโดยแอปอื่นอยู่';
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage = 'ไม่สามารถเข้าถึงกล้องหลังได้';
+      } else if (error.name === 'SecurityError') {
+        errorMessage = 'ต้องใช้ HTTPS เพื่อเข้าถึงกล้อง';
       }
 
       return { hasPermission: false, error: errorMessage };
@@ -1185,71 +1234,70 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
 
   // ฟังก์ชันเปิดกล้อง
   const startCameraScanner = async () => {
-     // ✅ เพิ่มการเช็คให้เข้มงวดขึ้น
-    if (isScanning || scannerInstanceRef.current) {
-    console.log('Camera already active, skipping...');
-    return;
-  }
+    if (isScanning) {
+      console.log('Already scanning, skipping...');
+      return;
+    }
 
-    console.log("Starting camera scanner...");
+    console.log('Starting camera scanner...');
     setIsScanning(true);
     setIsCameraActive(true);
     setScanError("");
 
     try {
       // 1. โหลด Html5Qrcode library ก่อน
-      console.log("Step 1: Loading Html5Qrcode library...");
+      console.log('Step 1: Loading Html5Qrcode library...');
       await loadHtml5QrcodeScript();
-      console.log("✓ Library loaded");
+      console.log('✓ Library loaded');
 
       // 2. เช็ค permission
-      console.log("Step 2: Checking camera permission...");
+      console.log('Step 2: Checking camera permission...');
       const permissionCheck = await checkCameraPermission();
       if (!permissionCheck.hasPermission) {
         throw new Error(permissionCheck.error);
       }
-      console.log("✓ Permission granted");
+      console.log('✓ Permission granted');
 
       // 3. ตรวจสอบว่ามี element
-      console.log("Step 3: Checking element...");
+      console.log('Step 3: Checking element...');
       if (!qrScannerRef.current) {
         throw new Error("ไม่พบพื้นที่แสดงกล้อง");
       }
-      console.log("✓ Element found");
+      console.log('✓ Element found');
 
       // 4. ปิด scanner เก่า (ถ้ามี)
-      console.log("Step 4: Cleaning old scanner...");
+      console.log('Step 4: Cleaning old scanner...');
       if (scannerInstanceRef.current) {
         try {
           await scannerInstanceRef.current.stop();
           await scannerInstanceRef.current.clear();
         } catch (e) {
-          console.warn("Error clearing old scanner:", e);
+          console.warn('Error clearing old scanner:', e);
         }
         scannerInstanceRef.current = null;
       }
-      console.log("✓ Old scanner cleaned");
+      console.log('✓ Old scanner cleaned');
 
       // 5. สร้าง scanner instance ใหม่
-      console.log("Step 5: Creating scanner instance...");
+      console.log('Step 5: Creating scanner instance...');
       const Html5Qrcode = window.Html5Qrcode;
       if (!Html5Qrcode) {
-        throw new Error("Html5Qrcode is not available");
+        throw new Error('Html5Qrcode is not available');
       }
       scannerInstanceRef.current = new Html5Qrcode("qr-reader");
-      console.log("✓ Scanner instance created");
+      console.log('✓ Scanner instance created');
 
       // 6. เริ่มต้น scanner
-      console.log("Step 6: Starting camera...");
+      console.log('Step 6: Starting camera...');
       await scannerInstanceRef.current.start(
         { facingMode: "environment" },
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
+          aspectRatio: 1.0
         },
         (decodedText) => {
-          console.log("QR Code detected:", decodedText);
+          console.log('QR Code detected:', decodedText);
           const last4 = decodedText.slice(-4).replace(/\D/g, "");
 
           if (last4.length === 4) {
@@ -1274,26 +1322,24 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
         }
       );
 
-      console.log("✅ Camera started successfully!");
+      console.log('✅ Camera started successfully!');
+
     } catch (error) {
-      console.error("❌ Error starting camera:", error);
-      console.error("Error details:", {
+      console.error('❌ Error starting camera:', error);
+      console.error('Error details:', {
         name: error.name,
         message: error.message,
-        stack: error.stack,
+        stack: error.stack
       });
 
       let errorMsg = error.message || "ไม่สามารถเปิดกล้องได้";
 
-      if (errorMsg.includes("HTTPS")) {
-        errorMsg += " (ต้องใช้ HTTPS หรือ localhost)";
-      } else if (
-        errorMsg.includes("permission") ||
-        errorMsg.includes("อนุญาต")
-      ) {
-        errorMsg += " (ไปที่การตั้งค่า Browser)";
-      } else if (errorMsg.includes("Library") || errorMsg.includes("โหลด")) {
-        errorMsg = "ไม่สามารถโหลด QR Scanner ได้ กรุณา Reload หน้าเว็บ";
+      if (errorMsg.includes('HTTPS')) {
+        errorMsg += ' (ต้องใช้ HTTPS หรือ localhost)';
+      } else if (errorMsg.includes('permission') || errorMsg.includes('อนุญาต')) {
+        errorMsg += ' (ไปที่การตั้งค่า Browser)';
+      } else if (errorMsg.includes('Library') || errorMsg.includes('โหลด')) {
+        errorMsg = 'ไม่สามารถโหลด QR Scanner ได้ กรุณา Reload หน้าเว็บ';
       }
 
       setScanError(errorMsg);
@@ -1311,13 +1357,13 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
 
   // ฟังก์ชันปิดกล้อง
   const stopCameraScanner = async () => {
-    console.log("Stopping camera scanner...");
+    console.log('Stopping camera scanner...');
 
     if (scannerInstanceRef.current) {
       try {
         await scannerInstanceRef.current.stop();
         await scannerInstanceRef.current.clear();
-        console.log("Camera stopped successfully");
+        console.log('Camera stopped successfully');
       } catch (error) {
         console.warn("Error stopping scanner:", error);
       }
@@ -1330,7 +1376,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
 
   // ฟังก์ชันเปิดกล้องใหม่
   const restartCamera = async () => {
-    console.log("Restarting camera...");
+    console.log('Restarting camera...');
     setScannedCode("");
     setScanError("");
     await stopCameraScanner();
@@ -1344,7 +1390,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
   // useEffect - จัดการเมื่อเปิด dialog
   useEffect(() => {
     if (open) {
-      console.log("Dialog opened, initializing scanner...");
+      console.log('Dialog opened, initializing scanner...');
       setLocation("");
       setoperator("");
       setShowScanDialog(true);
@@ -1356,14 +1402,14 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
       fetchUserDataFromLocalStorage();
 
       // เริ่มกล้องหลังจาก dialog เปิดแล้ว
-      // const timer = setTimeout(() => {
-      //   startCameraScanner();
-      // }, 300);
+      const timer = setTimeout(() => {
+        startCameraScanner();
+      }, 300);
 
-      // return () => {
-      //   clearTimeout(timer);
-      //   stopCameraScanner();
-      // };
+      return () => {
+        clearTimeout(timer);
+        stopCameraScanner();
+      };
     } else {
       stopCameraScanner();
     }
@@ -1372,7 +1418,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
   // เพิ่ม useEffect นี้หลัง useEffect ที่มีอยู่
   useEffect(() => {
     return () => {
-      console.log("Component unmounting, cleaning up...");
+      console.log('Component unmounting, cleaning up...');
       stopCameraScanner();
     };
   }, []);
@@ -1594,25 +1640,19 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
 
             {/* พื้นที่แสดงกล้อง */}
             {/* ในส่วน DialogContent ของ Dialog แรก */}
-            <Box sx={{ width: "100%", maxWidth: 400 }}>
+            <Box sx={{ width: '100%', maxWidth: 400 }}>
               {isLoadingLibrary ? (
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minHeight: 300,
-                    backgroundColor: "#f5f5f5",
-                    borderRadius: 2,
-                  }}
-                >
+                <Box sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 300,
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: 2
+                }}>
                   <CircularProgress size={50} />
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 2 }}
-                  >
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                     กำลังโหลด QR Scanner...
                   </Typography>
                 </Box>
@@ -1622,25 +1662,19 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                     id="qr-reader"
                     ref={qrScannerRef}
                     style={{
-                      width: "100%",
-                      display: isCameraActive ? "block" : "none",
+                      width: '100%',
+                      display: isCameraActive ? 'block' : 'none'
                     }}
                   ></div>
 
                   {!isCameraActive && !isScanning && (
-                    <Box
-                      sx={{
-                        textAlign: "center",
-                        py: 2,
-                        backgroundColor: "#f5f5f5",
-                        borderRadius: 2,
-                      }}
-                    >
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mb: 1 }}
-                      >
+                    <Box sx={{
+                      textAlign: 'center',
+                      py: 2,
+                      backgroundColor: '#f5f5f5',
+                      borderRadius: 2
+                    }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                         กล้องปิดอยู่
                       </Typography>
                       <Button
@@ -1669,8 +1703,8 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                 placeholder="0000"
                 inputProps={{
                   maxLength: 4,
-                  inputMode: "numeric",
-                  pattern: "[0-9]*",
+                  inputMode: 'numeric',
+                  pattern: '[0-9]*',
                   style: {
                     fontSize: 24,
                     textAlign: "center",
@@ -1680,18 +1714,16 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                 error={!!scanError}
                 onFocus={(e) => {
                   // ไม่ทำอะไรเมื่อ focus - ให้ scanner ยิงค่าได้
-                  console.log(
-                    "Input focused - ready for scanner or manual input"
-                  );
+                  console.log('Input focused - ready for scanner or manual input');
                 }}
                 onBlur={(e) => {
-  // ✅ เพิ่มการเช็ค scannerInstanceRef
-  if (!scannedCode && !isCameraActive && !isScanning && !scannerInstanceRef.current) {
-    setTimeout(() => {
-      startCameraScanner();
-    }, 500);
-  }
-}}
+                  // เช็คว่าถ้า blur แล้วยังไม่มีค่า ให้เปิดกล้องใหม่
+                  if (!scannedCode && !isCameraActive && !isScanning) {
+                    setTimeout(() => {
+                      startCameraScanner();
+                    }, 500);
+                  }
+                }}
                 autoComplete="off"
               />
 

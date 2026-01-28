@@ -7,7 +7,8 @@ const pos_id = localStorage.getItem("pos_id");
 const allowedPositions = ["3", "4", "5", "6"];
 const showWorkplaceSelector = allowedPositions.includes(pos_id);
 
-const SIDEBAR_ITEMS = [	
+const SIDEBAR_ITEMS = [
+	{ name: "ติดตามรถเข็น", icon: BarChart2, href: "/packaging/TrackTro" },
 	{ name: "จัดการ (วัตถุดิบไม่ผสม)", icon: BarChart2, href: "/packaging/manage/ManagePage" },
 	{ name: "จัดการ (วัตถุดิบผสม)", icon: BarChart2, href: "/packaging/Mixed/Trolley" },
 	{ name: "ดึงข้อมูลวัตถุดิบ", icon: BarChart2, href: "/packaging/CheckOut" },

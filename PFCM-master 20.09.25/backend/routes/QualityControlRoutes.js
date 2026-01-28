@@ -54,6 +54,8 @@ module.exports = (io) => {
         (
           (rmm.dest = 'เข้าห้องเย็น' AND (rmm.rm_status = 'รอQCตรวจสอบ' OR rmm.rm_status = 'QcCheck รอแก้ไข'))
           OR 
+          (rmm.dest = 'เตรียมผสม' AND (rmm.rm_status = 'รอQCตรวจสอบ' OR rmm.rm_status = 'QcCheck รอแก้ไข'))
+          OR 
           (rmm.dest = 'ไปบรรจุ' AND (rmm.rm_status = 'รอQCตรวจสอบ' OR rmm.rm_status = 'QcCheck รอแก้ไข' OR rmm.rm_status = 'รอกลับมาเตรียม'))
 		  OR 
 		  (rmm.dest = 'ผสมเตรียม' AND (rmm.rm_status = 'รอQCตรวจสอบ' ))
