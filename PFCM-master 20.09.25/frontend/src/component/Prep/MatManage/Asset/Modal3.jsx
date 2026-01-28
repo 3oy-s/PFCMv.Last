@@ -168,11 +168,11 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
         weightTotal: weightTotal,
         ntray: numberOfTrays,
         recorder: input2?.operator || "",
-        Dest: "รอCheckin",  // ✅ ส่งค่าคงที่
-        // Dest: input2?.deliveryLocation || "",
+        // Dest: "รอCheckin",  // ✅ ส่งค่าคงที่
+        Dest: input2?.deliveryLocation || "",
         Process: input2?.selectedProcessType?.process_id || "",
-        // deliveryType: input2?.deliveryType || "",
-        deliveryType: "",    // ✅ ส่งค่าว่าง
+        deliveryType: input2?.deliveryType || "",
+        // deliveryType: "",    // ✅ ส่งค่าว่าง
         userID: Number(userId),
         level_eu: level_eu || "",
         tray_count: numberOfTrays,
@@ -187,7 +187,7 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
       console.log("Payload before sending:", payload);
 
       const apiResponse = await axios.post(
-        `${API_URL}/api/prep/manage/saveTrolleyV2`,
+        `${API_URL}/api/prep/manage/saveTrolley`,
         payload,
         {
           headers: {
@@ -205,12 +205,12 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
       const printData = {
         tro_id: tro_id,
         batch_after: batchAfterArray.length > 0 ? batchAfterArray.map(item => item.batch_after).join(", ") : batchAfter || "",
-        // dest: input2?.deliveryLocation || "",
-        dest: "รอCheckin",  // ✅ ใช้ค่าคงที่
+        dest: input2?.deliveryLocation || "",
+        // dest: "รอCheckin",  // ✅ ใช้ค่าคงที่
         mat_name: materialName,
         production: productionValue,
-        // rmm_line_name: input2?.deliveryLocation || "",
-        rmm_line_name: "รอCheckin",  // ✅ ใช้ค่าคงที่
+        rmm_line_name: input2?.deliveryLocation || "",
+        // rmm_line_name: "รอCheckin",  // ✅ ใช้ค่าคงที่
         level_eu: level_eu || "-",
         process_name: input2?.selectedProcessType?.process_name || "",
         weight_RM: weightTotal,
@@ -224,10 +224,10 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
         defectcheck: "-",
         qc_datetime_formatted: "",
         receiver_qc: input2?.operator || "",
-        // general_remark: input2?.deliveryType || "ทั่วไป",
-        general_remark: "ทั่วไป",  // ✅ ใช้ค่าคงที่
-        // deliveryType: input2?.deliveryType || ""
-        deliveryType: ""            // ✅ ส่งค่าว่าง
+        general_remark: input2?.deliveryType || "ทั่วไป",
+        // general_remark: "ทั่วไป",  // ✅ ใช้ค่าคงที่
+        deliveryType: input2?.deliveryType || ""
+        // deliveryType: ""            // ✅ ส่งค่าว่าง
       };
 
       setRowData(printData);
@@ -411,12 +411,12 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
               Level EU (สำหรับวัตถุดิบปลา): {level_eu || "ไม่มีข้อมูล EU"}
             </Typography>
             {/* ✅ เปลี่ยนจาก deliveryLocation เป็น dest */}
-            <Typography color="rgba(0, 0, 0, 0.6)">
-               สถานที่จัดส่ง: {data?.dest || "รอCheckin"}
-            </Typography>
             {/* <Typography color="rgba(0, 0, 0, 0.6)">
-              สถานที่จัดส่ง: {input2?.deliveryLocation || "ข้อมูลไม่พบ"}
+               สถานที่จัดส่ง: {data?.dest || "รอCheckin"}
             </Typography> */}
+            <Typography color="rgba(0, 0, 0, 0.6)">
+              สถานที่จัดส่ง: {input2?.deliveryLocation || "ข้อมูลไม่พบ"}
+            </Typography>
             <Typography color="rgba(0, 0, 0, 0.6)">
               แผนการผลิต: {productionValue || "ข้อมูลไม่พบ"}
             </Typography>

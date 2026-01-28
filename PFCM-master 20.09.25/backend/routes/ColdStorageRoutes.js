@@ -2401,7 +2401,7 @@ WHERE
                         .input("tro_id", sql.VarChar, tro_id)
                         .input("new_tro_id", sql.VarChar, new_tro_id)
                         .query(`
-                        UPDATE RMInTrolley SET tro_id = @new_tro_id WHERE tro_id = @tro_id;
+                        UPDATE TrolleyRMMapping SET tro_id = @new_tro_id WHERE tro_id = @tro_id;
                         UPDATE t SET t.weight_per_tro = ISNULL((SELECT SUM(r.weight_RM) FROM RMInTrolley r WHERE r.tro_id = @new_tro_id),0)
                         FROM RMInTrolley t WHERE t.tro_id = @new_tro_id;
                         UPDATE Slot SET tro_id = NULL ,status ='2061' WHERE slot_id = @slot_id;

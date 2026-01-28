@@ -313,16 +313,16 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
       isValid = false;
     }
 
-    // if (!deliveryLocation) {
-    //   setLocationError(true);
-    //   isValid = false;
-    // } else {
-    //   setLocationError(false);
-    // }
+    if (!deliveryLocation) {
+      setLocationError(true);
+      isValid = false;
+    } else {
+      setLocationError(false);
+    }
 
-    // if (deliveryLocation === "เข้าห้องเย็น" && !deliveryType) {
-    //   isValid = false;
-    // }
+    if (deliveryLocation === "เข้าห้องเย็น" && !deliveryType) {
+      isValid = false;
+    }
 
     if (!preparedTime) {
       setPreparedTimeError(true);
@@ -393,10 +393,10 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
         selectedItem,
         numberOfTrays: parseInt(numberOfTrays, 10),
         selectedProcessType: selectedProcessType,
-        // deliveryLocation: String(deliveryLocation),
-        // deliveryType: String(deliveryType),
-        deliveryLocation: "รอCheckin",  // ✅ ตั้งค่าคงที่
-        deliveryType: "",                // ✅ เคลียร์ค่า
+        deliveryLocation: String(deliveryLocation),
+        deliveryType: String(deliveryType),
+        // deliveryLocation: "รอCheckin",  // ✅ ตั้งค่าคงที่
+        // deliveryType: "",                // ✅ เคลียร์ค่า
         preparedTime: formattedPreparedTime,
       },
       batch: data?.batch || '',
@@ -407,8 +407,8 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
       inputValues: data?.inputValues || [], // ✅ ส่งต่อ inputValues (รถเข็น)
       cookedDateTimeNew: formattedCookedTime,
       preparedDateTimeNew: formattedPreparedTime,
-      // dest: dest
-      dest: "รอCheckin"  // ✅ ตั้งค่าคงที่
+      dest: dest
+      // dest: "รอCheckin"  // ✅ ตั้งค่าคงที่
     };
 
     console.log("ส่งข้อมูลไป Modal3:", updatedData);
@@ -696,7 +696,7 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
             helperText={operatorError ? "กรุณากรอกชื่อผู้ดำเนินการ" : ""}
           />
 
-          {/* <Box sx={{
+          <Box sx={{
             display: "flex",
             alignItems: "center",
             paddingLeft: "12px",
@@ -713,8 +713,8 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
               <FormControlLabel value="เข้าห้องเย็น" control={<Radio />} style={{ color: "#666" }} label="ห้องเย็น" />
               <FormControlLabel value="ผสมเตรียม" control={<Radio />} style={{ color: "#666" }} label="จุดเตรียม" />
             </RadioGroup>
-          </Box> */}
-          {/* {locationError && (
+          </Box>
+          {locationError && (
             <Typography variant="caption" color="error" sx={{ ml: 2 }}>
               กรุณาเลือกสถานที่จัดส่ง
             </Typography>
@@ -750,7 +750,7 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
                 />
               </RadioGroup>
             </Box>
-          )} */}
+          )}
 
           <Divider />
         </DialogContent>
