@@ -88,12 +88,14 @@ const Row = ({
           }}>
           {(() => {
             const { dest, rm_status } = row;
-            if ((dest === "เข้าห้องเย็น" || dest === "ไปบรรจุ") && rm_status === "รอQCตรวจสอบ") {
+            if ((dest === "เข้าห้องเย็น" || dest === "ไปบรรจุ" || dest === "ผสมเตรียม" ) && rm_status === "รอQCตรวจสอบ") {
               return "รอQC ตรวจสอบ";
             } else if (dest === "เข้าห้องเย็น" && rm_status === "QcCheck" || rm_status === "QcCheck รอกลับมาเตรียม" || rm_status === "QcCheck รอ QC") {
               return "รอห้องเย็นรับเข้า";
             } else if (dest === "ไปบรรจุ" && rm_status === "QcCheck") {
               return "รอบรรจุรับ";
+            } else if (dest === "ผสมเตรียม" && rm_status === "QcCheck") {
+              return "รอผสมเตรียมรับเข้า";
             } else if ((dest === "เข้าห้องเย็น" || dest === "บรรจุ") && rm_status === "QcCheck รอแก้ไข") {
               return "ส่งกลับไปแก้ไข";
             } else if (dest === "หม้ออบ" && rm_status === "ปกติ") {

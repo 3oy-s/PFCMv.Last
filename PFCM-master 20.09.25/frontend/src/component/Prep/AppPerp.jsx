@@ -14,9 +14,11 @@ import WorkplaceSelector from "../User/WorkplaceSelector.jsx";
 import BatchSAPPage from "./BatchSAP/BatchSAPPage.jsx";
 import EmulsionPage from "./Emulsion/EmusionPage.jsx";
 import RM_EMU from "./RMEmu/MainPage.jsx";
+import RMInclude from "./RMInclude/MainPage.jsx";
 import BatchMIXPage from "./BatchMIX/BatchMIXPage.jsx";
 import TraceBack_HU from "./TraceBackHU/MainPage.jsx";
 import EditDataTrolley from "./EditDataTrolley/EditDataTrolley.jsx";
+import IncludeRawmatPage from "./IncludeRawmat/IncludeRawmatPage.jsx";
 
 function AppPrep() {
   return (
@@ -43,11 +45,13 @@ function AppPrep() {
         <Route path="/HistoryTranform/HistoryTranformPage"element={<HistoryTranform />}/>
         <Route path="/User/SelectWP" element={<ManageSelect />} />
         <Route path="/RM_EMU" element={<RM_EMU/>} />
+        <Route path="/RMInclude" element={<RMInclude/>} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/Emulsions" element={<EmulsionPage />} />
         <Route path="/BatchMIX" element={<BatchMIXPage />} />
         <Route path="/TraceBack_HU" element={<TraceBack_HU />} />
         <Route path="/EditDataTrolley" element={<EditDataTrolley />} />
+        <Route path="/IncludeRawmat" element={<IncludeRawmatPage />} />
       </Routes>
     </div>
   );

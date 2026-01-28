@@ -444,7 +444,7 @@ const TrolleyTable = ({ data }) => {
                   borderTopRightRadius: "8px",
                   borderBottomRightRadius: "8px",
                   borderTop: "1px solid #e0e0e0",
-                  borderBottom: "1px solid #e0e0e0",
+                  borderBottom: "1px solid #e0e0e0", 
                   borderRight: "1px solid #f2f2f2",
                   fontSize: '12px',
                   padding: '5px',

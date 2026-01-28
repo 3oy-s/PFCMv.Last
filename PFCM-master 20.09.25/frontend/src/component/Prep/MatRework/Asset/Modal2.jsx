@@ -468,6 +468,7 @@ const Modal2 = ({ open, onClose, onNext, data, mapping_id, tro_id, CookedDateTim
                 <RadioGroup row name="location" value={deliveryLocation} onChange={handleDeliveryLocationChange}>
                   <FormControlLabel value="ไปบรรจุ" control={<Radio />} style={{ color: "#666" }} label="บรรจุ" />
                   <FormControlLabel value="เข้าห้องเย็น" control={<Radio />} style={{ color: "#666" }} label="ห้องเย็น" />
+                  <FormControlLabel value="ผสมเตรียม" control={<Radio />} style={{ color: "#666" }} label="จุดเตรียม" />
                 </RadioGroup>
               </Box>
 

@@ -42,8 +42,6 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [rowData, setRowData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [batchArray, setBatchArray] = useState([]);
-  const [batchAfterArray, setBatchAfterArray] = useState([]);
 
   console.log("Data passed to Modal3:", data); // Debugging line to check data
 
@@ -76,7 +74,7 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
     onClose();
   };
 
-  const returnreserveTrolley = async (tro_id) => {
+    const returnreserveTrolley = async (tro_id) => {
     try {
       const response = await axios.post(`${API_URL}/api/re/reserveTrolley`, {
         tro_id: tro_id,
@@ -160,19 +158,16 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
       const payload = {
         license_plate: Array.isArray(inputValues) ? inputValues.join(" ") : inputValues,
         rmfpID: rmfp_id || "",
-        // batch_before: batchBefore || "",
-        // batch_after: batchAfter || "", // อันนี้ optional ขึ้นอยู่กับ backend
-        batchAfterArray: batchAfterArray || [], // <-- ส่งแบบ object
+        batch_before: batchBefore || "",
+        batch_after: batchAfter || "",
         cookedDateTimeNew: formattedDateTime || "",
         preparedDateTimeNew: formattedPreparedTime || "",
         weightTotal: weightTotal,
         ntray: numberOfTrays,
         recorder: input2?.operator || "",
-        Dest: "รอCheckin",  // ✅ ส่งค่าคงที่
-        // Dest: input2?.deliveryLocation || "",
+        Dest: input2?.deliveryLocation || "",
         Process: input2?.selectedProcessType?.process_id || "",
-        // deliveryType: input2?.deliveryType || "",
-        deliveryType: "",    // ✅ ส่งค่าว่าง
+        deliveryType: input2?.deliveryType || "",
         userID: Number(userId),
         level_eu: level_eu || "",
         tray_count: numberOfTrays,
@@ -183,11 +178,10 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
         mat: materialCode || mat || ""
       };
 
-
       console.log("Payload before sending:", payload);
 
       const apiResponse = await axios.post(
-        `${API_URL}/api/prep/manage/saveTrolleyV2`,
+        `${API_URL}/api/prep/manage/saveTrolley`,
         payload,
         {
           headers: {
@@ -204,13 +198,11 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
       // สร้างข้อมูลสำหรับการพิมพ์
       const printData = {
         tro_id: tro_id,
-        batch_after: batchAfterArray.length > 0 ? batchAfterArray.map(item => item.batch_after).join(", ") : batchAfter || "",
-        // dest: input2?.deliveryLocation || "",
-        dest: "รอCheckin",  // ✅ ใช้ค่าคงที่
+        batch_after: batchAfter || batchBefore,
+        dest: input2?.deliveryLocation || "",
         mat_name: materialName,
         production: productionValue,
-        // rmm_line_name: input2?.deliveryLocation || "",
-        rmm_line_name: "รอCheckin",  // ✅ ใช้ค่าคงที่
+        rmm_line_name: input2?.deliveryLocation || "",
         level_eu: level_eu || "-",
         process_name: input2?.selectedProcessType?.process_name || "",
         weight_RM: weightTotal,
@@ -224,75 +216,45 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
         defectcheck: "-",
         qc_datetime_formatted: "",
         receiver_qc: input2?.operator || "",
-        // general_remark: input2?.deliveryType || "ทั่วไป",
-        general_remark: "ทั่วไป",  // ✅ ใช้ค่าคงที่
-        // deliveryType: input2?.deliveryType || ""
-        deliveryType: ""            // ✅ ส่งค่าว่าง
+        general_remark: input2?.deliveryType || "ทั่วไป",
+        deliveryType: input2?.deliveryType || ""
       };
 
       setRowData(printData);
-       setShowAlert(true);
-       setIsLoading(false);
-       setIsProcessing(false);
-       onClose();
 
       // เปิด modal พิมพ์เฉพาะเมื่อประเภทการส่งเป็น "รอกลับมาเตรียม" เท่านั้น
-      // if (input2?.deliveryType === "รอกลับมาเตรียม") {
-      //   setPrintModalOpen(true);
-      // } else {
-      //   // กรณีไม่ใช่ "รอกลับมาเตรียม" ให้แสดง alert สำเร็จโดยตรง
-      //   setShowAlert(true);
-      //   setIsLoading(false);
-      //   setIsProcessing(false);
-      //   onClose();
-      // }
+      if (input2?.deliveryType === "รอกลับมาเตรียม") {
+        setPrintModalOpen(true);
+      } else {
+        // กรณีไม่ใช่ "รอกลับมาเตรียม" ให้แสดง alert สำเร็จโดยตรง
+        setShowAlert(true);
+        setIsLoading(false);
+        setIsProcessing(false);
+        onClose();
+      }
 
     } catch (error) {
       console.error("Error:", error);
-      setError("ไม่สามารถทำรายการได้ เนื่องจากเลยเวลาที่กำหนด 5 นาที ");
+      setError("ไม่สามารถทำรายการได้ เนื่องจากเลยเวลาที่กำหนด 5 นาที หรือ เกิดข้อผิดพลาดในการบันทึกข้อมูล");
       setIsLoading(false);
       setIsProcessing(false);
     }
   };
 
-  // useEffect(() => {
-  //   // ดึงค่า user_id จาก localStorage
-  //   const storedUserId = localStorage.getItem("user_id");
-  //   setBatchBefore(data?.batch || "ยังไม่ได้กำหนด");
-  //   setBatchAfter(data?.newBatch || data?.batch || "ยังไม่ได้กำหนด");
-
-  //   console.log("🔄 Updating batch values...");
-  //   console.log("✅ batchBefore:", data?.batch || "ไม่มีข้อมูล");
-  //   console.log("✅ batchAfter:", data?.newBatch || data?.batch || "ไม่มีข้อมูล");
-
-  //   if (data?.batchArray && Array.isArray(data.batchArray)) {
-  //     setBatchArray(data.batchArray);
-  //   }
-
-  //   if (data?.batchAfterArray && Array.isArray(data.batchAfterArray)) {
-  //     // ดึงค่า new_batch_after หรือ batch_after
-  //     const afterBatches = data.batchAfterArray.map(item =>
-  //       item.new_batch_after || item.batch_after || ''
-  //     );
-  //     setBatchAfterArray(afterBatches);
-  //   }
-
-  //   if (storedUserId) {
-  //     setUserId(storedUserId);
-  //   }
-  // }, [data]);
-
   useEffect(() => {
-    // ดึงค่า batchAfterArray แบบ object
-    if (data?.batchAfterArray && Array.isArray(data.batchAfterArray)) {
-      const afterBatches = data.batchAfterArray.map(item => ({
-        batch_before: item.batch_before,
-        batch_after: item.batch_after || item.new_batch_after || ""
-      }));
-      setBatchAfterArray(afterBatches);
+    // ดึงค่า user_id จาก localStorage
+    const storedUserId = localStorage.getItem("user_id");
+    setBatchBefore(data?.batch || "ยังไม่ได้กำหนด");
+    setBatchAfter(data?.newBatch || data?.batch || "ยังไม่ได้กำหนด");
+
+    console.log("🔄 Updating batch values...");
+    console.log("✅ batchBefore:", data?.batch || "ไม่มีข้อมูล");
+    console.log("✅ batchAfter:", data?.newBatch || data?.batch || "ไม่มีข้อมูล");
+
+    if (storedUserId) {
+      setUserId(storedUserId);
     }
   }, [data]);
-
 
   const handleBatchAfterChange = (event) => {
     setBatchAfter(event.target.value); // Update batch_after when input changes
@@ -334,60 +296,8 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
             )}
 
             <Typography>ชื่อวัตถุดิบ: {materialName}</Typography>
-            {/* <Typography>Batch ก่อน: {batchBefore || "ยังไม่ได้กำหนด"}</Typography>
-            <Typography>Batch ใหม่: {batchAfter || "ยังไม่ได้กำหนด"}</Typography> */}
-            {batchArray.length > 0 && (
-              <>
-                <Divider sx={{ mt: 2, mb: 2 }} />
-                <Typography sx={{ fontSize: "16px", fontWeight: 500, color: "#333", marginBottom: "8px" }}>
-                  รายการ Batch ทั้งหมด:
-                </Typography>
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 2 }}>
-                  {batchArray.map((batchItem, idx) => {
-                    const newBatchObj = batchAfterArray[idx];
-                    const newBatch = newBatchObj?.batch_after || "N/A";
-
-                    return (
-                      <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        {/* Batch เดิม */}
-                        <Box
-                          sx={{
-                            padding: "4px 8px",
-                            backgroundColor: "#f0f0f0",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            minWidth: "120px",
-                            textAlign: "center",
-                            color: "#666"
-                          }}
-                        >
-                          {batchItem}
-                        </Box>
-
-                        {/* ลูกศร */}
-                        <Typography sx={{ fontSize: "16px", color: "#666" }}>→</Typography>
-
-                        {/* Batch ใหม่ */}
-                        <Box
-                          sx={{
-                            padding: "4px 8px",
-                            backgroundColor: "#d0f0d0",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            minWidth: "120px",
-                            textAlign: "center",
-                            fontWeight: "bold",
-                            color: "#2e7d32"
-                          }}
-                        >
-                          {newBatch}
-                        </Box>
-                      </Box>
-                    );
-                  })}
-                </Box>
-              </>
-            )}
+            <Typography>Batch ก่อน: {batchBefore || "ยังไม่ได้กำหนด"}</Typography>
+            <Typography>Batch ใหม่: {batchAfter || "ยังไม่ได้กำหนด"}</Typography>
             <Typography>
               ป้ายทะเบียน: {Array.isArray(inputValues) ?
                 (inputValues.length > 0 ? inputValues[0] : "ไม่มีข้อมูล") :
@@ -410,13 +320,9 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
             <Typography>
               Level EU (สำหรับวัตถุดิบปลา): {level_eu || "ไม่มีข้อมูล EU"}
             </Typography>
-            {/* ✅ เปลี่ยนจาก deliveryLocation เป็น dest */}
             <Typography color="rgba(0, 0, 0, 0.6)">
-               สถานที่จัดส่ง: {data?.dest || "รอCheckin"}
-            </Typography>
-            {/* <Typography color="rgba(0, 0, 0, 0.6)">
               สถานที่จัดส่ง: {input2?.deliveryLocation || "ข้อมูลไม่พบ"}
-            </Typography> */}
+            </Typography>
             <Typography color="rgba(0, 0, 0, 0.6)">
               แผนการผลิต: {productionValue || "ข้อมูลไม่พบ"}
             </Typography>

@@ -152,10 +152,10 @@ const QcCheck = ({
 
     };
 
-    console.log("Payload sent to /api/qc/check:", payload);
+    console.log("Payload sent to /api/qc/checkV2:", payload);
 
     try {
-      const response = await axios.post(`${API_URL}/api/qc/check`, payload);
+      const response = await axios.post(`${API_URL}/api/qc/checkV2`, payload);
       if (response.status === 200) {
         console.log("✅ Data sent successfully:", response.data);
         onSuccess();

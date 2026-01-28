@@ -310,13 +310,13 @@ const RawMatSelectionModal = ({ open, onClose, onAdd, currentTroId, onSelectionC
                                 <TableHead>
                                     <TableRow>
                                         <TableCell padding="checkbox">
-                                            <Checkbox
+                                            {/* <Checkbox
                                                 indeterminate={
                                                     selected.length > 0 && selected.length < rawMaterials.length
                                                 }
                                                 checked={rawMaterials.length > 0 && selected.length === rawMaterials.length}
                                                 onChange={handleSelectAll}
-                                            />
+                                            /> */}
                                         </TableCell>
                                         <TableCell>Delay Time</TableCell>
                                         <TableCell><Box sx={{ display: 'flex', alignItems: 'center' }}>

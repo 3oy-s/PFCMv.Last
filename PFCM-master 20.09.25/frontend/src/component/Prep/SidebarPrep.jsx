@@ -221,10 +221,12 @@ const Sidebar = () => {
     { name: "Scan SAP", icon: LuScanBarcode, href: "/prep/ScanSAP/ScanSAPPage" },
     { name: "ผสมวัตถุดิบ", icon: PiFishSimple, href: "/prep/Emulsions" },
     { name: "ผสม Batch", icon: PiFishSimple, href: "/prep/BatchMIX" },
+    { name: "ผสมเตรียม", icon: PiFishSimple, href: "/prep/IncludeRawmat" },
     { name: "จัดการวัตถุดิบ", icon: PiFishSimple, href: "/prep/MatManage/MatManagePage" },
     { name: "วัตถุดิบรอแก้ไข", icon: PiFishLight, href: "/prep/MatRework/MatReworkPage" },
     { name: "กลับมาเตรียม", icon: PiFishFill, href: "/prep/MatImport/MatImportPage" },
-    // { name: "รายการผสมวัตถุดิบ", icon: PiFishFill, href: "/prep/RM_EMU" },
+     { name: "รายการผสมวัตถุดิบ", icon: PiFishFill, href: "/prep/RM_EMU" },
+     { name: "รายการผสมเตรียม", icon: PiFishFill, href: "/prep/RMInclude" },
     { name: "ตรวจสอบ HU", icon: PiFishFill, href: "/prep/TraceBack_HU" },
     { name: "ประวัติ", icon: PiFishFill, href: "/prep/history" },
     // ...(showWorkplaceSelector

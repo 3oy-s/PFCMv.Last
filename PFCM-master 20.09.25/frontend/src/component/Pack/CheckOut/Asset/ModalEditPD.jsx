@@ -25,10 +25,11 @@ import {
   TableHead,
   TableRow,
   TableCell,
-  TableBody
+  TableBody,
+  CircularProgress,
 } from "@mui/material";
-import KeyboardIcon from '@mui/icons-material/Keyboard';
-import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import KeyboardIcon from "@mui/icons-material/Keyboard";
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import PrintModal from "./PrintModal";
 import CancelIcon from "@mui/icons-material/CancelOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
@@ -40,18 +41,119 @@ import ModalAlert from "../../../../Popup/AlertSuccess";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standard_ptc, heck, cold, rm_cold_status, rm_status, ComeColdDateTime, slot_id,
-  tro_id, batch, rmfp_id, onSuccess, Location, ColdOut, operator, level_eu, formattedDelayTime, latestComeColdDate, cooked_date, rmit_date, materials,
-  qccheck, sq_remark, mdcheck, md_remark, defect_remark, defectcheck, machine_MD, sq_acceptance, defect_acceptance, dest, weight_RM, tray_count
-  , rmm_line_name, withdraw_date, name_edit_prod_two, name_edit_prod_three, first_prod, two_prod, three_prod, qccheck_cold, receiver_qc_cold, approver, production, remark_rework, remark_rework_cold, edit_rework, prepare_mor_night
+const QcCheck = ({
+  open,
+  onClose,
+  material_code,
+  materialName,
+  ptc_time,
+  standard_ptc,
+  heck,
+  cold,
+  rm_cold_status,
+  rm_status,
+  ComeColdDateTime,
+  slot_id,
+  tro_id,
+  batch,
+  rmfp_id,
+  onSuccess,
+  Location,
+  ColdOut,
+  operator,
+  level_eu,
+  formattedDelayTime,
+  latestComeColdDate,
+  cooked_date,
+  rmit_date,
+  materials,
+  qccheck,
+  sq_remark,
+  mdcheck,
+  md_remark,
+  defect_remark,
+  defectcheck,
+  machine_MD,
+  sq_acceptance,
+  defect_acceptance,
+  dest,
+  weight_RM,
+  tray_count,
+  rmm_line_name,
+  withdraw_date,
+  name_edit_prod_two,
+  name_edit_prod_three,
+  first_prod,
+  two_prod,
+  three_prod,
+  qccheck_cold,
+  receiver_qc_cold,
+  approver,
+  production,
+  remark_rework,
+  remark_rework_cold,
+  edit_rework,
+  prepare_mor_night,
 }) => {
-
   const [showAlert, setShowAlert] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [dataForPrint, setDataForPrint] = useState(null);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
 
+  const loadHtml5QrcodeScript = () => {
+    return new Promise((resolve, reject) => {
+      setIsLoadingLibrary(true);
 
+      if (window.Html5Qrcode) {
+        console.log("Html5Qrcode already loaded");
+        setIsLoadingLibrary(false);
+        resolve();
+        return;
+      }
 
+      const existingScript = document.querySelector(
+        'script[src*="html5-qrcode"]'
+      );
+      if (existingScript) {
+        console.log("Script tag exists, waiting for load...");
+        existingScript.addEventListener("load", () => {
+          console.log("Html5Qrcode loaded from existing script");
+          setIsLoadingLibrary(false);
+          resolve();
+        });
+        existingScript.addEventListener("error", () => {
+          setIsLoadingLibrary(false);
+          reject(new Error("Failed to load script"));
+        });
+        return;
+      }
+
+      console.log("Loading Html5Qrcode script...");
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+      script.async = true;
+
+      script.onload = () => {
+        console.log("Html5Qrcode script loaded successfully");
+        setTimeout(() => {
+          setIsLoadingLibrary(false);
+          if (window.Html5Qrcode) {
+            resolve();
+          } else {
+            reject(new Error("Html5Qrcode not available after script load"));
+          }
+        }, 100);
+      };
+
+      script.onerror = () => {
+        console.error("Failed to load Html5Qrcode script");
+        setIsLoadingLibrary(false);
+        reject(new Error("ไม่สามารถโหลด QR Scanner Library ได้"));
+      };
+
+      document.head.appendChild(script);
+    });
+  };
 
   // ฟังก์ชันแปลงเวลาจาก UTC เป็นเวลาไทย
   const formatThaiDateTime = (utcDateTimeStr) => {
@@ -63,15 +165,15 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
 
       // เพิ่ม 7 ชั่วโมงเพื่อแปลงเป็นเวลาไทย (GMT+7)
       // หรือใช้ toLocaleString กับ time zone 'Asia/Bangkok'
-      return utcDate.toLocaleString('th-TH', {
-        timeZone: 'Asia/Bangkok',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
+      return utcDate.toLocaleString("th-TH", {
+        timeZone: "Asia/Bangkok",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
         // second: '2-digit',
-        hour12: false
+        hour12: false,
       });
     } catch (error) {
       console.error("Error formatting date:", error);
@@ -131,13 +233,15 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
 
     try {
       // แปลงเวลาจากรูปแบบ HH.MM เป็นนาที
-      const standardParts = standardPtc.toString().split('.');
-      const ptcParts = ptcTime.toString().split('.');
+      const standardParts = standardPtc.toString().split(".");
+      const ptcParts = ptcTime.toString().split(".");
 
       // แปลงชั่วโมงเป็นนาที และรวมกับนาที
-      const standardMinutes = parseInt(standardParts[0]) * 60 +
+      const standardMinutes =
+        parseInt(standardParts[0]) * 60 +
         (standardParts.length > 1 ? parseInt(standardParts[1]) : 0);
-      const ptcMinutes = parseInt(ptcParts[0]) * 60 +
+      const ptcMinutes =
+        parseInt(ptcParts[0]) * 60 +
         (ptcParts.length > 1 ? parseInt(ptcParts[1]) : 0);
 
       // คำนวณความแตกต่าง
@@ -170,7 +274,6 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
     return timeDiff;
   };
 
-
   // ฟังก์ชันแปลงข้อความเวลาเป็นรูปแบบ HH.MM
   const convertDelayTimeToHHMM = (delayTimeText) => {
     if (!delayTimeText || delayTimeText === "-") return 0;
@@ -179,7 +282,9 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
     const isExceeded = delayTimeText.includes("เลยกำหนด");
 
     // แยกข้อความเพื่อดึงวัน ชั่วโมง และนาที
-    let timeText = delayTimeText.replace("เลยกำหนด ", "").replace("เหลืออีก ", "");
+    let timeText = delayTimeText
+      .replace("เลยกำหนด ", "")
+      .replace("เหลืออีก ", "");
 
     let days = 0;
     let hours = 0;
@@ -206,22 +311,25 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
     }
 
     // แปลงวันเป็นชั่วโมง และรวมกับชั่วโมงที่มีอยู่
-    const totalHours = (days * 24) + hours;
+    const totalHours = days * 24 + hours;
 
     // แปลงเป็นรูปแบบ HH.MM
-    const formattedTime = totalHours + (minutes / 100);
+    const formattedTime = totalHours + minutes / 100;
 
     // ถ้าเป็นเวลาที่เลยกำหนด ให้ใส่เครื่องหมายลบ
     return isExceeded ? -formattedTime : formattedTime;
   };
 
-
-
   const handleScanInputChange = (e) => {
     const value = e.target.value.replace(/\D/g, "").slice(0, 4);
     setScannedCode(value);
     setScanError("");
-
+    
+      // ✅ ปรับเงื่อนไขการปิดกล้อง - ปิดเฉพาะเมื่อผู้ใช้พิมพ์เอง
+  if (e.nativeEvent.inputType && isCameraActive && scannerInstanceRef.current) {
+    stopCameraScanner();
+    setIsCameraActive(false);
+  }
     // Auto-submit เมื่อครบ 4 หลัก
     if (value.length === 4) {
       setTimeout(() => handleScanVerify(), 100);
@@ -235,38 +343,44 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
   };
 
   const handleConfirm = async () => {
-    const processedMaterials = materials ? materials.map(item => {
-      // ตรวจสอบประเภทวัตถุดิบและจัดการกับ delayTime
-      if (item.rawMatType === "mixed" && item.delayTime) {
-        // แปลง delayTime จากข้อความเป็นตัวเลขในรูปแบบ HH.MM
-        const convertedDelayTime = convertDelayTimeToHHMM(item.delayTime);
-        return {
-          ...item,
-          mix_time: convertedDelayTime // เก็บค่าที่แปลงแล้วใน mix_time สำหรับวัตถุดิบผสม
-        };
-      } else if (item.delayTime && item.remaining_rework_time !== null && item.remaining_rework_time !== undefined) {
-        // สำหรับวัตถุดิบที่มี remaining_rework_time
-        const convertedDelayTime = convertDelayTimeToHHMM(item.delayTime);
-        return {
-          ...item,
-          rework_delay_time: convertedDelayTime
-        };
-      } else if (item.delayTime) {
-        // กรณีทั่วไปที่มีแค่ delayTime
-        const convertedDelayTime = convertDelayTimeToHHMM(item.delayTime);
-        return {
-          ...item,
-          cold: convertedDelayTime
-        };
-      }
-      return item;
-    }) : [];
+    const processedMaterials = materials
+      ? materials.map((item) => {
+          // ตรวจสอบประเภทวัตถุดิบและจัดการกับ delayTime
+          if (item.rawMatType === "mixed" && item.delayTime) {
+            // แปลง delayTime จากข้อความเป็นตัวเลขในรูปแบบ HH.MM
+            const convertedDelayTime = convertDelayTimeToHHMM(item.delayTime);
+            return {
+              ...item,
+              mix_time: convertedDelayTime, // เก็บค่าที่แปลงแล้วใน mix_time สำหรับวัตถุดิบผสม
+            };
+          } else if (
+            item.delayTime &&
+            item.remaining_rework_time !== null &&
+            item.remaining_rework_time !== undefined
+          ) {
+            // สำหรับวัตถุดิบที่มี remaining_rework_time
+            const convertedDelayTime = convertDelayTimeToHHMM(item.delayTime);
+            return {
+              ...item,
+              rework_delay_time: convertedDelayTime,
+            };
+          } else if (item.delayTime) {
+            // กรณีทั่วไปที่มีแค่ delayTime
+            const convertedDelayTime = convertDelayTimeToHHMM(item.delayTime);
+            return {
+              ...item,
+              cold: convertedDelayTime,
+            };
+          }
+          return item;
+        })
+      : [];
 
     const payload = {
       mat: material_code,
       rmfpID: rmfp_id ? parseInt(rmfp_id, 10) : null,
       cold: formattedDelayTime,
-      ptc_time: ptc_time, 
+      ptc_time: ptc_time,
       ColdOut: ColdOut,
       dest: Location,
       operator: operator,
@@ -280,13 +394,16 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
       weight_RM: weight_RM,
       tray_count: tray_count,
       rmm_line_name: rmm_line_name,
-      materials: processedMaterials.length > 0 ? processedMaterials : materials
+      materials: processedMaterials.length > 0 ? processedMaterials : materials,
     };
 
     console.log("Sending payload:", JSON.stringify(payload, null, 2));
 
     try {
-      const response = await axios.put(`${API_URL}/api/coldstorage/outcoldstorage`, payload);
+      const response = await axios.put(
+        `${API_URL}/api/coldstorage/outcoldstorage`,
+        payload
+      );
       if (response.status === 200) {
         console.log("✅ Data sent successfully:", response.data);
         setDataForPrint({
@@ -328,7 +445,7 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
           production,
           qccheck_cold,
           prepare_mor_night,
-          materials: materials
+          materials: materials,
         });
         setShowPrintModal(true);
         onSuccess();
@@ -351,161 +468,295 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
       <Dialog
         open={open}
         onClose={(e, reason) => {
-          if (reason === 'backdropClick') return;
+          if (reason === "backdropClick") return;
           onClose();
         }}
         fullWidth
         maxWidth="xs"
         sx={{
-          '@media print': {
-            width: 'auto',
-            maxWidth: 'none',
-            padding: '10px',
+          "@media print": {
+            width: "auto",
+            maxWidth: "none",
+            padding: "10px",
           },
         }}
       >
         <DialogContent>
-          <Typography variant="h6" style={{ fontSize: "18px", color: "#787878" }} mb={2}>
+          <Typography
+            variant="h6"
+            style={{ fontSize: "18px", color: "#787878" }}
+            mb={2}
+          >
             กรุณาตรวจสอบข้อมูลก่อนทำรายการ
           </Typography>
           <Divider sx={{ mb: 2 }} />
 
-          <Typography variant="subtitle1" style={{ fontSize: "16px", color: "#505050", marginBottom: "10px" }}>
+          <Typography
+            variant="subtitle1"
+            style={{ fontSize: "16px", color: "#505050", marginBottom: "10px" }}
+          >
             รายการวัตถุดิบในรถเข็น: {tro_id}
           </Typography>
 
-          <Box sx={{ mb: 2, maxHeight: 300, overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: '4px', p: 2 }}>
+          <Box
+            sx={{
+              mb: 2,
+              maxHeight: 300,
+              overflow: "auto",
+              border: "1px solid #e0e0e0",
+              borderRadius: "4px",
+              p: 2,
+            }}
+          >
             {materials && materials.length > 0 ? (
               materials.map((item, index) => (
-                <Box key={index} sx={{ mb: 3, pb: 2, borderBottom: index < materials.length - 1 ? '1px dashed #ccc' : 'none' }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1, color: '#2388d1' }}>
+                <Box
+                  key={index}
+                  sx={{
+                    mb: 3,
+                    pb: 2,
+                    borderBottom:
+                      index < materials.length - 1 ? "1px dashed #ccc" : "none",
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ fontWeight: "bold", mb: 1, color: "#2388d1" }}
+                  >
                     วัตถุดิบที่ {index + 1}
                   </Typography>
                   <Stack spacing={1}>
-                    <Typography color="rgba(0, 0, 0, 0.6)">Batch: {item.batch || '-'}</Typography>
-                    <Typography color="rgba(0, 0, 0, 0.6)">Material: {item.material_code}</Typography>
-                    <Typography color="rgba(0, 0, 0, 0.6)">รายชื่อวัตถุดิบ: {item.materialName}</Typography>
-                    <Typography color="rgba(0, 0, 0, 0.6)">Level EU: {item.levelEu || "-"}</Typography>
-                    <Typography color="rgba(0, 0, 0, 0.6)">สถานะวัตถุดิบ: {item.materialStatus}</Typography>
-                    <Typography color="rgba(0, 0, 0, 0.6)">เวลาเบิกจากห้องเย็นใหญ่: {formatThaiDateTime(item.withdraw_date || "-")}</Typography>
-                    <Typography color="rgba(0, 0, 0, 0.6)">เวลาต้มเสร็จ/อบเสร็จ: {formatThaiDateTime(item.cooked_date || "-")}</Typography>
-                    <Typography color="rgba(0, 0, 0, 0.6)">เวลาเตรียมเสร็จ: {formatThaiDateTime(item.rmit_date || "-")}</Typography>
-                    <Typography color="rgba(0, 0, 0, 0.6)">เวลาเข้าห้องเย็น (ครั้งที่ 1): {formatThaiDateTime(item.come_cold_date || "-")}</Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      Batch: {item.batch || "-"}
+                    </Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      Material: {item.material_code}
+                    </Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      รายชื่อวัตถุดิบ: {item.materialName}
+                    </Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      Level EU: {item.levelEu || "-"}
+                    </Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      สถานะวัตถุดิบ: {item.materialStatus}
+                    </Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      เวลาเบิกจากห้องเย็นใหญ่:{" "}
+                      {formatThaiDateTime(item.withdraw_date || "-")}
+                    </Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      เวลาต้มเสร็จ/อบเสร็จ:{" "}
+                      {formatThaiDateTime(item.cooked_date || "-")}
+                    </Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      เวลาเตรียมเสร็จ:{" "}
+                      {formatThaiDateTime(item.rmit_date || "-")}
+                    </Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      เวลาเข้าห้องเย็น (ครั้งที่ 1):{" "}
+                      {formatThaiDateTime(item.come_cold_date || "-")}
+                    </Typography>
                     {item.out_cold_date && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">ออกห้องเย็น (ครั้งที่ 1): {formatThaiDateTime(item.out_cold_date)}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        ออกห้องเย็น (ครั้งที่ 1):{" "}
+                        {formatThaiDateTime(item.out_cold_date)}
+                      </Typography>
                     )}
                     {item.come_cold_date && item.out_cold_date && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">DCS ครั้งที่ 1: {calculateDCS(item.come_cold_date, item.out_cold_date)}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        DCS ครั้งที่ 1:{" "}
+                        {calculateDCS(item.come_cold_date, item.out_cold_date)}
+                      </Typography>
                     )}
 
                     {item.come_cold_date_two && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">เวลาเข้าห้องเย็น (ครั้งที่ 2): {formatThaiDateTime(item.come_cold_date_two)}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        เวลาเข้าห้องเย็น (ครั้งที่ 2):{" "}
+                        {formatThaiDateTime(item.come_cold_date_two)}
+                      </Typography>
                     )}
                     {item.out_cold_date_two && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">ออกห้องเย็น (ครั้งที่ 2): {formatThaiDateTime(item.out_cold_date_two)}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        ออกห้องเย็น (ครั้งที่ 2):{" "}
+                        {formatThaiDateTime(item.out_cold_date_two)}
+                      </Typography>
                     )}
                     {item.come_cold_date_two && item.out_cold_date_two && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">DCS ครั้งที่ 2: {calculateDCS(item.come_cold_date_two, item.out_cold_date_two)}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        DCS ครั้งที่ 2:{" "}
+                        {calculateDCS(
+                          item.come_cold_date_two,
+                          item.out_cold_date_two
+                        )}
+                      </Typography>
                     )}
-
 
                     {item.come_cold_date_three && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">เวลาเข้าห้องเย็น (ครั้งที่ 3): {formatThaiDateTime(item.come_cold_date_three)}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        เวลาเข้าห้องเย็น (ครั้งที่ 3):{" "}
+                        {formatThaiDateTime(item.come_cold_date_three)}
+                      </Typography>
                     )}
                     {item.out_cold_date_three && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">ออกห้องเย็น (ครั้งที่ 3): {formatThaiDateTime(item.out_cold_date_three)}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        ออกห้องเย็น (ครั้งที่ 3):{" "}
+                        {formatThaiDateTime(item.out_cold_date_three)}
+                      </Typography>
                     )}
                     {item.come_cold_date_three && item.out_cold_date_three && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">DCS ครั้งที่ 3: {calculateDCS(item.come_cold_date_three, item.out_cold_date_three)}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        DCS ครั้งที่ 3:{" "}
+                        {calculateDCS(
+                          item.come_cold_date_three,
+                          item.out_cold_date_three
+                        )}
+                      </Typography>
                     )}
-
 
                     {/* แสดง DBS (เวลาเข้าห้องเย็นล่าสุด - เวลาต้มเสร็จ/อบเสร็จ) */}
                     {item.cooked_date && latestComeColdDate && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">DBS เตรียม - เข้า CS: {calculateDBS(item.standard_ptc, item.ptc_time)}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        DBS เตรียม - เข้า CS:{" "}
+                        {calculateDBS(item.standard_ptc, item.ptc_time)}
+                      </Typography>
                     )}
 
                     {/* ถ้ามีข้อมูล Delay Time สำหรับแต่ละรายการ ก็แสดงด้วย */}
-                    <Typography color="rgba(0, 0, 0, 0.6)">Qc check sensory: {item.qccheck || "-"}</Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      Qc check sensory: {item.qccheck || "-"}
+                    </Typography>
                     {/* <Typography color="rgba(0, 0, 0, 0.6)">ยอมรับพิเศษ Sensory: {item.sq_remark || "-"}</Typography> */}
 
                     {item.sq_remark && item.sq_acceptance === true && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">ยอมรับพิเศษ Sensory: {item.sq_remark}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        ยอมรับพิเศษ Sensory: {item.sq_remark}
+                      </Typography>
                     )}
                     {item.sq_remark && item.sq_acceptance !== true && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">หมายเหตุ Sensory: {item.sq_remark}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        หมายเหตุ Sensory: {item.sq_remark}
+                      </Typography>
                     )}
-                    <Typography color="rgba(0, 0, 0, 0.6)">Qc MD check: {item.mdcheck || "-"}</Typography>
-                    <Typography color="rgba(0, 0, 0, 0.6)">หมายเหตุ MD: {item.md_remark || "-"}</Typography>
-                    <Typography color="rgba(0, 0, 0, 0.6)">Qc defect check: {item.defectcheck || "-"}</Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      Qc MD check: {item.mdcheck || "-"}
+                    </Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      หมายเหตุ MD: {item.md_remark || "-"}
+                    </Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      Qc defect check: {item.defectcheck || "-"}
+                    </Typography>
                     {/* <Typography color="rgba(0, 0, 0, 0.6)">ยอมรับพิเศษ Defect: {item.defect_remark || "-"}</Typography> */}
                     {item.defect_remark && item.defect_acceptance === true && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">ยอมรับพิเศษ Defect: {item.defect_remark}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        ยอมรับพิเศษ Defect: {item.defect_remark}
+                      </Typography>
                     )}
                     {item.defect_remark && item.defect_acceptance !== true && (
-                      <Typography color="rgba(0, 0, 0, 0.6)">หมายเหตุ Defect: {item.defect_remark}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        หมายเหตุ Defect: {item.defect_remark}
+                      </Typography>
                     )}
-                    <Typography color="rgba(0, 0, 0, 0.6)">หมายเลขเครื่อง : {formatSpecialChars(item.machine_MD)}</Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      หมายเลขเครื่อง : {formatSpecialChars(item.machine_MD)}
+                    </Typography>
 
-
-                    {(item.qccheck_cold || item.receiver_qc_cold || item.approver) && (
+                    {(item.qccheck_cold ||
+                      item.receiver_qc_cold ||
+                      item.approver) && (
                       <>
-                        <Typography color="black">การตรวจสอบ Sensory ในห้องเย็น</Typography>
+                        <Typography color="black">
+                          การตรวจสอบ Sensory ในห้องเย็น
+                        </Typography>
                         {item.qccheck_cold && item.qccheck_cold !== "-" && (
-                          <Typography color="rgba(0, 0, 0, 0.6)">ผลการตรวจสอบ Sensory : {item.qccheck_cold}</Typography>
+                          <Typography color="rgba(0, 0, 0, 0.6)">
+                            ผลการตรวจสอบ Sensory : {item.qccheck_cold}
+                          </Typography>
                         )}
-                        {item.remark_rework_cold && item.remark_rework_cold !== "-" && (
-                          <Typography color="rgba(0, 0, 0, 0.6)">หมายเหตุไม่ผ่าน : {item.remark_rework_cold}</Typography>
-                        )}
-                        {item.receiver_qc_cold && item.receiver_qc_cold !== "-" && (
-                          <Typography color="rgba(0, 0, 0, 0.6)">ผู้ตรวจ : {item.receiver_qc_cold}</Typography>
-                        )}
+                        {item.remark_rework_cold &&
+                          item.remark_rework_cold !== "-" && (
+                            <Typography color="rgba(0, 0, 0, 0.6)">
+                              หมายเหตุไม่ผ่าน : {item.remark_rework_cold}
+                            </Typography>
+                          )}
+                        {item.receiver_qc_cold &&
+                          item.receiver_qc_cold !== "-" && (
+                            <Typography color="rgba(0, 0, 0, 0.6)">
+                              ผู้ตรวจ : {item.receiver_qc_cold}
+                            </Typography>
+                          )}
                         {item.approver && item.approver !== "-" && (
-                          <Typography color="rgba(0, 0, 0, 0.6)">ผู้อนุมัติ : {item.approver}</Typography>
+                          <Typography color="rgba(0, 0, 0, 0.6)">
+                            ผู้อนุมัติ : {item.approver}
+                          </Typography>
                         )}
                       </>
                     )}
 
                     {item.remark_rework && (
-
-                      <Typography color="rgba(0, 0, 0, 0.6)">หมายเหตุแก้ไข-บรรจุ  : {item.remark_rework}</Typography>
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        หมายเหตุแก้ไข-บรรจุ : {item.remark_rework}
+                      </Typography>
                     )}
 
                     {item.edit_rework && item.edit_rework !== "-" && (
                       <>
-                        <Typography color="black">วิธีการที่เคยใช้ในการแก้ไขวัตถุดิบ</Typography>
-                        <Typography color="rgba(0, 0, 0, 0.6)">ประวัติการแก้ไข : {item.edit_rework}</Typography>
+                        <Typography color="black">
+                          วิธีการที่เคยใช้ในการแก้ไขวัตถุดิบ
+                        </Typography>
+                        <Typography color="rgba(0, 0, 0, 0.6)">
+                          ประวัติการแก้ไข : {item.edit_rework}
+                        </Typography>
                       </>
                     )}
 
-                    {(item.first_prod || item.two_prod || item.name_edit_prod_two) && (
+                    {(item.first_prod ||
+                      item.two_prod ||
+                      item.name_edit_prod_two) && (
                       <>
-                        <Typography color="black">วัตถุดิบเคยเปลี่ยนแผนการผลิต</Typography>
+                        <Typography color="black">
+                          วัตถุดิบเคยเปลี่ยนแผนการผลิต
+                        </Typography>
 
                         {item.first_prod && (
-                          <Typography color="rgba(0, 0, 0, 0.6)">แผนการผลิต ครั้งที่ 1 : {item.first_prod}</Typography>
+                          <Typography color="rgba(0, 0, 0, 0.6)">
+                            แผนการผลิต ครั้งที่ 1 : {item.first_prod}
+                          </Typography>
                         )}
 
                         {item.two_prod && (
-                          <Typography color="rgba(0, 0, 0, 0.6)">แผนการผลิตใหม่ ครั้งที่ 2 : {item.two_prod}</Typography>
+                          <Typography color="rgba(0, 0, 0, 0.6)">
+                            แผนการผลิตใหม่ ครั้งที่ 2 : {item.two_prod}
+                          </Typography>
                         )}
 
                         {item.name_edit_prod_two && (
-                          <Typography color="rgba(0, 0, 0, 0.6)">ผู้อนุมัติแก้ไข ครั้งที่ 2 : {item.name_edit_prod_two}</Typography>
+                          <Typography color="rgba(0, 0, 0, 0.6)">
+                            ผู้อนุมัติแก้ไข ครั้งที่ 2 :{" "}
+                            {item.name_edit_prod_two}
+                          </Typography>
                         )}
 
                         {item.three_prod && (
-                          <Typography color="rgba(0, 0, 0, 0.6)">แผนการผลิตใหม่ ครั้งที่ 3 : {item.three_prod}</Typography>
+                          <Typography color="rgba(0, 0, 0, 0.6)">
+                            แผนการผลิตใหม่ ครั้งที่ 3 : {item.three_prod}
+                          </Typography>
                         )}
                         {item.name_edit_prod_three && (
-                          <Typography color="rgba(0, 0, 0, 0.6)">ผู้อนุมัติแก้ไข ครั้งที่ 3 : {item.name_edit_prod_three}</Typography>
+                          <Typography color="rgba(0, 0, 0, 0.6)">
+                            ผู้อนุมัติแก้ไข ครั้งที่ 3 :{" "}
+                            {item.name_edit_prod_three}
+                          </Typography>
                         )}
-
-
                       </>
                     )}
                     {/* {item.name_edit_prod && ( */}
-                    {item.prepare_mor_night && (<Typography color="rgba(0, 0, 0, 0.6)">เตรียมงานให้กะ : {item.prepare_mor_night}</Typography>)}
+                    {item.prepare_mor_night && (
+                      <Typography color="rgba(0, 0, 0, 0.6)">
+                        เตรียมงานให้กะ : {item.prepare_mor_night}
+                      </Typography>
+                    )}
 
                     {/* )} */}
                   </Stack>
@@ -514,37 +765,77 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
             ) : (
               <Box sx={{ mb: 2 }}>
                 <Stack spacing={1}>
-                  <Typography color="rgba(0, 0, 0, 0.6)">Batch: {batch}</Typography>
-                  <Typography color="rgba(0, 0, 0, 0.6)">Material: {material_code}</Typography>
-                  <Typography color="rgba(0, 0, 0, 0.6)">รายชื่อวัตถุดิบ: {materialName}</Typography>
-                  <Typography color="rgba(0, 0, 0, 0.6)">Level EU: {level_eu || "-"}</Typography>
-                  <Typography color="rgba(0, 0, 0, 0.6)">สถานะวัตถุดิบ: {rm_status}</Typography>
-                  <Typography color="rgba(0, 0, 0, 0.6)">เวลาต้มเสร็จ/อบเสร็จ: {formatThaiDateTime(cooked_date) || "-"}</Typography>
-                  <Typography color="rgba(0, 0, 0, 0.6)">เวลาเตรียมเสร็จ: {formatThaiDateTime(rmit_date || "-")}</Typography>
-                  <Typography color="rgba(0, 0, 0, 0.6)">เวลาเข้าห้องเย็น (ครั้งที่ 1): {formatThaiDateTime(latestComeColdDate || "-")}</Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    Batch: {batch}
+                  </Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    Material: {material_code}
+                  </Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    รายชื่อวัตถุดิบ: {materialName}
+                  </Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    Level EU: {level_eu || "-"}
+                  </Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    สถานะวัตถุดิบ: {rm_status}
+                  </Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    เวลาต้มเสร็จ/อบเสร็จ:{" "}
+                    {formatThaiDateTime(cooked_date) || "-"}
+                  </Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    เวลาเตรียมเสร็จ: {formatThaiDateTime(rmit_date || "-")}
+                  </Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    เวลาเข้าห้องเย็น (ครั้งที่ 1):{" "}
+                    {formatThaiDateTime(latestComeColdDate || "-")}
+                  </Typography>
                   {/* แสดง DBS (เวลาเข้าห้องเย็นล่าสุด - เวลาต้มเสร็จ/อบเสร็จ) */}
                   {cooked_date && latestComeColdDate && (
-                    <Typography color="rgba(0, 0, 0, 0.6)">DBS เตรียม - เข้า CS: {calculateDBS(standard_ptc, ptc_time)}</Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      DBS เตรียม - เข้า CS:{" "}
+                      {calculateDBS(standard_ptc, ptc_time)}
+                    </Typography>
                   )}
 
                   {/* ถ้ามีข้อมูล Delay Time สำหรับแต่ละรายการ ก็แสดงด้วย */}
-                  <Typography color="rgba(0, 0, 0, 0.6)">Qc check sensory: {qccheck || "-"}</Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    Qc check sensory: {qccheck || "-"}
+                  </Typography>
                   {sq_remark && sq_acceptance === true && (
-                    <Typography color="rgba(0, 0, 0, 0.6)">ยอมรับพิเศษ Sensory: {sq_remark}</Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      ยอมรับพิเศษ Sensory: {sq_remark}
+                    </Typography>
                   )}
                   {sq_remark && sq_acceptance !== true && (
-                    <Typography color="rgba(0, 0, 0, 0.6)">หมายเหตุ Sensory: {sq_remark}</Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      หมายเหตุ Sensory: {sq_remark}
+                    </Typography>
                   )}
-                  <Typography color="rgba(0, 0, 0, 0.6)">Qc MD check: {mdcheck || "-"}</Typography>
-                  <Typography color="rgba(0, 0, 0, 0.6)">หมายเหตุ MD: {md_remark || "-"}</Typography>
-                  <Typography color="rgba(0, 0, 0, 0.6)">Qc defect check: {defectcheck || "-"}</Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    Qc MD check: {mdcheck || "-"}
+                  </Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    หมายเหตุ MD: {md_remark || "-"}
+                  </Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    Qc defect check: {defectcheck || "-"}
+                  </Typography>
                   {defect_remark && defect_acceptance === true && (
-                    <Typography color="rgba(0, 0, 0, 0.6)">ยอมรับพิเศษ Defect: {defect_remark}</Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      ยอมรับพิเศษ Defect: {defect_remark}
+                    </Typography>
                   )}
                   {defect_remark && defect_acceptance !== true && (
-                    <Typography color="rgba(0, 0, 0, 0.6)">หมายเหตุ Defect: {defect_remark}</Typography>
+                    <Typography color="rgba(0, 0, 0, 0.6)">
+                      หมายเหตุ Defect: {defect_remark}
+                    </Typography>
                   )}
-                  <Typography color="rgba(0, 0, 0, 0.6)">หมายเลขเครื่อง : {machine_MD === "/" ? "-" : (machine_MD || "-")}</Typography>
+                  <Typography color="rgba(0, 0, 0, 0.6)">
+                    หมายเลขเครื่อง :{" "}
+                    {machine_MD === "/" ? "-" : machine_MD || "-"}
+                  </Typography>
                 </Stack>
               </Box>
             )}
@@ -553,18 +844,33 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
           <Divider sx={{ my: 2 }} />
 
           {/* ข้อมูลทั่วไปของรถเข็น */}
-          <Typography variant="subtitle1" style={{ fontSize: "16px", color: "#505050", marginBottom: "10px" }}>
+          <Typography
+            variant="subtitle1"
+            style={{ fontSize: "16px", color: "#505050", marginBottom: "10px" }}
+          >
             ข้อมูลทั่วไป
           </Typography>
 
           <Stack spacing={1}>
-            <Typography color="rgba(0, 0, 0, 0.6)">ป้ายทะเบียน: {tro_id}</Typography>
-            <Typography color="rgba(0, 0, 0, 0.6)">พื้นที่จอด: {slot_id}</Typography>
+            <Typography color="rgba(0, 0, 0, 0.6)">
+              ป้ายทะเบียน: {tro_id}
+            </Typography>
+            <Typography color="rgba(0, 0, 0, 0.6)">
+              พื้นที่จอด: {slot_id}
+            </Typography>
             {/* <Typography color="rgba(0, 0, 0, 0.6)">ประเภทการส่งออก: {ColdOut}</Typography> */}
-            <Typography color="rgba(0, 0, 0, 0.6)">สถานที่จัดส่ง: {Location}</Typography>
-            <Typography color="rgba(0, 0, 0, 0.6)">ไลน์ผลิต: {rmm_line_name || "-"}</Typography>
-            <Typography color="rgba(0, 0, 0, 0.6)">ผู้ดำเนินการ: {operator}</Typography>
-            <Typography color="rgba(0, 0, 0, 0.6)">สถานะรถเข็นในห้องเย็น: {rm_cold_status}</Typography>
+            <Typography color="rgba(0, 0, 0, 0.6)">
+              สถานที่จัดส่ง: {Location}
+            </Typography>
+            <Typography color="rgba(0, 0, 0, 0.6)">
+              ไลน์ผลิต: {rmm_line_name || "-"}
+            </Typography>
+            <Typography color="rgba(0, 0, 0, 0.6)">
+              ผู้ดำเนินการ: {operator}
+            </Typography>
+            <Typography color="rgba(0, 0, 0, 0.6)">
+              สถานะรถเข็นในห้องเย็น: {rm_cold_status}
+            </Typography>
             {/* {prepare_mor_night && prepare_mor_night !== "-" && (
             <Typography color="rgba(0, 0, 0, 0.6)">เตรียมกะ: {prepare_mor_night}</Typography>
             )} */}
@@ -581,8 +887,8 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
                 height: "50px",
                 margin: "5px",
                 backgroundColor: "#ff4444",
-                '@media print': {
-                  display: 'none',
+                "@media print": {
+                  display: "none",
                 },
               }}
             >
@@ -599,8 +905,8 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
                 marginBottom: "20px",
                 margin: "5px",
                 backgroundColor: "#2388d1",
-                '@media print': {
-                  display: 'none',
+                "@media print": {
+                  display: "none",
                 },
               }}
             >
@@ -639,7 +945,7 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
             remark_rework_cold,
             edit_rework,
             prepare_mor_night,
-            materials: materials
+            materials: materials,
           }}
         />
       )}
@@ -647,9 +953,6 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
     </>
   );
 };
-
-
-
 
 const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
   const [errorMessage, setErrorMessage] = useState("");
@@ -668,6 +971,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
   // State สำหรับ QR Scanner
   const [isCameraActive, setIsCameraActive] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const qrScannerRef = useRef(null);
   const scannerInstanceRef = useRef(null);
 
@@ -716,7 +1020,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
     production,
     qccheck_cold,
     prepare_mor_night,
-    materials = []
+    materials = [],
   } = data || {};
 
   // ฟังก์ชันตรวจสอบรหัส
@@ -739,12 +1043,15 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
     setScannedCode(value);
     setScanError("");
 
-    // ปิดกล้องเมื่อเริ่มพิมพ์
-    if (value.length > 0 && isCameraActive) {
+    // ไม่ปิดกล้องเมื่อ Scanner ยิงค่าเข้ามา (เพราะมันเกิดขึ้นเร็วมาก)
+    // ปิดกล้องเฉพาะเมื่อผู้ใช้พิมพ์เอง (เช็คจาก event type)
+    if (e.nativeEvent.inputType && isCameraActive) {
+      // มีการพิมพ์จริงๆ (ไม่ใช่ scanner)
       stopCameraScanner();
       setIsCameraActive(false);
     }
 
+    // Auto-submit เมื่อครบ 4 หลัก
     if (value.length === 4) {
       setTimeout(() => handleScanVerify(), 100);
     }
@@ -757,21 +1064,20 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
   };
 
   const handleClose = () => {
-  stopCameraScanner();
-  setShowScanDialog(true);
-  setIsVerified(false);
-  setScannedCode("");
-  setScanError("");
-  setIsCameraActive(true);
-  setIsScanning(false);
+    stopCameraScanner();
+    setShowScanDialog(true);
+    setIsVerified(false);
+    setScannedCode("");
+    setScanError("");
+    setIsCameraActive(true);
+    setIsScanning(false);
 
-  onClose();
-};
-
+    onClose();
+  };
 
   const fetchUserDataFromLocalStorage = () => {
     try {
-      const firstName = localStorage.getItem('first_name') || '';
+      const firstName = localStorage.getItem("first_name") || "";
       if (firstName) {
         setoperator(`${firstName}`.trim());
       }
@@ -780,102 +1086,296 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
     }
   };
 
-  // ฟังก์ชันเปิดกล้อง
-  const startCameraScanner = () => {
-    if (isScanning) return;
+  // เพิ่มฟังก์ชันนี้ก่อน checkCameraPermission
+  const loadHtml5QrcodeScript = () => {
+    return new Promise((resolve, reject) => {
+      // เช็คว่าโหลดไว้แล้วหรือยัง
+      if (window.Html5Qrcode) {
+        console.log("Html5Qrcode already loaded");
+        resolve();
+        return;
+      }
 
+      // เช็คว่ามี script tag อยู่แล้วหรือยัง
+      const existingScript = document.querySelector(
+        'script[src*="html5-qrcode"]'
+      );
+      if (existingScript) {
+        console.log("Script tag exists, waiting for load...");
+        existingScript.addEventListener("load", () => {
+          console.log("Html5Qrcode loaded from existing script");
+          resolve();
+        });
+        existingScript.addEventListener("error", reject);
+        return;
+      }
+
+      // สร้าง script tag ใหม่
+      console.log("Loading Html5Qrcode script...");
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+      script.async = true;
+
+      script.onload = () => {
+        console.log("Html5Qrcode script loaded successfully");
+        // รอสักครู่ให้แน่ใจว่า library พร้อมใช้งาน
+        setTimeout(() => {
+          if (window.Html5Qrcode) {
+            resolve();
+          } else {
+            reject(new Error("Html5Qrcode not available after script load"));
+          }
+        }, 100);
+      };
+
+      script.onerror = () => {
+        console.error("Failed to load Html5Qrcode script");
+        reject(new Error("ไม่สามารถโหลด QR Scanner Library ได้"));
+      };
+
+      document.head.appendChild(script);
+    });
+  };
+
+  const checkCameraPermission = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        return {
+          hasPermission: false,
+          error: "Browser ไม่รองรับการใช้กล้อง",
+        };
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+
+      stream.getTracks().forEach((track) => track.stop());
+
+      return { hasPermission: true, error: null };
+    } catch (error) {
+      console.error("Camera permission error:", error);
+
+      let errorMessage = "ไม่สามารถเข้าถึงกล้องได้";
+
+      if (
+        error.name === "NotAllowedError" ||
+        error.name === "PermissionDeniedError"
+      ) {
+        errorMessage = "กรุณาอนุญาตให้เข้าถึงกล้องในการตั้งค่า Browser";
+      } else if (
+        error.name === "NotFoundError" ||
+        error.name === "DevicesNotFoundError"
+      ) {
+        errorMessage = "ไม่พบกล้องในอุปกรณ์";
+      } else if (
+        error.name === "NotReadableError" ||
+        error.name === "TrackStartError"
+      ) {
+        errorMessage = "กล้องถูกใช้งานโดยแอปอื่นอยู่";
+      } else if (error.name === "OverconstrainedError") {
+        errorMessage = "ไม่สามารถเข้าถึงกล้องหลังได้";
+      } else if (error.name === "SecurityError") {
+        errorMessage = "ต้องใช้ HTTPS เพื่อเข้าถึงกล้อง";
+      }
+
+      return { hasPermission: false, error: errorMessage };
+    }
+  };
+
+  // ฟังก์ชันเปิดกล้อง
+  const startCameraScanner = async () => {
+     // ✅ เพิ่มการเช็คให้เข้มงวดขึ้น
+    if (isScanning || scannerInstanceRef.current) {
+    console.log('Camera already active, skipping...');
+    return;
+  }
+
+    console.log("Starting camera scanner...");
     setIsScanning(true);
     setIsCameraActive(true);
     setScanError("");
 
-    setTimeout(() => {
-      if (!qrScannerRef.current) return;
+    try {
+      // 1. โหลด Html5Qrcode library ก่อน
+      console.log("Step 1: Loading Html5Qrcode library...");
+      await loadHtml5QrcodeScript();
+      console.log("✓ Library loaded");
 
-      try {
-        const Html5Qrcode = window.Html5Qrcode;
-
-        if (!Html5Qrcode) {
-          setScanError("ไม่สามารถโหลด QR Scanner ได้ กรุณาพิมพ์เอง");
-          setIsScanning(false);
-          return;
-        }
-
-        scannerInstanceRef.current = new Html5Qrcode("qr-reader");
-
-        scannerInstanceRef.current.start(
-          { facingMode: "environment" },   // เปิดกล้องหลังทันที
-          {
-            fps: 10,
-            qrbox: 250
-          },
-          (decodedText) => {
-            const last4 = decodedText.slice(-4).replace(/\D/g, "");
-
-            if (last4.length === 4) {
-              setScannedCode(last4);
-
-              if (last4 === tro_id.slice(-4)) {
-                setIsVerified(true);
-                setShowScanDialog(false);
-                stopCameraScanner();
-              } else {
-                setScanError(`ป้ายทะเบียนไม่ตรงกับรถเข็น ${tro_id}`);
-                setScannedCode("");
-              }
-            }
-          },
-          (error) => { }
-        );
-      } catch (e) {
-        console.error(e);
-        setScanError("ไม่สามารถเปิดกล้องได้ กรุณาพิมพ์เอง");
-        setIsScanning(false);
+      // 2. เช็ค permission
+      console.log("Step 2: Checking camera permission...");
+      const permissionCheck = await checkCameraPermission();
+      if (!permissionCheck.hasPermission) {
+        throw new Error(permissionCheck.error);
       }
-    }, 200);
+      console.log("✓ Permission granted");
+
+      // 3. ตรวจสอบว่ามี element
+      console.log("Step 3: Checking element...");
+      if (!qrScannerRef.current) {
+        throw new Error("ไม่พบพื้นที่แสดงกล้อง");
+      }
+      console.log("✓ Element found");
+
+      // 4. ปิด scanner เก่า (ถ้ามี)
+      console.log("Step 4: Cleaning old scanner...");
+      if (scannerInstanceRef.current) {
+        try {
+          await scannerInstanceRef.current.stop();
+          await scannerInstanceRef.current.clear();
+        } catch (e) {
+          console.warn("Error clearing old scanner:", e);
+        }
+        scannerInstanceRef.current = null;
+      }
+      console.log("✓ Old scanner cleaned");
+
+      // 5. สร้าง scanner instance ใหม่
+      console.log("Step 5: Creating scanner instance...");
+      const Html5Qrcode = window.Html5Qrcode;
+      if (!Html5Qrcode) {
+        throw new Error("Html5Qrcode is not available");
+      }
+      scannerInstanceRef.current = new Html5Qrcode("qr-reader");
+      console.log("✓ Scanner instance created");
+
+      // 6. เริ่มต้น scanner
+      console.log("Step 6: Starting camera...");
+      await scannerInstanceRef.current.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
+        (decodedText) => {
+          console.log("QR Code detected:", decodedText);
+          const last4 = decodedText.slice(-4).replace(/\D/g, "");
+
+          if (last4.length === 4) {
+            setScannedCode(last4);
+
+            if (last4 === tro_id.slice(-4)) {
+              setIsVerified(true);
+              setShowScanDialog(false);
+              stopCameraScanner();
+            } else {
+              setScanError(`ป้ายทะเบียนไม่ตรงกับรถเข็น ${tro_id}`);
+              setScannedCode("");
+
+              setTimeout(() => {
+                setScanError("");
+              }, 3000);
+            }
+          }
+        },
+        (errorMessage) => {
+          // Ignore scanning errors
+        }
+      );
+
+      console.log("✅ Camera started successfully!");
+    } catch (error) {
+      console.error("❌ Error starting camera:", error);
+      console.error("Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+
+      let errorMsg = error.message || "ไม่สามารถเปิดกล้องได้";
+
+      if (errorMsg.includes("HTTPS")) {
+        errorMsg += " (ต้องใช้ HTTPS หรือ localhost)";
+      } else if (
+        errorMsg.includes("permission") ||
+        errorMsg.includes("อนุญาต")
+      ) {
+        errorMsg += " (ไปที่การตั้งค่า Browser)";
+      } else if (errorMsg.includes("Library") || errorMsg.includes("โหลด")) {
+        errorMsg = "ไม่สามารถโหลด QR Scanner ได้ กรุณา Reload หน้าเว็บ";
+      }
+
+      setScanError(errorMsg);
+      setIsScanning(false);
+      setIsCameraActive(false);
+
+      // Focus ที่ input แทน
+      setTimeout(() => {
+        if (scanInputRef.current) {
+          scanInputRef.current.focus();
+        }
+      }, 500);
+    }
   };
 
-
   // ฟังก์ชันปิดกล้อง
-  const stopCameraScanner = () => {
+  const stopCameraScanner = async () => {
+    console.log("Stopping camera scanner...");
+
     if (scannerInstanceRef.current) {
       try {
-        scannerInstanceRef.current.clear().catch(error => {
-          console.error("Error clearing scanner:", error);
-        });
+        await scannerInstanceRef.current.stop();
+        await scannerInstanceRef.current.clear();
+        console.log("Camera stopped successfully");
       } catch (error) {
-        console.error("Error stopping scanner:", error);
+        console.warn("Error stopping scanner:", error);
       }
       scannerInstanceRef.current = null;
     }
+
     setIsScanning(false);
+    setIsCameraActive(false);
   };
 
   // ฟังก์ชันเปิดกล้องใหม่
-  const restartCamera = () => {
+  const restartCamera = async () => {
+    console.log("Restarting camera...");
     setScannedCode("");
     setScanError("");
-    startCameraScanner();
+    await stopCameraScanner();
+
+    // รอสักครู่ก่อนเปิดใหม่
+    setTimeout(() => {
+      startCameraScanner();
+    }, 500);
   };
 
   // useEffect - จัดการเมื่อเปิด dialog
   useEffect(() => {
     if (open) {
+      console.log("Dialog opened, initializing scanner...");
       setLocation("");
       setoperator("");
       setShowScanDialog(true);
       setIsVerified(false);
       setScannedCode("");
       setScanError("");
-      setIsCameraActive(true);
+      setIsCameraActive(false);
       setIsScanning(false);
       fetchUserDataFromLocalStorage();
 
-    }
+      // เริ่มกล้องหลังจาก dialog เปิดแล้ว
+      // const timer = setTimeout(() => {
+      //   startCameraScanner();
+      // }, 300);
 
+      // return () => {
+      //   clearTimeout(timer);
+      //   stopCameraScanner();
+      // };
+    } else {
+      stopCameraScanner();
+    }
+  }, [open]);
+
+  // เพิ่ม useEffect นี้หลัง useEffect ที่มีอยู่
+  useEffect(() => {
     return () => {
+      console.log("Component unmounting, cleaning up...");
       stopCameraScanner();
     };
-  }, [open]);
+  }, []);
 
   useEffect(() => {
     if (mat) {
@@ -886,7 +1386,9 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
 
   const fetchMaterialName = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/fetchRawMatName`, { params: { mat } });
+      const response = await axios.get(`${API_URL}/api/fetchRawMatName`, {
+        params: { mat },
+      });
       if (response.data.success) {
         setMaterialName(response.data.data[0]?.mat_name || "ไม่พบชื่อวัตถุดิบ");
       } else {
@@ -899,7 +1401,9 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
 
   const fetchProduction = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/fetchProduction`, { params: { mat } });
+      const response = await axios.get(`${API_URL}/api/fetchProduction`, {
+        params: { mat },
+      });
       if (response.data.success) {
         setProduction(response.data.data);
       } else {
@@ -923,7 +1427,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
       let processedMaterials = materials;
 
       if (materials && materials.length > 0) {
-        processedMaterials = materials.map(item => {
+        processedMaterials = materials.map((item) => {
           if (item.formattedDelayTime !== undefined) {
             return item;
           }
@@ -950,7 +1454,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
     const now = new Date();
     const diffHours = (now - coldDate) / (1000 * 60 * 60);
 
-    return Number((diffHours).toFixed(2));
+    return Number(diffHours.toFixed(2));
   };
 
   const formatSpecialChars = (value) => {
@@ -971,14 +1475,14 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
 
     try {
       const utcDate = new Date(utcDateTimeStr);
-      return utcDate.toLocaleString('th-TH', {
-        timeZone: 'Asia/Bangkok',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
+      return utcDate.toLocaleString("th-TH", {
+        timeZone: "Asia/Bangkok",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
       });
     } catch (error) {
       console.error("Error formatting date:", error);
@@ -1012,12 +1516,14 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
     if (!standardPtc || !ptcTime) return "-";
 
     try {
-      const standardParts = standardPtc.toString().split('.');
-      const ptcParts = ptcTime.toString().split('.');
+      const standardParts = standardPtc.toString().split(".");
+      const ptcParts = ptcTime.toString().split(".");
 
-      const standardMinutes = parseInt(standardParts[0]) * 60 +
+      const standardMinutes =
+        parseInt(standardParts[0]) * 60 +
         (standardParts.length > 1 ? parseInt(standardParts[1]) : 0);
-      const ptcMinutes = parseInt(ptcParts[0]) * 60 +
+      const ptcMinutes =
+        parseInt(ptcParts[0]) * 60 +
         (ptcParts.length > 1 ? parseInt(ptcParts[1]) : 0);
 
       let diffMinutes = standardMinutes - ptcMinutes;
@@ -1043,7 +1549,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
       <Dialog
         open={open && showScanDialog}
         onClose={(e, reason) => {
-          if (reason === 'backdropClick') return;
+          if (reason === "backdropClick") return;
           handleClose();
         }}
         fullWidth
@@ -1052,61 +1558,102 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
           onEntered: () => {
             // เปิดกล้องทันทีหลัง modal แสดงเสร็จจริง
             startCameraScanner();
-          }
+          },
         }}
       >
-
         <DialogContent>
           <Stack spacing={3} alignItems="center" sx={{ py: 2 }}>
             {/* Icon */}
-            <Box sx={{
-              fontSize: 60,
-              color: scannedCode.length === 4 ? "#4caf50" : "#2388d1",
-              transition: "color 0.3s"
-            }}>
+            <Box
+              sx={{
+                fontSize: 60,
+                color: scannedCode.length === 4 ? "#4caf50" : "#2388d1",
+                transition: "color 0.3s",
+              }}
+            >
               <QrCodeScannerIcon sx={{ fontSize: "inherit" }} />
             </Box>
 
             {/* Header */}
-            <Typography variant="h6" align="center" style={{ color: "#787878" }}>
+            <Typography
+              variant="h6"
+              align="center"
+              style={{ color: "#787878" }}
+            >
               สแกนป้ายทะเบียนรถเข็น
             </Typography>
 
             {/* Trolley ID */}
-            <Typography variant="body2" align="center" style={{ color: "#787878" }}>
+            <Typography
+              variant="body2"
+              align="center"
+              style={{ color: "#787878" }}
+            >
               รถเข็น: <strong>{tro_id}</strong>
             </Typography>
 
             {/* พื้นที่แสดงกล้อง */}
-            <Box sx={{ width: '100%', maxWidth: 400 }}>
-              <div
-                id="qr-reader"
-                ref={qrScannerRef}
-                style={{
-                  width: '100%',
-                  display: isCameraActive ? 'block' : 'none'
-                }}
-              ></div>
-
-              {!isCameraActive && !isScanning && (
-                <Box sx={{
-                  textAlign: 'center',
-                  py: 2,
-                  backgroundColor: '#f5f5f5',
-                  borderRadius: 2
-                }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    กล้องปิดอยู่
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    onClick={restartCamera}
-                    startIcon={<CameraAltIcon />}
-                    size="small"
+            {/* ในส่วน DialogContent ของ Dialog แรก */}
+            <Box sx={{ width: "100%", maxWidth: 400 }}>
+              {isLoadingLibrary ? (
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: 300,
+                    backgroundColor: "#f5f5f5",
+                    borderRadius: 2,
+                  }}
+                >
+                  <CircularProgress size={50} />
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 2 }}
                   >
-                    เปิดกล้องใหม่
-                  </Button>
+                    กำลังโหลด QR Scanner...
+                  </Typography>
                 </Box>
+              ) : (
+                <>
+                  <div
+                    id="qr-reader"
+                    ref={qrScannerRef}
+                    style={{
+                      width: "100%",
+                      display: isCameraActive ? "block" : "none",
+                    }}
+                  ></div>
+
+                  {!isCameraActive && !isScanning && (
+                    <Box
+                      sx={{
+                        textAlign: "center",
+                        py: 2,
+                        backgroundColor: "#f5f5f5",
+                        borderRadius: 2,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 1 }}
+                      >
+                        กล้องปิดอยู่
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        onClick={restartCamera}
+                        startIcon={<CameraAltIcon />}
+                        size="small"
+                      >
+                        เปิดกล้องใหม่
+                      </Button>
+                    </Box>
+                  )}
+                </>
               )}
             </Box>
 
@@ -1115,30 +1662,48 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
               <TextField
                 inputRef={scanInputRef}
                 fullWidth
-                label="หรือพิมพ์เลข 4 หลักท้าย"
+                label="หรือพิมพ์เลข 4 หลักท้าย / ใช้ Scanner"
                 value={scannedCode}
                 onChange={handleScanInputChange}
                 onKeyPress={handleScanKeyPress}
                 placeholder="0000"
                 inputProps={{
                   maxLength: 4,
+                  inputMode: "numeric",
+                  pattern: "[0-9]*",
                   style: {
                     fontSize: 24,
                     textAlign: "center",
-                    letterSpacing: 8
-                  }
+                    letterSpacing: 8,
+                  },
                 }}
                 error={!!scanError}
-                onFocus={() => {
-                  if (isCameraActive) {
-                    stopCameraScanner();
-                    setIsCameraActive(false);
-                  }
+                onFocus={(e) => {
+                  // ไม่ทำอะไรเมื่อ focus - ให้ scanner ยิงค่าได้
+                  console.log(
+                    "Input focused - ready for scanner or manual input"
+                  );
                 }}
+                onBlur={(e) => {
+  // ✅ เพิ่มการเช็ค scannerInstanceRef
+  if (!scannedCode && !isCameraActive && !isScanning && !scannerInstanceRef.current) {
+    setTimeout(() => {
+      startCameraScanner();
+    }, 500);
+  }
+}}
+                autoComplete="off"
               />
 
               {/* Progress Dots */}
-              <Box sx={{ display: "flex", justifyContent: "center", gap: 1, mt: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: 1,
+                  mt: 2,
+                }}
+              >
                 {[1, 2, 3, 4].map((dot) => (
                   <Box
                     key={dot}
@@ -1146,8 +1711,9 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                       width: 12,
                       height: 12,
                       borderRadius: "50%",
-                      backgroundColor: scannedCode.length >= dot ? "#2388d1" : "#e0e0e0",
-                      transition: "background-color 0.3s"
+                      backgroundColor:
+                        scannedCode.length >= dot ? "#2388d1" : "#e0e0e0",
+                      transition: "background-color 0.3s",
                     }}
                   />
                 ))}
@@ -1162,7 +1728,11 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
             )}
 
             {/* Helper Text */}
-            <Typography variant="caption" style={{ color: "#999" }} align="center">
+            <Typography
+              variant="caption"
+              style={{ color: "#999" }}
+              align="center"
+            >
               สแกน QR Code หรือพิมพ์เลข 4 หลักท้ายของป้ายทะเบียน
             </Typography>
 
@@ -1175,7 +1745,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                 fullWidth
                 sx={{
                   color: "#E74A3B",
-                  borderColor: "#E74A3B"
+                  borderColor: "#E74A3B",
                 }}
               >
                 ยกเลิก
@@ -1197,12 +1767,21 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
       </Dialog>
 
       {/* Dialog ที่สอง - ข้อมูลการส่งออก */}
-      <Dialog open={open && !showScanDialog && isVerified} onClose={(e, reason) => {
-        if (reason === 'backdropClick') return;
-        onClose();
-      }} fullWidth maxWidth="md">
+      <Dialog
+        open={open && !showScanDialog && isVerified}
+        onClose={(e, reason) => {
+          if (reason === "backdropClick") return;
+          onClose();
+        }}
+        fullWidth
+        maxWidth="md"
+      >
         <DialogContent>
-          <Typography variant="h6" style={{ fontSize: "18px", color: "#787878" }} mb={2}>
+          <Typography
+            variant="h6"
+            style={{ fontSize: "18px", color: "#787878" }}
+            mb={2}
+          >
             กรุณาระบุข้อมูลในการส่งออก
           </Typography>
 
@@ -1215,7 +1794,10 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
           <Stack spacing={2}>
             <Divider />
 
-            <Typography variant="h6" style={{ fontSize: "16px", color: "#505050" }}>
+            <Typography
+              variant="h6"
+              style={{ fontSize: "16px", color: "#505050" }}
+            >
               รายการวัตถุดิบในรถเข็น: {tro_id}
             </Typography>
 
@@ -1255,28 +1837,43 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                   {materials && materials.length > 0 ? (
                     materials.map((item, index) => (
                       <TableRow key={index}>
-                        <TableCell>{item.batch || '-'}</TableCell>
+                        <TableCell>{item.batch || "-"}</TableCell>
                         <TableCell>{item.material_code}</TableCell>
                         <TableCell>{item.materialName}</TableCell>
                         <TableCell>{item.levelEu || "-"}</TableCell>
                         <TableCell>{item.materialStatus}</TableCell>
-                        <TableCell>{formatThaiDateTime(item.withdraw_date) || "-"}</TableCell>
-                        <TableCell>{formatThaiDateTime(item.cooked_date) || "-"}</TableCell>
-                        <TableCell>{formatThaiDateTime(item.rmit_date) || "-"}</TableCell>
-                        <TableCell>{formatThaiDateTime(item.come_cold_date) || "-"}</TableCell>
-                        <TableCell>{calculateDBS(item.standard_ptc, item.ptc_time) || "-"}</TableCell>
+                        <TableCell>
+                          {formatThaiDateTime(item.withdraw_date) || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {formatThaiDateTime(item.cooked_date) || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {formatThaiDateTime(item.rmit_date) || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {formatThaiDateTime(item.come_cold_date) || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {calculateDBS(item.standard_ptc, item.ptc_time) ||
+                            "-"}
+                        </TableCell>
                         <TableCell>{item.qccheck || "-"}</TableCell>
                         <TableCell>{item.sq_remark || "-"}</TableCell>
                         <TableCell>{item.mdcheck || "-"}</TableCell>
                         <TableCell>{item.md_remark || "-"}</TableCell>
                         <TableCell>{item.defectcheck || "-"}</TableCell>
                         <TableCell>{item.defect_remark || "-"}</TableCell>
-                        <TableCell>{formatSpecialChars(item.machine_MD) || "-"}</TableCell>
+                        <TableCell>
+                          {formatSpecialChars(item.machine_MD) || "-"}
+                        </TableCell>
                         <TableCell>{item.first_prod || "-"}</TableCell>
                         <TableCell>{item.two_prod || "-"}</TableCell>
                         <TableCell>{item.name_edit_prod_two || "-"}</TableCell>
                         <TableCell>{item.three_prod || "-"}</TableCell>
-                        <TableCell>{item.name_edit_prod_three || "-"}</TableCell>
+                        <TableCell>
+                          {item.name_edit_prod_three || "-"}
+                        </TableCell>
                         <TableCell>{item.qccheck_cold || "-"}</TableCell>
                         <TableCell>{item.remark_rework_cold || "-"}</TableCell>
                         <TableCell>{item.remark_rework || "-"}</TableCell>
@@ -1290,11 +1887,21 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                       <TableCell>{materialName}</TableCell>
                       <TableCell>{level_eu || "-"}</TableCell>
                       <TableCell>{rm_status}</TableCell>
-                      <TableCell>{formatThaiDateTime(withdraw_date || "-")}</TableCell>
-                      <TableCell>{formatThaiDateTime(cooked_date || "-")}</TableCell>
-                      <TableCell>{formatThaiDateTime(rmit_date || "-")}</TableCell>
-                      <TableCell>{formatThaiDateTime(latestComeColdDate || "-")}</TableCell>
-                      <TableCell>{calculateDBS(standard_ptc, ptc_time)}</TableCell>
+                      <TableCell>
+                        {formatThaiDateTime(withdraw_date || "-")}
+                      </TableCell>
+                      <TableCell>
+                        {formatThaiDateTime(cooked_date || "-")}
+                      </TableCell>
+                      <TableCell>
+                        {formatThaiDateTime(rmit_date || "-")}
+                      </TableCell>
+                      <TableCell>
+                        {formatThaiDateTime(latestComeColdDate || "-")}
+                      </TableCell>
+                      <TableCell>
+                        {calculateDBS(standard_ptc, ptc_time)}
+                      </TableCell>
                       <TableCell>{qccheck || "-"}</TableCell>
                       <TableCell>{sq_remark || "-"}</TableCell>
                       <TableCell>{mdcheck || "-"}</TableCell>
@@ -1305,7 +1912,9 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                       <TableCell>{remark_rework_cold || "-"}</TableCell>
                       <TableCell>{edit_rework || "-"}</TableCell>
                       <TableCell>{qccheck_cold || "-"}</TableCell>
-                      <TableCell>{formatSpecialChars(machine_MD) || "-"}</TableCell>
+                      <TableCell>
+                        {formatSpecialChars(machine_MD) || "-"}
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -1313,94 +1922,156 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
             </TableContainer>
 
             <Divider />
-            <Typography color="rgba(0, 0, 0, 0.6)">เลขรถเข็น: {tro_id}</Typography>
-            <Typography color="rgba(0, 0, 0, 0.6)">สถานะรถเข็นในห้องเย็น: {rm_cold_status}</Typography>
-            <Typography color="rgba(0, 0, 0, 0.6)">ไลน์ผลิต: {rmm_line_name || "-"}</Typography>
+            <Typography color="rgba(0, 0, 0, 0.6)">
+              เลขรถเข็น: {tro_id}
+            </Typography>
+            <Typography color="rgba(0, 0, 0, 0.6)">
+              สถานะรถเข็นในห้องเย็น: {rm_cold_status}
+            </Typography>
+            <Typography color="rgba(0, 0, 0, 0.6)">
+              ไลน์ผลิต: {rmm_line_name || "-"}
+            </Typography>
             <Divider />
 
-            <Box sx={{
-              paddingLeft: "12px",
-              border: showLocationError ? '2px solid red' : 'none',
-              borderRadius: showLocationError ? '4px' : '0',
-              padding: showLocationError ? '8px' : '0 0 0 12px',
-              transition: 'all 0.3s ease'
-            }}>
-              <Typography style={{ color: "#666", marginRight: "16px" }}>สถานที่จัดส่ง</Typography>
-              <RadioGroup row name="location" value={Location} onChange={(e) => {
-                handleLocation(e);
-                setShowLocationError(false);
-              }}>
+            <Box
+              sx={{
+                paddingLeft: "12px",
+                border: showLocationError ? "2px solid red" : "none",
+                borderRadius: showLocationError ? "4px" : "0",
+                padding: showLocationError ? "8px" : "0 0 0 12px",
+                transition: "all 0.3s ease",
+              }}
+            >
+              <Typography style={{ color: "#666", marginRight: "16px" }}>
+                สถานที่จัดส่ง
+              </Typography>
+              <RadioGroup
+                row
+                name="location"
+                value={Location}
+                onChange={(e) => {
+                  handleLocation(e);
+                  setShowLocationError(false);
+                }}
+              >
                 {["เหลือจากไลน์ผลิต", "QcCheck"].includes(rm_status) && (
-                  <Box sx={{ backgroundColor: '#09af00ff', borderRadius: '4px', padding: '4px 8px', marginRight: '20px' }}>
+                  <Box
+                    sx={{
+                      backgroundColor: "#09af00ff",
+                      borderRadius: "4px",
+                      padding: "4px 8px",
+                      marginRight: "20px",
+                    }}
+                  >
                     <FormControlLabel
                       value="บรรจุ"
                       control={
                         <Radio
                           sx={{
                             color: "#2196f3",
-                            '&.Mui-checked': { color: "#1976d2" },
+                            "&.Mui-checked": { color: "#1976d2" },
                           }}
                         />
                       }
                       label={
                         <Box display="flex" alignItems="center" gap={0.5}>
-                          <Typography sx={{ color: "#333", fontWeight: 500 }}>บรรจุ</Typography>
+                          <Typography sx={{ color: "#333", fontWeight: 500 }}>
+                            บรรจุ
+                          </Typography>
                         </Box>
                       }
                     />
                   </Box>
                 )}
 
-                {["QcCheck รอกลับมาเตรียม", "รอ Qc", "QcCheck รอ MD", "รอกลับมาเตรียม"].includes(rm_status) && (
-                  <Box sx={{ backgroundColor: '#ff0000ff', borderRadius: '4px', padding: '4px 8px' }}>
+                {[
+                  "QcCheck รอกลับมาเตรียม",
+                  "รอ Qc",
+                  "QcCheck รอ MD",
+                  "รอกลับมาเตรียม",
+                ].includes(rm_status) && (
+                  <Box
+                    sx={{
+                      backgroundColor: "#ff0000ff",
+                      borderRadius: "4px",
+                      padding: "4px 8px",
+                    }}
+                  >
                     <Box display="flex" alignItems="center" gap={0.5}>
-                      <Typography sx={{ color: "#ffffffff", fontWeight: 500 }}>ไม่สามารถจัดส่งไปบรรจุได้</Typography>
+                      <Typography sx={{ color: "#ffffffff", fontWeight: 500 }}>
+                        ไม่สามารถจัดส่งไปบรรจุได้
+                      </Typography>
                     </Box>
                   </Box>
                 )}
 
-                {["รอแก้ไข"].includes(rm_status) && ["เหลือจากไลน์ผลิต", "วัตถุดิบตรง"].includes(rm_cold_status) && remark_rework_cold === null && (
-                  <Box sx={{ backgroundColor: '#ff0000ff', borderRadius: '4px', padding: '4px 8px' }}>
-                    <FormControlLabel
-                      value="จุดเตรียม"
-                      control={
-                        <Radio
-                          sx={{
-                            color
-                              : "#2196f3",
-                            '&.Mui-checked': { color: "#1976d2" },
-                          }}
-                        />
-                      }
-                      label={
-                        <Box display="flex" alignItems="center" gap={0.5}>
-                          <Typography sx={{ color: "#ffffffff", fontWeight: 500 }}>จุดเตรียม</Typography>
-                        </Box>
-                      }
-                    />
-                  </Box>
-                )}
+                {["รอแก้ไข"].includes(rm_status) &&
+                  ["เหลือจากไลน์ผลิต", "วัตถุดิบตรง"].includes(
+                    rm_cold_status
+                  ) &&
+                  remark_rework_cold === null && (
+                    <Box
+                      sx={{
+                        backgroundColor: "#ff0000ff",
+                        borderRadius: "4px",
+                        padding: "4px 8px",
+                      }}
+                    >
+                      <FormControlLabel
+                        value="จุดเตรียม"
+                        control={
+                          <Radio
+                            sx={{
+                              color: "#2196f3",
+                              "&.Mui-checked": { color: "#1976d2" },
+                            }}
+                          />
+                        }
+                        label={
+                          <Box display="flex" alignItems="center" gap={0.5}>
+                            <Typography
+                              sx={{ color: "#ffffffff", fontWeight: 500 }}
+                            >
+                              จุดเตรียม
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </Box>
+                  )}
 
-                {["รอแก้ไข"].includes(rm_status) && ["เหลือจากไลน์ผลิต", "วัตถุดิบตรง"].includes(rm_cold_status) && remark_rework_cold !== null && (
-                  <Box sx={{ backgroundColor: '#09af00ff', borderRadius: '4px', padding: '4px 8px' }}>
-                    <FormControlLabel
-                      value="บรรจุ"
-                      control={
-                        <Radio
-                          sx={{
-                            color: "#2196f3",
-                            '&.Mui-checked': { color: "#1976d2" },
-                          }}
-                        />
-                      }
-                      label={
-                        <Box display="flex" alignItems="center" gap={0.5}>
-                          <Typography sx={{ color: "#333", fontWeight: 500 }}>บรรจุ</Typography>
-                        </Box>
-                      }
-                    />
-                  </Box>
-                )}
+                {["รอแก้ไข"].includes(rm_status) &&
+                  ["เหลือจากไลน์ผลิต", "วัตถุดิบตรง"].includes(
+                    rm_cold_status
+                  ) &&
+                  remark_rework_cold !== null && (
+                    <Box
+                      sx={{
+                        backgroundColor: "#09af00ff",
+                        borderRadius: "4px",
+                        padding: "4px 8px",
+                      }}
+                    >
+                      <FormControlLabel
+                        value="บรรจุ"
+                        control={
+                          <Radio
+                            sx={{
+                              color: "#2196f3",
+                              "&.Mui-checked": { color: "#1976d2" },
+                            }}
+                          />
+                        }
+                        label={
+                          <Box display="flex" alignItems="center" gap={0.5}>
+                            <Typography sx={{ color: "#333", fontWeight: 500 }}>
+                              บรรจุ
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </Box>
+                  )}
               </RadioGroup>
             </Box>
 
@@ -1424,10 +2095,10 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                 sx={{
                   color: "#E74A3B",
                   borderColor: "#E74A3B",
-                  '&:hover': {
+                  "&:hover": {
                     borderColor: "#C0392B",
-                    backgroundColor: "rgba(231, 74, 59, 0.04)"
-                  }
+                    backgroundColor: "rgba(231, 74, 59, 0.04)",
+                  },
                 }}
               >
                 ยกเลิก
@@ -1438,9 +2109,9 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                 onClick={handleConfirm}
                 sx={{
                   backgroundColor: "#41a2e6",
-                  '&:hover': {
-                    backgroundColor: "#2196f3"
-                  }
+                  "&:hover": {
+                    backgroundColor: "#2196f3",
+                  },
                 }}
               >
                 ยืนยัน
@@ -1454,62 +2125,62 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
       {isConfirmProdOpen && (
         <QcCheck
           open={isConfirmProdOpen}
-    onClose={() => {
-      setIsConfirmProdOpen(false);
-      showModal();
-    }}
-    onSuccess={() => {
-      setIsConfirmProdOpen(false);
-      onSuccess();
-    }}
-    material_code={mat}
-    materialName={materialName}
-    ptc_time={ptc_time}
-    standard_ptc={standard_ptc}
-    cold={cold}
-    rm_cold_status={rm_cold_status}
-    rm_status={rm_status}
-    ComeColdDateTime={ComeColdDateTime}
-    slot_id={slot_id}
-    tro_id={tro_id}
-    batch={batch}
-    rmfp_id={rmfp_id}
-    Location={Location}
-    operator={operator}
-    level_eu={level_eu}
-    formattedDelayTime={formattedDelayTime}
-    latestComeColdDate={latestComeColdDate}
-    cooked_date={cooked_date}
-    rmit_date={rmit_date}
-    materials={processedMaterials}
-    qccheck={qccheck}
-    sq_remark={sq_remark}
-    mdcheck={mdcheck}
-    md_remark={md_remark}
-    defect_remark={defect_remark}
-    defectcheck={defectcheck}
-    machine_MD={machine_MD}
-    sq_acceptance={sq_acceptance}
-    defect_acceptance={defect_acceptance}
-    weight_RM={weight_RM}
-    tray_count={tray_count}
-    rmm_line_name={rmm_line_name}
-    withdraw_date={withdraw_date}
-    name_edit_prod_two={name_edit_prod_two}
-    name_edit_prod_three={name_edit_prod_three}
-    first_prod={first_prod}
-    two_prod={two_prod}
-    three_prod={three_prod}
-    qccheck_cold={qccheck_cold}
-    receiver_qc_cold={receiver_qc_cold}
-    approver={approver}
-    production={production}
-    remark_rework={remark_rework}
-    remark_rework_cold={remark_rework_cold}
-    edit_rework={edit_rework}
-    prepare_mor_night={prepare_mor_night}
-  />
-   )}
+          onClose={() => {
+            setIsConfirmProdOpen(false);
+            showModal();
+          }}
+          onSuccess={() => {
+            setIsConfirmProdOpen(false);
+            onSuccess();
+          }}
+          material_code={mat}
+          materialName={materialName}
+          ptc_time={ptc_time}
+          standard_ptc={standard_ptc}
+          cold={cold}
+          rm_cold_status={rm_cold_status}
+          rm_status={rm_status}
+          ComeColdDateTime={ComeColdDateTime}
+          slot_id={slot_id}
+          tro_id={tro_id}
+          batch={batch}
+          rmfp_id={rmfp_id}
+          Location={Location}
+          operator={operator}
+          level_eu={level_eu}
+          formattedDelayTime={formattedDelayTime}
+          latestComeColdDate={latestComeColdDate}
+          cooked_date={cooked_date}
+          rmit_date={rmit_date}
+          materials={processedMaterials}
+          qccheck={qccheck}
+          sq_remark={sq_remark}
+          mdcheck={mdcheck}
+          md_remark={md_remark}
+          defect_remark={defect_remark}
+          defectcheck={defectcheck}
+          machine_MD={machine_MD}
+          sq_acceptance={sq_acceptance}
+          defect_acceptance={defect_acceptance}
+          weight_RM={weight_RM}
+          tray_count={tray_count}
+          rmm_line_name={rmm_line_name}
+          withdraw_date={withdraw_date}
+          name_edit_prod_two={name_edit_prod_two}
+          name_edit_prod_three={name_edit_prod_three}
+          first_prod={first_prod}
+          two_prod={two_prod}
+          three_prod={three_prod}
+          qccheck_cold={qccheck_cold}
+          receiver_qc_cold={receiver_qc_cold}
+          approver={approver}
+          production={production}
+          remark_rework={remark_rework}
+          remark_rework_cold={remark_rework_cold}
+          edit_rework={edit_rework}
+          prepare_mor_night={prepare_mor_night}
+        />
+      )}
     </>
   );
 };

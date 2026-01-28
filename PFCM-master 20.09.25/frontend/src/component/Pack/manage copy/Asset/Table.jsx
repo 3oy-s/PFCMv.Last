@@ -240,6 +240,10 @@ const Row = ({
         weight: parseFloat(weight),
         sc_pack_date: prepDateTime
       });
+       // Clear ข้อมูลหลังจาก confirm สำเร็จ
+    setWeight('');
+    setPrepDateTime('');
+    setErrors({ weight: '', prepDateTime: '' });
     }
   };
 
@@ -377,6 +381,8 @@ const Row = ({
               <DateTimePicker
                 ampm={false}
                 minutesStep={1}
+                // timeSteps={{ minutes: 1 }}  // ⬅️ เพิ่มบรรทัดนี้
+                // maxDateTime={dayjs()} // เพิ่มบรรทัดนี้ - จำกัดไม่ให้เลือกเวลาในอนาคต
                 value={prepDateTime ? dayjs(prepDateTime) : null}
                 onChange={(newValue) => {
                   setPrepDateTime(
