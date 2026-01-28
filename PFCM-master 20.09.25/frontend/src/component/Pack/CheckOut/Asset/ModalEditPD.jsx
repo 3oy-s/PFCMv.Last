@@ -25,7 +25,8 @@ import {
   TableHead,
   TableRow,
   TableCell,
-  TableBody
+  TableBody,
+  CircularProgress
 } from "@mui/material";
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
@@ -49,9 +50,62 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
   const [showAlert, setShowAlert] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [dataForPrint, setDataForPrint] = useState(null);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
 
 
 
+  const loadHtml5QrcodeScript = () => {
+    return new Promise((resolve, reject) => {
+      setIsLoadingLibrary(true);
+
+      if (window.Html5Qrcode) {
+        console.log('Html5Qrcode already loaded');
+        setIsLoadingLibrary(false);
+        resolve();
+        return;
+      }
+
+      const existingScript = document.querySelector('script[src*="html5-qrcode"]');
+      if (existingScript) {
+        console.log('Script tag exists, waiting for load...');
+        existingScript.addEventListener('load', () => {
+          console.log('Html5Qrcode loaded from existing script');
+          setIsLoadingLibrary(false);
+          resolve();
+        });
+        existingScript.addEventListener('error', () => {
+          setIsLoadingLibrary(false);
+          reject(new Error('Failed to load script'));
+        });
+        return;
+      }
+
+      console.log('Loading Html5Qrcode script...');
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+      script.async = true;
+
+      script.onload = () => {
+        console.log('Html5Qrcode script loaded successfully');
+        setTimeout(() => {
+          setIsLoadingLibrary(false);
+          if (window.Html5Qrcode) {
+            resolve();
+          } else {
+            reject(new Error('Html5Qrcode not available after script load'));
+          }
+        }, 100);
+      };
+
+      script.onerror = () => {
+        console.error('Failed to load Html5Qrcode script');
+        setIsLoadingLibrary(false);
+        reject(new Error('ไม่สามารถโหลด QR Scanner Library ได้'));
+      };
+
+      document.head.appendChild(script);
+    });
+  };
 
   // ฟังก์ชันแปลงเวลาจาก UTC เป็นเวลาไทย
   const formatThaiDateTime = (utcDateTimeStr) => {
@@ -266,7 +320,7 @@ const QcCheck = ({ open, onClose, material_code, materialName, ptc_time, standar
       mat: material_code,
       rmfpID: rmfp_id ? parseInt(rmfp_id, 10) : null,
       cold: formattedDelayTime,
-      ptc_time: ptc_time, 
+      ptc_time: ptc_time,
       ColdOut: ColdOut,
       dest: Location,
       operator: operator,
@@ -668,6 +722,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
   // State สำหรับ QR Scanner
   const [isCameraActive, setIsCameraActive] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const qrScannerRef = useRef(null);
   const scannerInstanceRef = useRef(null);
 
@@ -739,12 +794,15 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
     setScannedCode(value);
     setScanError("");
 
-    // ปิดกล้องเมื่อเริ่มพิมพ์
-    if (value.length > 0 && isCameraActive) {
+    // ไม่ปิดกล้องเมื่อ Scanner ยิงค่าเข้ามา (เพราะมันเกิดขึ้นเร็วมาก)
+    // ปิดกล้องเฉพาะเมื่อผู้ใช้พิมพ์เอง (เช็คจาก event type)
+    if (e.nativeEvent.inputType && isCameraActive) {
+      // มีการพิมพ์จริงๆ (ไม่ใช่ scanner)
       stopCameraScanner();
       setIsCameraActive(false);
     }
 
+    // Auto-submit เมื่อครบ 4 หลัก
     if (value.length === 4) {
       setTimeout(() => handleScanVerify(), 100);
     }
@@ -757,16 +815,16 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
   };
 
   const handleClose = () => {
-  stopCameraScanner();
-  setShowScanDialog(true);
-  setIsVerified(false);
-  setScannedCode("");
-  setScanError("");
-  setIsCameraActive(true);
-  setIsScanning(false);
+    stopCameraScanner();
+    setShowScanDialog(true);
+    setIsVerified(false);
+    setScannedCode("");
+    setScanError("");
+    setIsCameraActive(true);
+    setIsScanning(false);
 
-  onClose();
-};
+    onClose();
+  };
 
 
   const fetchUserDataFromLocalStorage = () => {
@@ -780,102 +838,283 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
     }
   };
 
-  // ฟังก์ชันเปิดกล้อง
-  const startCameraScanner = () => {
-    if (isScanning) return;
+  // เพิ่มฟังก์ชันนี้ก่อน checkCameraPermission
+  const loadHtml5QrcodeScript = () => {
+    return new Promise((resolve, reject) => {
+      // เช็คว่าโหลดไว้แล้วหรือยัง
+      if (window.Html5Qrcode) {
+        console.log('Html5Qrcode already loaded');
+        resolve();
+        return;
+      }
 
+      // เช็คว่ามี script tag อยู่แล้วหรือยัง
+      const existingScript = document.querySelector('script[src*="html5-qrcode"]');
+      if (existingScript) {
+        console.log('Script tag exists, waiting for load...');
+        existingScript.addEventListener('load', () => {
+          console.log('Html5Qrcode loaded from existing script');
+          resolve();
+        });
+        existingScript.addEventListener('error', reject);
+        return;
+      }
+
+      // สร้าง script tag ใหม่
+      console.log('Loading Html5Qrcode script...');
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+      script.async = true;
+
+      script.onload = () => {
+        console.log('Html5Qrcode script loaded successfully');
+        // รอสักครู่ให้แน่ใจว่า library พร้อมใช้งาน
+        setTimeout(() => {
+          if (window.Html5Qrcode) {
+            resolve();
+          } else {
+            reject(new Error('Html5Qrcode not available after script load'));
+          }
+        }, 100);
+      };
+
+      script.onerror = () => {
+        console.error('Failed to load Html5Qrcode script');
+        reject(new Error('ไม่สามารถโหลด QR Scanner Library ได้'));
+      };
+
+      document.head.appendChild(script);
+    });
+  };
+
+  const checkCameraPermission = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        return {
+          hasPermission: false,
+          error: 'Browser ไม่รองรับการใช้กล้อง'
+        };
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      });
+
+      stream.getTracks().forEach(track => track.stop());
+
+      return { hasPermission: true, error: null };
+    } catch (error) {
+      console.error('Camera permission error:', error);
+
+      let errorMessage = 'ไม่สามารถเข้าถึงกล้องได้';
+
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        errorMessage = 'กรุณาอนุญาตให้เข้าถึงกล้องในการตั้งค่า Browser';
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        errorMessage = 'ไม่พบกล้องในอุปกรณ์';
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        errorMessage = 'กล้องถูกใช้งานโดยแอปอื่นอยู่';
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage = 'ไม่สามารถเข้าถึงกล้องหลังได้';
+      } else if (error.name === 'SecurityError') {
+        errorMessage = 'ต้องใช้ HTTPS เพื่อเข้าถึงกล้อง';
+      }
+
+      return { hasPermission: false, error: errorMessage };
+    }
+  };
+
+  // ฟังก์ชันเปิดกล้อง
+  const startCameraScanner = async () => {
+    if (isScanning) {
+      console.log('Already scanning, skipping...');
+      return;
+    }
+
+    console.log('Starting camera scanner...');
     setIsScanning(true);
     setIsCameraActive(true);
     setScanError("");
 
-    setTimeout(() => {
-      if (!qrScannerRef.current) return;
+    try {
+      // 1. โหลด Html5Qrcode library ก่อน
+      console.log('Step 1: Loading Html5Qrcode library...');
+      await loadHtml5QrcodeScript();
+      console.log('✓ Library loaded');
 
-      try {
-        const Html5Qrcode = window.Html5Qrcode;
-
-        if (!Html5Qrcode) {
-          setScanError("ไม่สามารถโหลด QR Scanner ได้ กรุณาพิมพ์เอง");
-          setIsScanning(false);
-          return;
-        }
-
-        scannerInstanceRef.current = new Html5Qrcode("qr-reader");
-
-        scannerInstanceRef.current.start(
-          { facingMode: "environment" },   // เปิดกล้องหลังทันที
-          {
-            fps: 10,
-            qrbox: 250
-          },
-          (decodedText) => {
-            const last4 = decodedText.slice(-4).replace(/\D/g, "");
-
-            if (last4.length === 4) {
-              setScannedCode(last4);
-
-              if (last4 === tro_id.slice(-4)) {
-                setIsVerified(true);
-                setShowScanDialog(false);
-                stopCameraScanner();
-              } else {
-                setScanError(`ป้ายทะเบียนไม่ตรงกับรถเข็น ${tro_id}`);
-                setScannedCode("");
-              }
-            }
-          },
-          (error) => { }
-        );
-      } catch (e) {
-        console.error(e);
-        setScanError("ไม่สามารถเปิดกล้องได้ กรุณาพิมพ์เอง");
-        setIsScanning(false);
+      // 2. เช็ค permission
+      console.log('Step 2: Checking camera permission...');
+      const permissionCheck = await checkCameraPermission();
+      if (!permissionCheck.hasPermission) {
+        throw new Error(permissionCheck.error);
       }
-    }, 200);
+      console.log('✓ Permission granted');
+
+      // 3. ตรวจสอบว่ามี element
+      console.log('Step 3: Checking element...');
+      if (!qrScannerRef.current) {
+        throw new Error("ไม่พบพื้นที่แสดงกล้อง");
+      }
+      console.log('✓ Element found');
+
+      // 4. ปิด scanner เก่า (ถ้ามี)
+      console.log('Step 4: Cleaning old scanner...');
+      if (scannerInstanceRef.current) {
+        try {
+          await scannerInstanceRef.current.stop();
+          await scannerInstanceRef.current.clear();
+        } catch (e) {
+          console.warn('Error clearing old scanner:', e);
+        }
+        scannerInstanceRef.current = null;
+      }
+      console.log('✓ Old scanner cleaned');
+
+      // 5. สร้าง scanner instance ใหม่
+      console.log('Step 5: Creating scanner instance...');
+      const Html5Qrcode = window.Html5Qrcode;
+      if (!Html5Qrcode) {
+        throw new Error('Html5Qrcode is not available');
+      }
+      scannerInstanceRef.current = new Html5Qrcode("qr-reader");
+      console.log('✓ Scanner instance created');
+
+      // 6. เริ่มต้น scanner
+      console.log('Step 6: Starting camera...');
+      await scannerInstanceRef.current.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0
+        },
+        (decodedText) => {
+          console.log('QR Code detected:', decodedText);
+          const last4 = decodedText.slice(-4).replace(/\D/g, "");
+
+          if (last4.length === 4) {
+            setScannedCode(last4);
+
+            if (last4 === tro_id.slice(-4)) {
+              setIsVerified(true);
+              setShowScanDialog(false);
+              stopCameraScanner();
+            } else {
+              setScanError(`ป้ายทะเบียนไม่ตรงกับรถเข็น ${tro_id}`);
+              setScannedCode("");
+
+              setTimeout(() => {
+                setScanError("");
+              }, 3000);
+            }
+          }
+        },
+        (errorMessage) => {
+          // Ignore scanning errors
+        }
+      );
+
+      console.log('✅ Camera started successfully!');
+
+    } catch (error) {
+      console.error('❌ Error starting camera:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+
+      let errorMsg = error.message || "ไม่สามารถเปิดกล้องได้";
+
+      if (errorMsg.includes('HTTPS')) {
+        errorMsg += ' (ต้องใช้ HTTPS หรือ localhost)';
+      } else if (errorMsg.includes('permission') || errorMsg.includes('อนุญาต')) {
+        errorMsg += ' (ไปที่การตั้งค่า Browser)';
+      } else if (errorMsg.includes('Library') || errorMsg.includes('โหลด')) {
+        errorMsg = 'ไม่สามารถโหลด QR Scanner ได้ กรุณา Reload หน้าเว็บ';
+      }
+
+      setScanError(errorMsg);
+      setIsScanning(false);
+      setIsCameraActive(false);
+
+      // Focus ที่ input แทน
+      setTimeout(() => {
+        if (scanInputRef.current) {
+          scanInputRef.current.focus();
+        }
+      }, 500);
+    }
   };
 
 
   // ฟังก์ชันปิดกล้อง
-  const stopCameraScanner = () => {
+  const stopCameraScanner = async () => {
+    console.log('Stopping camera scanner...');
+
     if (scannerInstanceRef.current) {
       try {
-        scannerInstanceRef.current.clear().catch(error => {
-          console.error("Error clearing scanner:", error);
-        });
+        await scannerInstanceRef.current.stop();
+        await scannerInstanceRef.current.clear();
+        console.log('Camera stopped successfully');
       } catch (error) {
-        console.error("Error stopping scanner:", error);
+        console.warn("Error stopping scanner:", error);
       }
       scannerInstanceRef.current = null;
     }
+
     setIsScanning(false);
+    setIsCameraActive(false);
   };
 
   // ฟังก์ชันเปิดกล้องใหม่
-  const restartCamera = () => {
+  const restartCamera = async () => {
+    console.log('Restarting camera...');
     setScannedCode("");
     setScanError("");
-    startCameraScanner();
+    await stopCameraScanner();
+
+    // รอสักครู่ก่อนเปิดใหม่
+    setTimeout(() => {
+      startCameraScanner();
+    }, 500);
   };
 
   // useEffect - จัดการเมื่อเปิด dialog
   useEffect(() => {
     if (open) {
+      console.log('Dialog opened, initializing scanner...');
       setLocation("");
       setoperator("");
       setShowScanDialog(true);
       setIsVerified(false);
       setScannedCode("");
       setScanError("");
-      setIsCameraActive(true);
+      setIsCameraActive(false);
       setIsScanning(false);
       fetchUserDataFromLocalStorage();
 
-    }
+      // เริ่มกล้องหลังจาก dialog เปิดแล้ว
+      const timer = setTimeout(() => {
+        startCameraScanner();
+      }, 300);
 
+      return () => {
+        clearTimeout(timer);
+        stopCameraScanner();
+      };
+    } else {
+      stopCameraScanner();
+    }
+  }, [open]);
+
+  // เพิ่ม useEffect นี้หลัง useEffect ที่มีอยู่
+  useEffect(() => {
     return () => {
+      console.log('Component unmounting, cleaning up...');
       stopCameraScanner();
     };
-  }, [open]);
+  }, []);
 
   useEffect(() => {
     if (mat) {
@@ -1078,35 +1317,55 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
             </Typography>
 
             {/* พื้นที่แสดงกล้อง */}
+            {/* ในส่วน DialogContent ของ Dialog แรก */}
             <Box sx={{ width: '100%', maxWidth: 400 }}>
-              <div
-                id="qr-reader"
-                ref={qrScannerRef}
-                style={{
-                  width: '100%',
-                  display: isCameraActive ? 'block' : 'none'
-                }}
-              ></div>
-
-              {!isCameraActive && !isScanning && (
+              {isLoadingLibrary ? (
                 <Box sx={{
-                  textAlign: 'center',
-                  py: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 300,
                   backgroundColor: '#f5f5f5',
                   borderRadius: 2
                 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    กล้องปิดอยู่
+                  <CircularProgress size={50} />
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                    กำลังโหลด QR Scanner...
                   </Typography>
-                  <Button
-                    variant="outlined"
-                    onClick={restartCamera}
-                    startIcon={<CameraAltIcon />}
-                    size="small"
-                  >
-                    เปิดกล้องใหม่
-                  </Button>
                 </Box>
+              ) : (
+                <>
+                  <div
+                    id="qr-reader"
+                    ref={qrScannerRef}
+                    style={{
+                      width: '100%',
+                      display: isCameraActive ? 'block' : 'none'
+                    }}
+                  ></div>
+
+                  {!isCameraActive && !isScanning && (
+                    <Box sx={{
+                      textAlign: 'center',
+                      py: 2,
+                      backgroundColor: '#f5f5f5',
+                      borderRadius: 2
+                    }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        กล้องปิดอยู่
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        onClick={restartCamera}
+                        startIcon={<CameraAltIcon />}
+                        size="small"
+                      >
+                        เปิดกล้องใหม่
+                      </Button>
+                    </Box>
+                  )}
+                </>
               )}
             </Box>
 
@@ -1115,13 +1374,15 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
               <TextField
                 inputRef={scanInputRef}
                 fullWidth
-                label="หรือพิมพ์เลข 4 หลักท้าย"
+                label="หรือพิมพ์เลข 4 หลักท้าย / ใช้ Scanner"
                 value={scannedCode}
                 onChange={handleScanInputChange}
                 onKeyPress={handleScanKeyPress}
                 placeholder="0000"
                 inputProps={{
                   maxLength: 4,
+                  inputMode: 'numeric',
+                  pattern: '[0-9]*',
                   style: {
                     fontSize: 24,
                     textAlign: "center",
@@ -1129,12 +1390,19 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
                   }
                 }}
                 error={!!scanError}
-                onFocus={() => {
-                  if (isCameraActive) {
-                    stopCameraScanner();
-                    setIsCameraActive(false);
+                onFocus={(e) => {
+                  // ไม่ทำอะไรเมื่อ focus - ให้ scanner ยิงค่าได้
+                  console.log('Input focused - ready for scanner or manual input');
+                }}
+                onBlur={(e) => {
+                  // เช็คว่าถ้า blur แล้วยังไม่มีค่า ให้เปิดกล้องใหม่
+                  if (!scannedCode && !isCameraActive && !isScanning) {
+                    setTimeout(() => {
+                      startCameraScanner();
+                    }, 500);
                   }
                 }}
+                autoComplete="off"
               />
 
               {/* Progress Dots */}
@@ -1454,62 +1722,62 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
       {isConfirmProdOpen && (
         <QcCheck
           open={isConfirmProdOpen}
-    onClose={() => {
-      setIsConfirmProdOpen(false);
-      showModal();
-    }}
-    onSuccess={() => {
-      setIsConfirmProdOpen(false);
-      onSuccess();
-    }}
-    material_code={mat}
-    materialName={materialName}
-    ptc_time={ptc_time}
-    standard_ptc={standard_ptc}
-    cold={cold}
-    rm_cold_status={rm_cold_status}
-    rm_status={rm_status}
-    ComeColdDateTime={ComeColdDateTime}
-    slot_id={slot_id}
-    tro_id={tro_id}
-    batch={batch}
-    rmfp_id={rmfp_id}
-    Location={Location}
-    operator={operator}
-    level_eu={level_eu}
-    formattedDelayTime={formattedDelayTime}
-    latestComeColdDate={latestComeColdDate}
-    cooked_date={cooked_date}
-    rmit_date={rmit_date}
-    materials={processedMaterials}
-    qccheck={qccheck}
-    sq_remark={sq_remark}
-    mdcheck={mdcheck}
-    md_remark={md_remark}
-    defect_remark={defect_remark}
-    defectcheck={defectcheck}
-    machine_MD={machine_MD}
-    sq_acceptance={sq_acceptance}
-    defect_acceptance={defect_acceptance}
-    weight_RM={weight_RM}
-    tray_count={tray_count}
-    rmm_line_name={rmm_line_name}
-    withdraw_date={withdraw_date}
-    name_edit_prod_two={name_edit_prod_two}
-    name_edit_prod_three={name_edit_prod_three}
-    first_prod={first_prod}
-    two_prod={two_prod}
-    three_prod={three_prod}
-    qccheck_cold={qccheck_cold}
-    receiver_qc_cold={receiver_qc_cold}
-    approver={approver}
-    production={production}
-    remark_rework={remark_rework}
-    remark_rework_cold={remark_rework_cold}
-    edit_rework={edit_rework}
-    prepare_mor_night={prepare_mor_night}
-  />
-   )}
+          onClose={() => {
+            setIsConfirmProdOpen(false);
+            showModal();
+          }}
+          onSuccess={() => {
+            setIsConfirmProdOpen(false);
+            onSuccess();
+          }}
+          material_code={mat}
+          materialName={materialName}
+          ptc_time={ptc_time}
+          standard_ptc={standard_ptc}
+          cold={cold}
+          rm_cold_status={rm_cold_status}
+          rm_status={rm_status}
+          ComeColdDateTime={ComeColdDateTime}
+          slot_id={slot_id}
+          tro_id={tro_id}
+          batch={batch}
+          rmfp_id={rmfp_id}
+          Location={Location}
+          operator={operator}
+          level_eu={level_eu}
+          formattedDelayTime={formattedDelayTime}
+          latestComeColdDate={latestComeColdDate}
+          cooked_date={cooked_date}
+          rmit_date={rmit_date}
+          materials={processedMaterials}
+          qccheck={qccheck}
+          sq_remark={sq_remark}
+          mdcheck={mdcheck}
+          md_remark={md_remark}
+          defect_remark={defect_remark}
+          defectcheck={defectcheck}
+          machine_MD={machine_MD}
+          sq_acceptance={sq_acceptance}
+          defect_acceptance={defect_acceptance}
+          weight_RM={weight_RM}
+          tray_count={tray_count}
+          rmm_line_name={rmm_line_name}
+          withdraw_date={withdraw_date}
+          name_edit_prod_two={name_edit_prod_two}
+          name_edit_prod_three={name_edit_prod_three}
+          first_prod={first_prod}
+          two_prod={two_prod}
+          three_prod={three_prod}
+          qccheck_cold={qccheck_cold}
+          receiver_qc_cold={receiver_qc_cold}
+          approver={approver}
+          production={production}
+          remark_rework={remark_rework}
+          remark_rework_cold={remark_rework_cold}
+          edit_rework={edit_rework}
+          prepare_mor_night={prepare_mor_night}
+        />
+      )}
     </>
   );
 };

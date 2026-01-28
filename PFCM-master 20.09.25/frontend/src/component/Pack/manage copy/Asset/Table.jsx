@@ -587,7 +587,7 @@ const TableMainPrep = ({
   const [openRowId, setOpenRowId] = useState(null);
   const [selectedDocNo, setSelectedDocNo] = useState('');
 
-  const displayColumns = ['batch_after', 'mat_name', 'production', 'rmit_date', 'weight_RM'];
+  const displayColumns = ['batch_after', 'mat_name', 'production', 'rmit_date', 'out_cold_date', 'weight_RM'];
 
   const uniqueDocNos = [...new Set(data.map(row => row.doc_no).filter(Boolean))].sort();
 
@@ -634,6 +634,7 @@ const TableMainPrep = ({
     "batch_after": "Batch",
     "mat_name": "รายชื่อวัตถุดิบ",
     "rmit_date": "เวลาเตรียม",
+    "out_cold_date": "เวลาออกห้องเย็น",
     "production": "แผน",
     "weight_RM": "น้ำหนัก",
   };
@@ -641,6 +642,7 @@ const TableMainPrep = ({
   const getColumnWidth = (header) => {
     if (header === "mat_name") return "180px";
     if (header === "rmit_date") return "110px";
+    if (header === "out_cold_date") return "110px";
     if (header === "production") return "80px";
     if (header === "tro_id") return "180px";
     if (["weight_RM"].includes(header)) return "70px";

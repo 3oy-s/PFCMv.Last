@@ -94,11 +94,8 @@ const convertToUTC = (thaiTimeStr) => {
   return utcDate.toISOString();
 };
 
-const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id }) => {
-  // ดึงข้อมูลทั้งหมดจาก data object ที่ส่งมาจาก Modal1
-  const [oldBatchAfter, setOldBatchAfter] = useState([]);
+const Modal2 = ({ open, onClose, onNext, data, rmfp_id, CookedDateTime, dest, rm_type_id }) => {
   const [rmTypeId, setRmTypeId] = useState(rm_type_id ?? 3);
-  const [batchAfter, setBatchAfter] = useState([]);
   const [euOptions, setEuOptions] = useState([]);
   const [weightPerCart, setWeightPerCart] = useState('');
   const [operator, setOperator] = useState('');
@@ -119,27 +116,7 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
   const [preparedTimeError, setPreparedTimeError] = useState(false);
   const [preparedTime, setPreparedTime] = useState('');
   const [timeValid, setTimeValid] = useState(true);
-  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
-
-  useEffect(() => {
-    console.log("Data received from Modal1:", data);
-
-    if (open && data) {
-      // ดึงข้อมูล batchAfterArray จาก data
-      if (data.batchAfterArray && Array.isArray(data.batchAfterArray)) {
-        // เก็บค่า batch_after เก่าจาก object
-        const oldBatches = data.batchAfterArray.map(item => item.batch_after || '');
-        setOldBatchAfter(oldBatches);
-
-        // เก็บค่า batch_after ใหม่ที่ถูกสร้างขึ้น (ถ้ามี)
-        const newBatches = data.batchAfterArray.map(item => item.new_batch_after || item.batch_after || '');
-        setBatchAfter(newBatches);
-
-        console.log("Old Batch After Array:", oldBatches);
-        console.log("New Batch After Array:", newBatches);
-      }
-    }
-  }, [open, data]);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false); // สำหรับแจ้ง error
 
   useEffect(() => {
     console.log("rm_type_id updated:", rm_type_id);
@@ -217,15 +194,18 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
 
       // ถ้ามีข้อมูล preparedTime แล้วให้แปลงเป็นรูปแบบที่ถูกต้อง
       if (data.input2.preparedTime) {
+        // แปลงข้อมูลจากรูปแบบ DD/MM/YYYY HH:MM เป็น YYYY-MM-DDThh:mm
         try {
           const [datePart, timePart] = data.input2.preparedTime.split(" ");
           const [day, month, year] = datePart.split("/");
           const formattedDateTime = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${timePart}`;
           setPreparedTime(formattedDateTime);
         } catch (error) {
+          // ถ้าแปลงไม่สำเร็จ ให้ใช้เวลาปัจจุบันในเวลาไทย
           setPreparedTime(convertToThaiTime(new Date().toISOString()));
         }
       } else {
+        // ถ้าไม่มีข้อมูล ให้ใช้เวลาปัจจุบันในเวลาไทย
         setPreparedTime(convertToThaiTime(new Date().toISOString()));
       }
     } else if (open) {
@@ -234,6 +214,7 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
       setSelectedProcessType('');
       setDeliveryLocation('');
       setDeliveryType('');
+      // ตั้งค่าเป็นเวลาปัจจุบันในเวลาไทย
       setPreparedTime(convertToThaiTime(new Date().toISOString()));
     }
   }, [open, data]);
@@ -266,15 +247,18 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
     setProcessTypeError(false);
     setOperatorError(false);
     setPreparedTimeError(false);
-    setBatchAfter([]);
   };
 
   const isFutureTime = (selectedTime) => {
     if (!selectedTime) return false;
 
+    // สร้างวันที่จากค่า selectedTime
     const selectedDate = new Date(selectedTime);
+
+    // สร้างวันที่ปัจจุบัน (ไม่ต้องแปลงเป็นเวลาไทย เพราะเราเปรียบเทียบค่าวันที่โดยตรง)
     const now = new Date();
 
+    // เปรียบเทียบเวลาโดยตรง
     return selectedDate > now;
   };
 
@@ -324,6 +308,7 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
       isValid = false;
     }
 
+    // ตรวจสอบวันที่เตรียมเสร็จ
     if (!preparedTime) {
       setPreparedTimeError(true);
       isValid = false;
@@ -331,15 +316,16 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
       setPreparedTimeError(true);
       setErrorMessage("ไม่สามารถเลือกเวลาอนาคตเป็นเวลาการเตรียมเสร็จได้");
       isValid = false;
-      return false;
+      return false; // หยุดการตรวจสอบทันทีถ้าเป็นเวลาอนาคต
     } else {
       setPreparedTimeError(false);
     }
 
+    // ตรวจสอบเวลาอบเสร็จ/ต้มเสร็จ
     if (cookedTime && isFutureTime(cookedTime)) {
       setErrorMessage("ไม่สามารถเลือกเวลาอนาคตเป็นเวลาอบเสร็จ/ต้มเสร็จได้");
       isValid = false;
-      return false;
+      return false; // หยุดการตรวจสอบทันทีถ้าเป็นเวลาอนาคต
     }
 
     return isValid;
@@ -372,6 +358,7 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
       : "";
 
     // แปลงเวลาเตรียมเสร็จให้เป็นรูปแบบ DD/MM/YYYY HH:MM
+    // แต่ต้องแปลงเวลาไทยกลับเป็น UTC ก่อนเพื่อให้ Intl.DateTimeFormat ทำงานได้ถูกต้อง
     const preparedTimeUTC = preparedTime ? new Date(preparedTime) : null;
     const formattedPreparedTime = preparedTimeUTC
       ? new Intl.DateTimeFormat("en-GB", {
@@ -384,9 +371,8 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
       }).format(preparedTimeUTC)
       : "";
 
-    // ✅ รวมข้อมูลจาก Modal1 กับข้อมูลที่กรอกใน Modal2
     const updatedData = {
-      ...data, // รักษาข้อมูลทั้งหมดจาก Modal1
+      ...data,
       input2: {
         weightPerCart: parseFloat(weightPerCart),
         operator,
@@ -395,25 +381,21 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
         selectedProcessType: selectedProcessType,
         deliveryLocation: String(deliveryLocation),
         deliveryType: String(deliveryType),
-        preparedTime: formattedPreparedTime,
+        preparedTime: formattedPreparedTime, // เวลาในรูปแบบ DD/MM/YYYY HH:MM
       },
       batch: data?.batch || '',
       newBatch: data?.newBatch || '',
-      batchAfterArray: data?.batchAfterArray || [], // ✅ ส่งต่อ batchAfterArray แบบเดิม
-      batchArray: data?.batchArray || [], // ✅ ส่งต่อ batchArray
-      rmfp_id: data?.rmfp_id || '',
-      inputValues: data?.inputValues || [], // ✅ ส่งต่อ inputValues (รถเข็น)
+      rmfp_id: rmfp_id,
       cookedDateTimeNew: formattedCookedTime,
-      preparedDateTimeNew: formattedPreparedTime,
+      preparedDateTimeNew: formattedPreparedTime, // เพิ่ม preparedDateTimeNew ในข้อมูลหลัก
       dest: dest
     };
+    console.log(" ส่งข้อมูลไป Modal3:", updatedData);
 
-    console.log("ส่งข้อมูลไป Modal3:", updatedData);
     onNext(updatedData);
   };
 
   const handleClose = async () => {
-    // ✅ ดึง trolley ID จาก data.inputValues
     const troId = data?.inputValues?.[0];
 
     if (troId) {
@@ -427,7 +409,7 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
     onClose();
   };
 
-  const returnreserveTrolley = async (tro_id) => {
+    const returnreserveTrolley = async (tro_id) => {
     try {
       const response = await axios.post(`${API_URL}/api/re/reserveTrolley`, {
         tro_id: tro_id,
@@ -438,6 +420,7 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
       return false;
     }
   };
+
 
   const handleDeliveryLocationChange = (event) => {
     setDeliveryLocation(event.target.value);
@@ -470,8 +453,13 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
     setSnackbarOpen(false);
   };
 
+  // สร้างค่า max datetime สำหรับ input fields (ใช้เวลาไทย)
   const maxDateTime = convertToThaiTime(new Date().toISOString());
+
+  // Check if rm_type_id is 3 or 7 to show EU Level select
   const shouldShowEuSelect = rmTypeId === 3 || rmTypeId === 7 || rm_type_id === 8 || rm_type_id === 6;
+
+
 
   return (
     <Dialog open={open} onClose={(e, reason) => {
@@ -492,7 +480,6 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
             </Typography>
           </Box>
 
-          {/* ✅ แสดงข้อมูลรถเข็นจาก data.inputValues */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography style={{ fontSize: "15px" }} color="rgba(0, 0, 0, 0.6)">
               ป้ายทะเบียน:
@@ -507,53 +494,31 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
             )}
           </Box>
 
-          {/* ✅ แสดง Batch ใหม่จาก batchAfterArray */}
-          <Typography sx={{ fontSize: "16px", fontWeight: 400, color: "#333", marginTop: "8px", marginBottom: "8px" }}>
-            เทียบ Batch Array กับ Batch ใหม่:
-          </Typography>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 2 }}>
-            {data?.batchArray && data.batchArray.length > 0 ? (
-              data.batchArray.map((batchItem, idx) => {
-                const newBatch = batchAfter?.[idx] || "N/A"; // ถ้า batchAfter มีไม่ครบ
-                return (
-                  <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    {/* แสดง Batch จาก Batch Array */}
-                    <Box
-                      sx={{
-                        padding: "4px 8px",
-                        backgroundColor: "#f0f0f0",
-                        borderRadius: "4px",
-                        fontSize: "14px",
-                        minWidth: "120px",
-                        textAlign: "center",
-                        color: "#666"
-                      }}
-                    >
-                      {batchItem}
-                    </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginTop: "5px" }}>
+            <Typography style={{ fontSize: "15px" }} color="rgba(0, 0, 0, 0.6)">
+              Batch เก่า:
+            </Typography>
 
-                    {/* ลูกศร */}
-                    <Typography sx={{ fontSize: "16px", color: "#666" }}>→</Typography>
-
-                    {/* แสดง Batch ใหม่ */}
-                    <Box
-                      sx={{
-                        padding: "4px 8px",
-                        backgroundColor: "#d0f0d0",
-                        borderRadius: "4px",
-                        fontSize: "14px",
-                        minWidth: "120px",
-                        textAlign: "center",
-                        fontWeight: "bold"
-                      }}
-                    >
-                      {newBatch}
-                    </Box>
-                  </Box>
-                );
-              })
+            {data?.batch ? (
+              <Typography variant="body1" color="rgba(0, 0, 0, 0.6)" sx={{ fontWeight: 'solid' }}>
+                {data.batch}
+              </Typography>
             ) : (
-              <Typography sx={{ fontSize: "14px", color: "#999" }}>ไม่มีข้อมูล</Typography>
+              <Typography variant="body2">ไม่มีข้อมูล</Typography>
+            )}
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginTop: "5px" }}>
+            <Typography style={{ fontSize: "15px" }} color="rgba(0, 0, 0, 0.6)">
+              Batch ใหม่:
+            </Typography>
+
+            {data?.newBatch ? (
+              <Typography variant="body1" color="rgba(0, 0, 0, 0.6)" sx={{ fontWeight: 'solid' }}>
+                {data.newBatch}
+              </Typography>
+            ) : (
+              <Typography variant="body2">ไม่มีข้อมูล</Typography>
             )}
           </Box>
 
@@ -573,6 +538,7 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
               }}
               maxDateTime={dayjs()}
               ampm={false}
+               // ✅ ใช้ timeSteps แทน minutesStep
               timeSteps={{ minutes: 1 }}
               slotProps={{
                 textField: {
@@ -584,6 +550,7 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
               }}
             />
           </LocalizationProvider>
+
 
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DateTimePicker
@@ -603,6 +570,7 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
               }}
               maxDateTime={dayjs()}
               ampm={false}
+              // ✅ ใช้ timeSteps แทน minutesStep
               timeSteps={{ minutes: 1 }}
               slotProps={{
                 textField: {
@@ -615,6 +583,8 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
                 }
               }}
             />
+
+
           </LocalizationProvider>
 
           <TextField
@@ -624,7 +594,10 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
             value={weightPerCart}
             size="small"
             onChange={handleWeightChange}
-            sx={{ marginBottom: '16px' }}
+            sx={{
+              marginBottom: '16px',
+
+            }}
             error={weightError}
             helperText={weightError ? "กรุณากรอกน้ำหนักเป็นตัวเลขที่ถูกต้อง" : ""}
             inputProps={{
@@ -640,7 +613,10 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
             size="small"
             value={numberOfTrays}
             onChange={handleTrayChange}
-            sx={{ marginBottom: '16px' }}
+            sx={{
+              marginBottom: '16px',
+
+            }}
             error={trayError}
             helperText={trayError ? "กรุณากรอกจำนวนเป็นตัวเลขเต็มที่ถูกต้อง" : ""}
             inputProps={{
@@ -649,10 +625,14 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
             }}
           />
 
+
           <FormControl
             fullWidth
             size="small"
-            sx={{ marginBottom: '16px' }}
+            sx={{
+              marginBottom: '16px',
+
+            }}
             variant="outlined"
             error={processTypeError}
           >
@@ -688,7 +668,10 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
               setOperator(e.target.value);
               setOperatorError(false);
             }}
-            sx={{ marginBottom: '16px' }}
+            sx={{
+              marginBottom: '16px',
+
+            }}
             error={operatorError}
             helperText={operatorError ? "กรุณากรอกชื่อผู้ดำเนินการ" : ""}
           />
@@ -699,16 +682,12 @@ const Modal2 = ({ open, onClose, onNext, data, CookedDateTime, dest, rm_type_id 
             paddingLeft: "12px",
             border: locationError ? '1px solid red' : 'none',
             borderRadius: locationError ? '4px' : '0',
-            padding: locationError ? '8px' : '0',
-            flexWrap: "nowrap"
+            padding: locationError ? '8px' : '0'
           }}>
-            <Typography style={{ color: "#666", marginRight: "16px", whiteSpace: "nowrap" }}>สถานที่จัดส่ง</Typography>
-            <RadioGroup row name="location" value={deliveryLocation} onChange={handleDeliveryLocationChange} sx={{
-              flexWrap: "nowrap"
-            }}>
+            <Typography style={{ color: "#666", marginRight: "16px" }}>สถานที่จัดส่ง</Typography>
+            <RadioGroup row name="location" value={deliveryLocation} onChange={handleDeliveryLocationChange}>
               <FormControlLabel value="ไปบรรจุ" control={<Radio />} style={{ color: "#666" }} label="บรรจุ" />
               <FormControlLabel value="เข้าห้องเย็น" control={<Radio />} style={{ color: "#666" }} label="ห้องเย็น" />
-              <FormControlLabel value="เตรียมผสม" control={<Radio />} style={{ color: "#666" }} label="ผสมบรรจุ" />
             </RadioGroup>
           </Box>
           {locationError && (

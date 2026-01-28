@@ -3615,7 +3615,6 @@ router.put("/pack/mixed/trolley", async (req, res) => {
 
       // สร้างรายการวัตถุดิบสำหรับการผลิตใหม่
       const dataRM = await transaction.request()
-      const dataRM = await transaction.request()
         .input('prod_rm_id', sql.Int, tro_production_id)
         .input('weight', sql.Float, total_weight)
         .input('rm_group_id', sql.Int, rm_group_id)
@@ -3625,15 +3624,10 @@ router.put("/pack/mixed/trolley", async (req, res) => {
     OUTPUT INSERTED.rmfp_id
     VALUES (@prod_rm_id, @weight, @rm_group_id)
   `);
-    INSERT INTO RMForProd (prod_rm_id, weight, rm_group_id)
-    OUTPUT INSERTED.rmfp_id
-    VALUES (@prod_rm_id, @weight, @rm_group_id)
-  `);
       const new_rmfp_id = dataRM.recordset[0].rmfp_id;
 
 
       // สร้าง TrolleyRMMapping ใหม่สำหรับรถเข็นที่ผสมแล้ว
-      const insert_result = await transaction.request()
       const insert_result = await transaction.request()
         .input('rmfp_id', sql.Int, new_rmfp_id)
         .input('prod_mix', sql.Int, tro_production_id)
@@ -3659,7 +3653,6 @@ router.put("/pack/mixed/trolley", async (req, res) => {
 
 
       // สร้างประวัติใหม่สำหรับรถเข็นที่ผสมแล้ว
-      await transaction.request()
       await transaction.request()
         .input('mapping_id', sql.Int, newMixedMappingId)
         .input('total_weight', sql.Float, total_weight)

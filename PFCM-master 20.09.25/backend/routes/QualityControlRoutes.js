@@ -54,6 +54,8 @@ module.exports = (io) => {
         (
           (rmm.dest = 'เข้าห้องเย็น' AND (rmm.rm_status = 'รอQCตรวจสอบ' OR rmm.rm_status = 'QcCheck รอแก้ไข'))
           OR 
+          (rmm.dest = 'เตรียมผสม' AND (rmm.rm_status = 'รอQCตรวจสอบ' OR rmm.rm_status = 'QcCheck รอแก้ไข'))
+          OR 
           (rmm.dest = 'ไปบรรจุ' AND (rmm.rm_status = 'รอQCตรวจสอบ' OR rmm.rm_status = 'QcCheck รอแก้ไข' OR rmm.rm_status = 'รอกลับมาเตรียม'))
         )
         AND rmf.rm_group_id = rmg.rm_group_id
@@ -163,7 +165,7 @@ module.exports = (io) => {
         Batch b ON rmm.mapping_id = b.mapping_id  -- ✅ เปลี่ยนจาก batch_id เป็น mapping_id
       WHERE 
         rmm.stay_place IN ('จุดเตรียม','หม้ออบ')
-        AND rmm.dest IN ('ไปบรรจุ', 'เข้าห้องเย็น','Qc')
+        AND rmm.dest IN ('ไปบรรจุ', 'เข้าห้องเย็น','Qc','เตรียมผสม')
         AND rmm.rm_status IN ('รอQCตรวจสอบ' ,'รอ MD')
         AND rmf.rm_group_id = rmg.rm_group_id
         AND rmg.rm_type_id IN (${rmTypeIdsArray.map(t => `'${t}'`).join(',')})

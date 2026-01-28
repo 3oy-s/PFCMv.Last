@@ -17,6 +17,7 @@ import RM_EMU from "./RMEmu/MainPage.jsx";
 import BatchMIXPage from "./BatchMIX/BatchMIXPage.jsx";
 import TraceBack_HU from "./TraceBackHU/MainPage.jsx";
 import EditDataTrolley from "./EditDataTrolley/EditDataTrolley.jsx";
+import IncludeRawmatPage from "./IncludeRM/IncludeRawmatPage.jsx";
 
 function AppPrep() {
   return (
@@ -48,6 +49,7 @@ function AppPrep() {
         <Route path="/BatchMIX" element={<BatchMIXPage />} />
         <Route path="/TraceBack_HU" element={<TraceBack_HU />} />
         <Route path="/EditDataTrolley" element={<EditDataTrolley />} />
+        <Route path="/IncludeRM" element={<IncludeRawmatPage />} />
       </Routes>
     </div>
   );

@@ -221,6 +221,7 @@ const Sidebar = () => {
     { name: "Scan SAP", icon: LuScanBarcode, href: "/prep/ScanSAP/ScanSAPPage" },
     { name: "ผสมวัตถุดิบ", icon: PiFishSimple, href: "/prep/Emulsions" },
     { name: "ผสม Batch", icon: PiFishSimple, href: "/prep/BatchMIX" },
+    { name: "เตรียมผสม", icon: PiFishSimple, href: "/prep/IncludeRM" },
     { name: "จัดการวัตถุดิบ", icon: PiFishSimple, href: "/prep/MatManage/MatManagePage" },
     { name: "วัตถุดิบรอแก้ไข", icon: PiFishLight, href: "/prep/MatRework/MatReworkPage" },
     { name: "กลับมาเตรียม", icon: PiFishFill, href: "/prep/MatImport/MatImportPage" },
