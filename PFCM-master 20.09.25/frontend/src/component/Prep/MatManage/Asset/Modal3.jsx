@@ -168,11 +168,11 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
         weightTotal: weightTotal,
         ntray: numberOfTrays,
         recorder: input2?.operator || "",
-        // Dest: "รอCheckin",  // ✅ ส่งค่าคงที่
-        Dest: input2?.deliveryLocation || "",
+        Dest: "รอCheckin",  // ✅ ส่งค่าคงที่
+        // Dest: input2?.deliveryLocation || "",
         Process: input2?.selectedProcessType?.process_id || "",
-        deliveryType: input2?.deliveryType || "",
-        // deliveryType: "",    // ✅ ส่งค่าว่าง
+        // deliveryType: input2?.deliveryType || "",
+        deliveryType: "",    // ✅ ส่งค่าว่าง
         userID: Number(userId),
         level_eu: level_eu || "",
         tray_count: numberOfTrays,
@@ -187,7 +187,7 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
       console.log("Payload before sending:", payload);
 
       const apiResponse = await axios.post(
-        `${API_URL}/api/prep/manage/saveTrolley`,
+        `${API_URL}/api/prep/manage/saveTrolleyV2`,
         payload,
         {
           headers: {
@@ -205,8 +205,8 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
       const printData = {
         tro_id: tro_id,
         batch_after: batchAfterArray.length > 0 ? batchAfterArray.map(item => item.batch_after).join(", ") : batchAfter || "",
-        dest: input2?.deliveryLocation || "",
-        // dest: "รอCheckin",  // ✅ ใช้ค่าคงที่
+        // dest: input2?.deliveryLocation || "",
+        dest: "รอCheckin",  // ✅ ใช้ค่าคงที่
         mat_name: materialName,
         production: productionValue,
         rmm_line_name: input2?.deliveryLocation || "",

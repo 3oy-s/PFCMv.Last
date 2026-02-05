@@ -106,7 +106,7 @@ if (process.env.NODE_ENV === "production" && cluster.isPrimary) {
     cors: {
       origin: [
         `http://${process.env.DB_SERVER}:5173`,
-        "http://192.168.1.101:5173",
+        "http://192.168.1.106:5173",
    
         // "http://localhost:5173",
       ],
@@ -137,7 +137,7 @@ if (process.env.NODE_ENV === "production" && cluster.isPrimary) {
   // Enhanced Redis configuration
  const pubClient = createClient({
   socket: {
-    host: '192.168.1.101',
+    host: '192.168.1.106',
     port: 6379,
     tls: {
       servername: undefined  // ปิด SNI
@@ -174,7 +174,7 @@ if (process.env.NODE_ENV === "production" && cluster.isPrimary) {
  
       const allowedOrigins = [
         // "http://localhost:5173",
-        "http://192.168.1.101:5173",
+        "http://192.168.1.106:5173",
         `http://${process.env.DB_SERVER}:5173`
       ];
  

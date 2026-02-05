@@ -152,7 +152,7 @@ const QcCheck = ({
 
     };
 
-    console.log("Payload sent to /api/qc/check:", payload);
+    console.log("Payload sent to /api/qc/check/ghost:", payload);
 
     try {
       const response = await axios.post(`${API_URL}/api/qc/check`, payload);

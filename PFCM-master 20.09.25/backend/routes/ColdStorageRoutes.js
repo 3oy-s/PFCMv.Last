@@ -45,12 +45,15 @@ module.exports = (io) => {
           rmm.level_eu,
           FORMAT(rmm.prep_to_cold_time, 'N2') AS remaining_time,
           FORMAT(rmg.prep_to_cold, 'N2') AS standard_time,
+          FORMAT(rmm.prep_to_pack_time, 'N2') AS remaining_prep_to_pack_time,
+          FORMAT(rmg.prep_to_pack, 'N2') AS standard_prep_to_pack_time,
           FORMAT(rmm.rework_time, 'N2') AS remaining_rework_time,
           FORMAT(rmg.rework, 'N2') AS standard_rework_time,
           rmm.rm_status,
           rmm.dest,
           rmm.weight_RM,
           rmm.tray_count,
+          FORMAT(rmg.cold_to_pack, 'N2') AS standard_cold_to_pack_time,
           FORMAT(htr.cooked_date, 'yyyy-MM-dd HH:mm:ss') AS cooked_date,
           FORMAT(htr.rmit_date, 'yyyy-MM-dd HH:mm:ss') AS rmit_date,
           FORMAT(htr.qc_date, 'yyyy-MM-dd HH:mm:ss') AS qc_date,
@@ -86,7 +89,7 @@ module.exports = (io) => {
           )
           AND rmf.rm_group_id = rmg.rm_group_id
           AND rmm.tro_id IS NOT NULL
-          AND rmm.dest = 'เข้าห้องเย็น'
+          AND rmm.dest IN ('เข้าห้องเย็น', 'รอCheckin')
       GROUP BY
           rmm.mapping_id,
           rmf.rmfp_id,
@@ -98,6 +101,9 @@ module.exports = (io) => {
           rmm.level_eu,
           rmm.prep_to_cold_time,
           rmg.prep_to_cold,
+          rmm.prep_to_pack_time,
+          rmg.prep_to_pack,
+          rmg.cold_to_pack,
           rmm.rework_time,
           rmg.rework,
           rmm.rm_status,
@@ -152,7 +158,7 @@ module.exports = (io) => {
                 JOIN 
                     History htr ON rmm.mapping_id = htr.mapping_id
                 WHERE 
-                    rmm.dest = 'เข้าห้องเย็น'
+                    rmm.dest IN ('เข้าห้องเย็น', 'รอCheckin')
                     AND rmm.rm_status IN ('เหลือจากไลน์ผลิต','รอแก้ไข')
                     AND rmm.tro_id IS NOT NULL
             `);
@@ -186,6 +192,8 @@ module.exports = (io) => {
                     rmm.level_eu,
                     FORMAT(rmm.prep_to_cold_time, 'N2') AS remaining_time,
                     FORMAT(rmg.prep_to_cold, 'N2') AS standard_time,
+                    FORMAT(rmm.prep_to_pack_time, 'N2') AS remaining_prep_to_pack_time,
+                    FORMAT(rmg.prep_to_pack, 'N2') AS standard_prep_to_pack_time,
                     FORMAT(rmm.rework_time, 'N2') AS remaining_rework_time,
                     FORMAT(rmg.rework, 'N2') AS standard_rework_time,
                     rmm.rm_status,
@@ -214,7 +222,7 @@ module.exports = (io) => {
                 JOIN
                     History htr ON rmm.mapping_id = htr.mapping_id
                 WHERE 
-                    rmm.dest = 'เข้าห้องเย็น'
+                    rmm.dest IN ('เข้าห้องเย็น', 'รอCheckin')
                     AND rmm.rm_status IN ('รอกลับมาเตรียม','รอ Qc','QcCheck รอ MD','QcCheck รอกลับมาเตรียม')
                     AND rmf.rm_group_id = rmg.rm_group_id
                     AND rmm.tro_id IS NOT NULL;
@@ -2264,7 +2272,7 @@ WHERE
         }
     });
 
-     router.get("/coldstorage/history/test/:mapping_id", async (req, res) => {
+    router.get("/coldstorage/history/test/:mapping_id", async (req, res) => {
         try {
             const { mapping_id } = req.params;
             const pool = await connectToDatabase();
@@ -4032,7 +4040,7 @@ WHERE
 
 
             // ตรวจสอบว่าทุกวัตถุดิบมีปลายทางเป็น "เข้าห้องเย็น"
-            const invalidDestItems = rmResults.recordset.filter(item => item.dest !== "เข้าห้องเย็น");
+            const invalidDestItems = rmResults.recordset.filter(item => item.dest !== "เข้าห้องเย็น" && item.dest !== "รอCheckin");
             if (invalidDestItems.length > 0) {
                 await transaction.rollback();
                 return res.status(400).json({
@@ -4040,6 +4048,7 @@ WHERE
                     message: "มีวัตถุดิบในรถเข็นที่ไม่ได้เตรียมเข้าห้องเย็น"
                 });
             }
+
 
 
             // ตรวจสอบสถานะของวัตถุดิบตามเงื่อนไขที่เลือก
@@ -4536,7 +4545,692 @@ WHERE
         }
     });
 
+// router.put("/cold/checkin/update/Trolley", async (req, res) => {
+//     const { tro_id, cs_id, slot_id, selectedOption } = req.body;
 
+//     const pool = await connectToDatabase();
+//     const transaction = pool.transaction();
+
+//     try {
+//         // เริ่ม Transaction
+//         await transaction.begin();
+
+//         console.log("=== 🔍 START DEBUG ===");
+//         console.log("Input params:", { tro_id, cs_id, slot_id, selectedOption });
+
+//         // ✅ ขั้นตอนที่ 1: Lock Slot ตั้งแต่ต้น + ตรวจสอบว่าช่องว่างหรือไม่
+//         const slotLockResult = await transaction
+//             .request()
+//             .input("cs_id", sql.Int, cs_id)
+//             .input("slot_id", sql.VarChar, slot_id)
+//             .query(`
+//                 SELECT 
+//                     tro_id,
+//                     slot_id,
+//                     LEN(slot_id) as slot_id_len,
+//                     LEN(RTRIM(slot_id)) as slot_id_trimmed_len
+//                 FROM Slot WITH (UPDLOCK, HOLDLOCK)
+//                 WHERE cs_id = @cs_id AND RTRIM(slot_id) = RTRIM(@slot_id)
+//             `);
+
+//         console.log("🔒 Slot Lock Result:", slotLockResult.recordset);
+
+//         if (slotLockResult.recordset.length === 0) {
+//             await transaction.rollback();
+//             return res.status(400).json({ 
+//                 success: false, 
+//                 message: "ไม่พบช่องเก็บนี้ในระบบ" 
+//             });
+//         }
+
+//         const currentSlotTroId = slotLockResult.recordset[0].tro_id;
+        
+//         console.log("Current slot tro_id:", currentSlotTroId);
+        
+//         // ตรวจสอบว่าช่องว่างหรือไม่ (ต้องเป็น null หรือ 'rsrv' เท่านั้น)
+//         if (currentSlotTroId !== null && currentSlotTroId !== 'rsrv') {
+//             await transaction.rollback();
+//             return res.status(400).json({ 
+//                 success: false, 
+//                 message: "ช่องเก็บนี้ไม่ว่าง ถูกใช้งานโดยรถเข็น: " + currentSlotTroId
+//             });
+//         }
+
+//         // ตรวจสอบว่ารถเข็นมีอยู่ในระบบหรือไม่
+//         const trolleyResult = await transaction
+//             .request()
+//             .input("tro_id", sql.VarChar(4), tro_id)
+//             .query("SELECT tro_status, rsrv_timestamp FROM Trolley WHERE tro_id = @tro_id");
+
+//         if (trolleyResult.recordset.length === 0) {
+//             await transaction.rollback();
+//             return res.status(400).json({ 
+//                 success: false, 
+//                 message: "รถเข็นไม่พร้อมใช้งาน" 
+//             });
+//         }
+
+//         // ตรวจสอบว่ารถเข็นอยู่ในห้องเย็นอยู่แล้วหรือไม่
+//         const trolleyInColdResult = await transaction
+//             .request()
+//             .input("tro_id", sql.VarChar(4), tro_id)
+//             .query("SELECT cs_id, slot_id FROM Slot WHERE tro_id = @tro_id");
+
+//         if (trolleyInColdResult.recordset.length > 0) {
+//             await transaction.rollback();
+//             return res.status(400).json({
+//                 success: false,
+//                 message: `รถเข็นนี้อยู่ในห้องเย็นอยู่แล้ว (ช่อง ${trolleyInColdResult.recordset[0].slot_id})`
+//             });
+//         }
+
+//         const tro_status = trolleyResult.recordset[0].tro_status;
+//         const rsrv_timestamp = trolleyResult.recordset[0].rsrv_timestamp;
+
+//         console.log("tro_status", tro_status);
+//         console.log("rsrv_timestamp", rsrv_timestamp);
+
+//         // ========== กรณีรถเข็นว่าง ==========
+//         if (selectedOption === "รถเข็นว่าง") {
+//             // ตรวจสอบสถานะรถเข็น
+//             if (tro_status === false) {
+//                 await transaction.rollback();
+//                 return res.status(400).json({ 
+//                     success: false, 
+//                     message: "รถเข็นคันนี้ถูกใช้งานแล้ว" 
+//                 });
+//             }
+
+//             if (rsrv_timestamp === null) {
+//                 await transaction.rollback();
+//                 return res.status(400).json({
+//                     success: false,
+//                     message: "ไม่สามารถจองรถเข็นได้เนื่องจากเลยเวลาดำเนินการ 5 นาที"
+//                 });
+//             }
+
+//             if (tro_status === 1 || tro_status === 0) {
+//                 await transaction.rollback();
+//                 return res.status(400).json({
+//                     success: false,
+//                     message: "ไม่สามารถจองรถเข็นได้เนื่องจากเลยเวลาดำเนินการ 5 นาที"
+//                 });
+//             }
+
+//             console.log("=== 🔄 UPDATING SLOT (รถเข็นว่าง) ===");
+//             console.log("Before update - tro_id:", tro_id, "cs_id:", cs_id, "slot_id:", slot_id);
+
+//             // 🔥 ขั้นตอนที่ 2: UPDATE Slot ด้วย check condition ในคำสั่งเดียว
+//             const slotUpdateResult = await transaction
+//                 .request()
+//                 .input("tro_id", sql.VarChar(4), tro_id)
+//                 .input("cs_id", sql.Int, cs_id)
+//                 .input("slot_id", sql.VarChar, slot_id)
+//                 .query(`
+//                     UPDATE Slot 
+//                     SET tro_id = @tro_id, reserved_at = NULL 
+//                     WHERE cs_id = @cs_id 
+//                       AND RTRIM(slot_id) = RTRIM(@slot_id)
+//                       AND (tro_id IS NULL OR tro_id = 'rsrv')
+//                 `);
+
+//             console.log("✅ Slot update rows affected:", slotUpdateResult.rowsAffected[0]);
+
+//             // ตรวจสอบว่า UPDATE สำเร็จหรือไม่
+//             if (slotUpdateResult.rowsAffected[0] === 0) {
+//                 await transaction.rollback();
+//                 return res.status(400).json({ 
+//                     success: false, 
+//                     message: "ช่องเก็บไม่ว่าง หรือถูกใช้งานไปแล้ว" 
+//                 });
+//             }
+
+//             // 🔍 ตรวจสอบว่า UPDATE จริงๆ หรือไม่
+//             const verifySlot = await transaction
+//                 .request()
+//                 .input("cs_id", sql.Int, cs_id)
+//                 .input("slot_id", sql.VarChar, slot_id)
+//                 .query(`
+//                     SELECT tro_id, reserved_at 
+//                     FROM Slot 
+//                     WHERE cs_id = @cs_id AND RTRIM(slot_id) = RTRIM(@slot_id)
+//                 `);
+
+//             console.log("🔍 Verified slot after update:", verifySlot.recordset);
+
+//             if (!verifySlot.recordset[0] || verifySlot.recordset[0].tro_id !== tro_id) {
+//                 await transaction.rollback();
+//                 return res.status(400).json({ 
+//                     success: false, 
+//                     message: "การอัปเดต Slot ไม่สำเร็จ",
+//                     debug: {
+//                         expected: tro_id,
+//                         actual: verifySlot.recordset[0]?.tro_id
+//                     }
+//                 });
+//             }
+
+//             // อัพเดต tro_status เป็น 0 ในตาราง Trolley
+//             const trolleyUpdateResult = await transaction
+//                 .request()
+//                 .input("tro_id", sql.VarChar(4), tro_id)
+//                 .query("UPDATE Trolley SET tro_status = 0, rsrv_timestamp = null WHERE tro_id = @tro_id");
+
+//             if (trolleyUpdateResult.rowsAffected[0] === 0) {
+//                 await transaction.rollback();
+//                 return res.status(400).json({ 
+//                     success: false, 
+//                     message: "ไม่สามารถอัปเดตสถานะรถเข็นได้" 
+//                 });
+//             }
+
+//             console.log("=== ✅ COMMITTING TRANSACTION (รถเข็นว่าง) ===");
+
+//             // Commit transaction
+//             await transaction.commit();
+
+//             console.log("=== 🎉 SUCCESS (รถเข็นว่าง) ===");
+
+//             return res.status(200).json({ 
+//                 success: true, 
+//                 message: "รับเข้ารถเข็นว่าง" 
+//             });
+//         }
+
+//         // ========== กรณีรถเข็นมีวัตถุดิบ ==========
+        
+//         // ตรวจสอบข้อมูลวัตถุดิบใน TrolleyRMMapping
+//         const rmResults = await transaction
+//             .request()
+//             .input("tro_id", sql.VarChar(4), tro_id)
+//             .query(`
+//                 SELECT dest, rmm_line_name, rm_status, cold_time, prep_to_cold_time, 
+//                        rework_time, mix_time, rmfp_id, mapping_id 
+//                 FROM TrolleyRMMapping 
+//                 WHERE tro_id = @tro_id
+//             `);
+
+//         if (rmResults.recordset.length === 0) {
+//             await transaction.rollback();
+//             return res.status(400).json({ 
+//                 success: false, 
+//                 message: "ไม่พบวัตถุดิบในรถเข็นนี้" 
+//             });
+//         }
+
+//         console.log(`Found ${rmResults.recordset.length} items in trolley`);
+
+//         // ตรวจสอบว่าทุกวัตถุดิบมีปลายทางเป็น "เข้าห้องเย็น"
+//         const invalidDestItems = rmResults.recordset.filter(item => item.dest !== "เข้าห้องเย็น");
+//         if (invalidDestItems.length > 0) {
+//             await transaction.rollback();
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "มีวัตถุดิบในรถเข็นที่ไม่ได้เตรียมเข้าห้องเย็น"
+//             });
+//         }
+
+//         // ตรวจสอบสถานะของวัตถุดิบตามเงื่อนไขที่เลือก
+//         const statusMap = {
+//             "วัตถุดิบรอแก้ไข": ["รอแก้ไข"],
+//             "วัตถุดิบรับฝาก": ["QcCheck รอกลับมาเตรียม", "QcCheck รอ MD", "รอ Qc", "รอกลับมาเตรียม"],
+//             "วัตถุดิบตรง": ["QcCheck"],
+//             "เหลือจากไลน์ผลิต": ["เหลือจากไลน์ผลิต"],
+//         };
+
+//         if (!(selectedOption in statusMap)) {
+//             await transaction.rollback();
+//             return res.status(400).json({ 
+//                 success: false, 
+//                 message: "ตัวเลือกไม่ถูกต้อง" 
+//             });
+//         }
+
+//         const validStatuses = statusMap[selectedOption];
+//         const invalidStatusItems = rmResults.recordset.filter(item =>
+//             !validStatuses.includes(item.rm_status)
+//         );
+
+//         if (invalidStatusItems.length > 0) {
+//             await transaction.rollback();
+//             return res.status(400).json({
+//                 success: false,
+//                 message: `ไม่ตรงเงื่อนไขรับเข้า ${selectedOption} มีวัตถุดิบที่มีสถานะไม่ตรงกับเงื่อนไข`
+//             });
+//         }
+
+//         console.log("=== 🔄 UPDATING SLOT (มีวัตถุดิบ) ===");
+//         console.log("Before update - tro_id:", tro_id, "cs_id:", cs_id, "slot_id:", slot_id);
+
+//         // 🔥 ขั้นตอนที่ 2: UPDATE Slot ก่อน UPDATE TrolleyRMMapping
+//         const slotUpdateResult = await transaction
+//             .request()
+//             .input("tro_id", sql.VarChar(4), tro_id)
+//             .input("cs_id", sql.Int, cs_id)
+//             .input("slot_id", sql.VarChar, slot_id)
+//             .query(`
+//                 UPDATE Slot 
+//                 SET tro_id = @tro_id, reserved_at = NULL 
+//                 WHERE cs_id = @cs_id 
+//                   AND RTRIM(slot_id) = RTRIM(@slot_id)
+//                   AND (tro_id IS NULL OR tro_id = 'rsrv')
+//             `);
+
+//         console.log("✅ Slot update rows affected:", slotUpdateResult.rowsAffected[0]);
+
+//         // ตรวจสอบว่า UPDATE Slot สำเร็จหรือไม่
+//         if (slotUpdateResult.rowsAffected[0] === 0) {
+//             await transaction.rollback();
+//             return res.status(400).json({ 
+//                 success: false, 
+//                 message: "ช่องเก็บไม่ว่าง หรือถูกใช้งานไปแล้ว" 
+//             });
+//         }
+
+//         // 🔍 ตรวจสอบว่า UPDATE จริงๆ หรือไม่
+//         const verifySlot = await transaction
+//             .request()
+//             .input("cs_id", sql.Int, cs_id)
+//             .input("slot_id", sql.VarChar, slot_id)
+//             .query(`
+//                 SELECT tro_id, reserved_at 
+//                 FROM Slot 
+//                 WHERE cs_id = @cs_id AND RTRIM(slot_id) = RTRIM(@slot_id)
+//             `);
+
+//         console.log("🔍 Verified slot after update:", verifySlot.recordset);
+
+//         if (!verifySlot.recordset[0] || verifySlot.recordset[0].tro_id !== tro_id) {
+//             await transaction.rollback();
+//             return res.status(400).json({ 
+//                 success: false, 
+//                 message: "การอัปเดต Slot ไม่สำเร็จ",
+//                 debug: {
+//                     expected: tro_id,
+//                     actual: verifySlot.recordset[0]?.tro_id
+//                 }
+//             });
+//         }
+
+//         // ขั้นตอนที่ 3: UPDATE TrolleyRMMapping
+//         let successfulUpdates = 0;
+
+//         for (const item of rmResults.recordset) {
+//             const { cold_time, prep_to_cold_time, rework_time, mix_time, rmfp_id, mapping_id } = item;
+
+//             let coldTimeValue = cold_time;
+//             let pic_time = prep_to_cold_time;
+//             let ReworkTime = rework_time;
+//             let MixTime = mix_time;
+
+//             console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, cold_time ตอนรับ:`, cold_time);
+//             console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, ptc_time ตอนรับ:`, prep_to_cold_time);
+//             console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, rework_time ตอนรับ:`, rework_time);
+//             console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, mix_time ตอนรับ:`, mix_time);
+
+//             // เฉพาะกรณีที่ cold_time เป็น null ให้ดึงค่าจาก RawMatGroup
+//             if (cold_time === null) {
+//                 const rmgResult = await transaction
+//                     .request()
+//                     .input("rmfp_id", sql.Int, rmfp_id)
+//                     .query(`
+//                         SELECT rmg.cold
+//                         FROM RMForProd rmf
+//                         JOIN RawMatGroup rmg ON rmg.rm_group_id = rmf.rm_group_id
+//                         WHERE rmf.rmfp_id = @rmfp_id
+//                     `);
+
+//                 if (rmgResult.recordset.length > 0) {
+//                     coldTimeValue = rmgResult.recordset[0].cold;
+//                 }
+//             }
+
+//             // คำนวณ mix_time
+//             if (mix_time !== null) {
+//                 const mixQuery = await transaction
+//                     .request()
+//                     .input("mapping_id", sql.Int, mapping_id)
+//                     .query(`
+//                         SELECT FORMAT(mixed_date, 'yyyy-MM-dd HH:mm:ss') AS mixed_date
+//                         FROM History
+//                         WHERE mapping_id = @mapping_id AND mixed_date IS NOT NULL
+//                     `);
+
+//                 if (mixQuery.recordset.length > 0 && mixQuery.recordset[0].mixed_date) {
+//                     const mixedDate = new Date(mixQuery.recordset[0].mixed_date);
+//                     const currentDate = new Date();
+//                     const timeDiffMinutes = (currentDate - mixedDate) / (1000 * 60);
+
+//                     console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, ใช้เวลาอ้างอิงจาก mixed_date`);
+
+//                     if (mix_time === 0.00) {
+//                         const totalMinutesRemaining = -timeDiffMinutes;
+//                         const updatedHours = Math.floor(Math.abs(totalMinutesRemaining) / 60);
+//                         const updatedMinutes = Math.floor(Math.abs(totalMinutesRemaining) % 60);
+//                         MixTime = -1 * (updatedHours + (updatedMinutes / 100));
+
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, กรณี mix_time เป็น 0.00`);
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่ผ่านไปแล้ว (นาที):`, timeDiffMinutes);
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่เหลือ (ติดลบ):`, MixTime);
+//                     } else {
+//                         const isNegative = mix_time < 0;
+//                         const absValue = Math.abs(mix_time);
+//                         const hours = Math.floor(absValue);
+//                         const minutes = Math.round((absValue - hours) * 100);
+
+//                         let totalMinutes = (isNegative ? -1 : 1) * (hours * 60 + minutes);
+//                         const totalMinutesRemaining = totalMinutes - timeDiffMinutes;
+
+//                         const isResultNegative = totalMinutesRemaining < 0;
+//                         const absMinutesRemaining = Math.abs(totalMinutesRemaining);
+//                         const updatedHours = Math.floor(absMinutesRemaining / 60);
+//                         const updatedMinutes = Math.floor(absMinutesRemaining % 60);
+
+//                         MixTime = (isResultNegative ? -1 : 1) * (updatedHours + (updatedMinutes / 100));
+
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, mix_time เดิม:`, mix_time);
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่ผ่านไปแล้ว (นาที):`, timeDiffMinutes);
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่เหลืออยู่ (ชั่วโมง.นาที):`, MixTime);
+//                     }
+
+//                     MixTime = parseFloat(MixTime.toFixed(2));
+//                 }
+//             }
+
+//             // คำนวณ rework_time
+//             if (rework_time !== null) {
+//                 const reworkQuery = await transaction
+//                     .request()
+//                     .input("mapping_id", sql.Int, mapping_id)
+//                     .query(`
+//                         SELECT FORMAT(qc_date, 'yyyy-MM-dd HH:mm:ss') AS qc_date
+//                         FROM History
+//                         WHERE mapping_id = @mapping_id AND qc_date IS NOT NULL
+//                     `);
+
+//                 if (reworkQuery.recordset.length > 0 && reworkQuery.recordset[0].qc_date) {
+//                     const qcDate = new Date(reworkQuery.recordset[0].qc_date);
+//                     const currentDate = new Date();
+//                     const timeDiffMinutes = (currentDate - qcDate) / (1000 * 60);
+
+//                     console.log(`RMFP ID: ${rmfp_id}, ใช้เวลาอ้างอิงจาก qc_date`);
+
+//                     if (rework_time === 0.00) {
+//                         const totalMinutesRemaining = -timeDiffMinutes;
+//                         const updatedHours = Math.floor(Math.abs(totalMinutesRemaining) / 60);
+//                         const updatedMinutes = Math.floor(Math.abs(totalMinutesRemaining) % 60);
+//                         ReworkTime = -1 * (updatedHours + (updatedMinutes / 100));
+
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, กรณี rework_time เป็น 0.00`);
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่ผ่านไปแล้ว (นาที):`, timeDiffMinutes);
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่เหลือ (ติดลบ):`, ReworkTime);
+//                     } else {
+//                         const isNegative = rework_time < 0;
+//                         const absValue = Math.abs(rework_time);
+//                         const hours = Math.floor(absValue);
+//                         const minutes = Math.round((absValue - hours) * 100);
+
+//                         let totalMinutes = (isNegative ? -1 : 1) * (hours * 60 + minutes);
+//                         const totalMinutesRemaining = totalMinutes - timeDiffMinutes;
+
+//                         const isResultNegative = totalMinutesRemaining < 0;
+//                         const absMinutesRemaining = Math.abs(totalMinutesRemaining);
+//                         const updatedHours = Math.floor(absMinutesRemaining / 60);
+//                         const updatedMinutes = Math.floor(absMinutesRemaining % 60);
+
+//                         ReworkTime = (isResultNegative ? -1 : 1) * (updatedHours + (updatedMinutes / 100));
+
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, rework_time เดิม:`, rework_time);
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่ผ่านไปแล้ว (นาที):`, timeDiffMinutes);
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่เหลืออยู่ (ชั่วโมง.นาที):`, ReworkTime);
+//                     }
+
+//                     ReworkTime = parseFloat(ReworkTime.toFixed(2));
+//                 }
+//             } else {
+//                 // กรณี rework_time เป็น null ให้คำนวณ prep_to_cold_time
+//                 if (prep_to_cold_time === null) {
+//                     const ptcResult = await transaction
+//                         .request()
+//                         .input("rmfp_id", sql.Int, rmfp_id)
+//                         .input("tro_id", sql.VarChar(4), tro_id)
+//                         .query(`
+//                             SELECT
+//                                 rmg.prep_to_cold,
+//                                 FORMAT(htr.cooked_date, 'yyyy-MM-dd HH:mm:ss') AS cooked_date,
+//                                 FORMAT(htr.rmit_date, 'yyyy-MM-dd HH:mm:ss') AS rmit_date
+//                             FROM TrolleyRMMapping rmm
+//                             JOIN RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
+//                             JOIN RawMatGroup rmg ON rmg.rm_group_id = rmf.rm_group_id
+//                             JOIN History htr ON rmm.mapping_id = htr.mapping_id
+//                             WHERE rmm.rmfp_id = @rmfp_id AND rmm.tro_id = @tro_id
+//                         `);
+
+//                     if (ptcResult.recordset.length > 0) {
+//                         const prepToCold = ptcResult.recordset[0].prep_to_cold;
+//                         const currentDate = new Date();
+
+//                         const referenceDate = ptcResult.recordset[0].rmit_date ?
+//                             new Date(ptcResult.recordset[0].rmit_date) :
+//                             new Date(ptcResult.recordset[0].cooked_date);
+//                         const referenceType = ptcResult.recordset[0].rmit_date ? 'rmit_date' : 'cooked_date';
+
+//                         const timeDiffMinutes = (currentDate - referenceDate) / (1000 * 60);
+//                         let remainingTimeHours = prepToCold - (timeDiffMinutes / 60);
+
+//                         const hours = Math.floor(remainingTimeHours);
+//                         const minutes = Math.floor((remainingTimeHours - hours) * 60);
+
+//                         pic_time = hours + (minutes / 100);
+//                         pic_time = parseFloat(pic_time.toFixed(2));
+
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, ใช้เวลาอ้างอิงจาก: ${referenceType}`);
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, prep_to_cold จาก RawMatGroup:`, prepToCold);
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่ผ่านไปแล้ว (นาที):`, timeDiffMinutes);
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่เหลืออยู่ (ชั่วโมง.นาที):`, pic_time);
+//                     }
+//                 } else {
+//                     const ptcQuery = await transaction
+//                         .request()
+//                         .input("rmfp_id", sql.Int, rmfp_id)
+//                         .input("tro_id", sql.VarChar(4), tro_id)
+//                         .query(`
+//                             SELECT
+//                                 FORMAT(htr.cooked_date, 'yyyy-MM-dd HH:mm:ss') AS cooked_date,
+//                                 FORMAT(htr.rmit_date, 'yyyy-MM-dd HH:mm:ss') AS rmit_date,
+//                                 FORMAT(htr.out_cold_date, 'yyyy-MM-dd HH:mm:ss') AS out_cold_date,
+//                                 FORMAT(htr.out_cold_date_two, 'yyyy-MM-dd HH:mm:ss') AS out_cold_date_two,
+//                                 FORMAT(htr.out_cold_date_three, 'yyyy-MM-dd HH:mm:ss') AS out_cold_date_three
+//                             FROM TrolleyRMMapping rmm
+//                             JOIN History htr ON rmm.mapping_id = htr.mapping_id
+//                             WHERE rmm.rmfp_id = @rmfp_id AND rmm.tro_id = @tro_id
+//                         `);
+
+//                     if (ptcQuery.recordset.length > 0) {
+//                         const outColdDates = [
+//                             ptcQuery.recordset[0].out_cold_date_three,
+//                             ptcQuery.recordset[0].out_cold_date_two,
+//                             ptcQuery.recordset[0].out_cold_date
+//                         ].filter(date => date);
+
+//                         let referenceDate;
+//                         let referenceType = '';
+
+//                         if (outColdDates.length > 0) {
+//                             referenceDate = new Date(outColdDates[0]);
+//                             referenceType = 'out_cold_date';
+//                         } else {
+//                             referenceDate = ptcQuery.recordset[0].rmit_date ?
+//                                 new Date(ptcQuery.recordset[0].rmit_date) :
+//                                 new Date(ptcQuery.recordset[0].cooked_date);
+//                             referenceType = ptcQuery.recordset[0].rmit_date ? 'rmit_date' : 'cooked_date';
+//                         }
+
+//                         const currentDate = new Date();
+//                         const timeDiffMinutes = (currentDate - referenceDate) / (1000 * 60);
+
+//                         console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, ใช้เวลาอ้างอิงจาก: ${referenceType}`);
+
+//                         if (prep_to_cold_time === 0.00) {
+//                             const totalMinutesRemaining = -timeDiffMinutes;
+//                             const updatedHours = Math.floor(Math.abs(totalMinutesRemaining) / 60);
+//                             const updatedMinutes = Math.floor(Math.abs(totalMinutesRemaining) % 60);
+//                             pic_time = -1 * (updatedHours + (updatedMinutes / 100));
+
+//                             console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, กรณี prep_to_cold_time เป็น 0.00`);
+//                             console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่ผ่านไปแล้ว (นาที):`, timeDiffMinutes);
+//                             console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่เหลือ (ติดลบ):`, pic_time);
+//                         } else {
+//                             const isNegative = prep_to_cold_time < 0;
+//                             const absValue = Math.abs(prep_to_cold_time);
+//                             const hours = Math.floor(absValue);
+//                             const minutes = Math.round((absValue - hours) * 100);
+
+//                             let totalMinutes = (isNegative ? -1 : 1) * (hours * 60 + minutes);
+//                             const totalMinutesRemaining = totalMinutes - timeDiffMinutes;
+
+//                             const isResultNegative = totalMinutesRemaining < 0;
+//                             const absMinutesRemaining = Math.abs(totalMinutesRemaining);
+//                             const updatedHours = Math.floor(absMinutesRemaining / 60);
+//                             const updatedMinutes = Math.round(absMinutesRemaining % 60);
+
+//                             pic_time = (isResultNegative ? -1 : 1) * (updatedHours + (updatedMinutes / 100));
+
+//                             console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, prep_to_cold_time เดิม:`, prep_to_cold_time);
+//                             console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่ผ่านไปแล้ว (นาที):`, timeDiffMinutes);
+//                             console.log(`MP ID : ${mapping_id} ,RMFP ID: ${rmfp_id}, เวลาที่เหลืออยู่ (ชั่วโมง.นาที):`, pic_time);
+//                         }
+
+//                         pic_time = parseFloat(pic_time.toFixed(2));
+//                     }
+//                 }
+//             }
+
+//             console.log(`MP ID ${mapping_id}, RMFP ID: ${rmfp_id}, cold_time update:`, coldTimeValue);
+//             console.log(`MP ID ${mapping_id}, RMFP ID: ${rmfp_id}, prep_to_cold_time:`, pic_time);
+//             console.log(`MP ID ${mapping_id}, RMFP ID: ${rmfp_id}, rework_time update:`, ReworkTime);
+
+//             // อัปเดตข้อมูลในตาราง TrolleyRMMapping
+//             const updateResult = await transaction
+//                 .request()
+//                 .input("rmfp_id", sql.Int, rmfp_id)
+//                 .input("tro_id", sql.VarChar(4), tro_id)
+//                 .input("selectedOption", sql.VarChar, selectedOption)
+//                 .input("stay_place", sql.VarChar, "เข้าห้องเย็น")
+//                 .input("dest", sql.VarChar, "ห้องเย็น")
+//                 .input("cold_time", sql.Float, coldTimeValue)
+//                 .input("prep_to_cold_time", sql.Float, pic_time)
+//                 .input("rework_time", sql.Float, ReworkTime)
+//                 .input("mix_time", sql.Float, MixTime)
+//                 .query(`
+//                     UPDATE TrolleyRMMapping
+//                     SET
+//                         rm_cold_status = @selectedOption,
+//                         stay_place = @stay_place,
+//                         dest = @dest,
+//                         cold_time = @cold_time,
+//                         prep_to_cold_time = @prep_to_cold_time,
+//                         rework_time = @rework_time,
+//                         mix_time = @mix_time
+//                     WHERE tro_id = @tro_id AND rmfp_id = @rmfp_id
+//                 `);
+
+//             if (updateResult.rowsAffected[0] === 0) {
+//                 await transaction.rollback();
+//                 return res.status(400).json({
+//                     success: false,
+//                     message: `ไม่สามารถอัปเดตข้อมูลวัตถุดิบ RMFP ID: ${rmfp_id} ได้`
+//                 });
+//             }
+
+//             successfulUpdates++;
+//         }
+
+//         // ตรวจสอบว่าอัปเดตครบทุก item หรือไม่
+//         if (successfulUpdates !== rmResults.recordset.length) {
+//             await transaction.rollback();
+//             return res.status(400).json({
+//                 success: false,
+//                 message: `อัปเดตข้อมูลไม่ครบ อัปเดตสำเร็จ ${successfulUpdates}/${rmResults.recordset.length} รายการ`
+//             });
+//         }
+
+//         // ขั้นตอนที่ 4: อัปเดตประวัติการเข้าห้องเย็น
+//         const mappingResults = await transaction.request()
+//             .input("tro_id", sql.VarChar(4), tro_id)
+//             .query("SELECT mapping_id FROM TrolleyRMMapping WHERE tro_id = @tro_id");
+
+//         if (mappingResults.recordset.length > 0) {
+//             let historyUpdateCount = 0;
+
+//             for (const row of mappingResults.recordset) {
+//                 const mapping_id = row.mapping_id;
+
+//                 const historyUpdateResult = await transaction.request()
+//                     .input("mapping_id", sql.Int, mapping_id)
+//                     .query(`
+//                         UPDATE History
+//                         SET
+//                           come_cold_date =
+//                             CASE
+//                               WHEN come_cold_date IS NULL THEN GETDATE()
+//                               ELSE come_cold_date
+//                             END,
+//                           come_cold_date_two =
+//                             CASE
+//                               WHEN come_cold_date IS NOT NULL AND come_cold_date_two IS NULL THEN GETDATE()
+//                               ELSE come_cold_date_two
+//                             END,
+//                           come_cold_date_three =
+//                             CASE
+//                               WHEN come_cold_date IS NOT NULL AND come_cold_date_two IS NOT NULL AND come_cold_date_three IS NULL THEN GETDATE()
+//                               ELSE come_cold_date_three
+//                             END
+//                         WHERE mapping_id = @mapping_id
+//                     `);
+
+//                 if (historyUpdateResult.rowsAffected[0] > 0) {
+//                     historyUpdateCount++;
+//                 }
+//             }
+
+//             // ตรวจสอบว่าอัปเดต History ครบหรือไม่
+//             if (historyUpdateCount !== mappingResults.recordset.length) {
+//                 await transaction.rollback();
+//                 return res.status(400).json({
+//                     success: false,
+//                     message: `ไม่สามารถอัปเดตประวัติการเข้าห้องเย็นได้ครบทุกรายการ (อัปเดตสำเร็จ ${historyUpdateCount}/${mappingResults.recordset.length})`
+//                 });
+//             }
+//         }
+
+//         console.log("=== ✅ COMMITTING TRANSACTION ===");
+
+//         // Commit transaction เมื่อทุกอย่างสำเร็จ
+//         await transaction.commit();
+
+//         console.log("=== 🎉 SUCCESS ===");
+
+//         // ส่ง socket event หลัง commit สำเร็จ
+//         io.to('saveRMForProdRoom').emit('dataUpdated', []);
+
+//         return res.status(200).json({ 
+//             success: true, 
+//             message: `รับเข้า ${selectedOption}` 
+//         });
+
+//     } catch (err) {
+//         // Rollback ถ้าเกิด error ใดๆ
+//         try {
+//             await transaction.rollback();
+//         } catch (rollbackErr) {
+//             console.error("Rollback error", rollbackErr);
+//         }
+
+//         console.error("SQL error", err);
+//         res.status(500).json({ success: false, error: err.message });
+//     }
+// });
 
 
     // router.put("/coldstorage/moveRawmatintolley", async (req, res) => {

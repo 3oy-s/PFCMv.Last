@@ -231,7 +231,6 @@ module.exports = (io) => {
 		}
 	});
 
-
 router.post("/qc/check", async (req, res) => {
 	let transaction;
 	try {
@@ -743,566 +742,566 @@ if (destlast === 'ผสมเตรียม' && rm_status === 'QcCheck') {
 	}
 });
 
-router.post("/qc/checkV2", async (req, res) => {
-	let transaction;
-	try {
-		const {
-			mapping_id,
-			color,
-			odor,
-			texture,
-			sq_remark,
-			md,
-			md_remark,
-			defect,
-			defect_remark,
-			Defectacceptance,
-			Sensoryacceptance,
-			md_no,
-			operator,
-			rm_status_qc,
-			WorkAreaCode,
-			Moisture,
-			Temp,
-			md_time,
-			tro_id,
-			percent_fine,
-			weight_RM,
-			rmm_line_name,
-			tray_count,
-			dest,
-			general_remark,
-			prepare_mor_night
-		} = req.body;
+// router.post("/qc/check/TrolleyWait", async (req, res) => {
+// 	let transaction;
+// 	try {
+// 		const {
+// 			mapping_id,
+// 			color,
+// 			odor,
+// 			texture,
+// 			sq_remark,
+// 			md,
+// 			md_remark,
+// 			defect,
+// 			defect_remark,
+// 			Defectacceptance,
+// 			Sensoryacceptance,
+// 			md_no,
+// 			operator,
+// 			rm_status_qc,
+// 			WorkAreaCode,
+// 			Moisture,
+// 			Temp,
+// 			md_time,
+// 			tro_id,
+// 			percent_fine,
+// 			weight_RM,
+// 			rmm_line_name,
+// 			tray_count,
+// 			dest,
+// 			general_remark,
+// 			prepare_mor_night
+// 		} = req.body;
 
-		// ========================================
-		// 📝 LOGGING - Request Info
-		// ========================================
-		console.log("=== QC Check Request ===");
-		console.log("📥 mapping_id:", mapping_id);
-		console.log("📥 dest:", dest);
-		console.log("📥 tro_id:", tro_id);
-		console.log("📥 operator:", operator);
-		console.log("📊 QC Results:");
-		console.log("  - color:", color);
-		console.log("  - odor:", odor);
-		console.log("  - texture:", texture);
-		console.log("  - md:", md);
-		console.log("  - defect:", defect);
-		console.log("  - Sensoryacceptance:", Sensoryacceptance);
-		console.log("  - Defectacceptance:", Defectacceptance);
-		console.log("========================");
+// 		// ========================================
+// 		// 📝 LOGGING - Request Info
+// 		// ========================================
+// 		console.log("=== QC Check Request ===");
+// 		console.log("📥 mapping_id:", mapping_id);
+// 		console.log("📥 dest:", dest);
+// 		console.log("📥 tro_id:", tro_id);
+// 		console.log("📥 operator:", operator);
+// 		console.log("📊 QC Results:");
+// 		console.log("  - color:", color);
+// 		console.log("  - odor:", odor);
+// 		console.log("  - texture:", texture);
+// 		console.log("  - md:", md);
+// 		console.log("  - defect:", defect);
+// 		console.log("  - Sensoryacceptance:", Sensoryacceptance);
+// 		console.log("  - Defectacceptance:", Defectacceptance);
+// 		console.log("========================");
 
-		// ========================================
-		// ✅ VALIDATION - Input Data
-		// ========================================
-		if (
-			!mapping_id ||
-			isNaN(mapping_id) ||
-			color === undefined ||
-			odor === undefined ||
-			texture === undefined ||
-			md === undefined ||
-			defect === undefined ||
-			!operator ||
-			!dest ||
-			!tro_id ||
-			weight_RM === undefined || 
-			weight_RM === null ||
-			tray_count === undefined || 
-			tray_count === null ||
-			(md === 1 && (!md_no || !WorkAreaCode))
-		) {
-			console.warn("⚠️ Validation Failed - Missing Required Fields");
-			return res.status(400).json({
-				success: false,
-				message: "กรุณากรอกข้อมูลให้ครบถ้วน",
-				missing_fields: {
-					mapping_id: !mapping_id || isNaN(mapping_id),
-					color: color === undefined,
-					odor: odor === undefined,
-					texture: texture === undefined,
-					md: md === undefined,
-					defect: defect === undefined,
-					operator: !operator,
-					dest: !dest,
-					tro_id: !tro_id,
-					weight_RM: weight_RM === undefined || weight_RM === null,
-					tray_count: tray_count === undefined || tray_count === null,
-					md_no: md === 1 && !md_no,
-					WorkAreaCode: md === 1 && !WorkAreaCode
-				}
-			});
-		}
+// 		// ========================================
+// 		// ✅ VALIDATION - Input Data
+// 		// ========================================
+// 		if (
+// 			!mapping_id ||
+// 			isNaN(mapping_id) ||
+// 			color === undefined ||
+// 			odor === undefined ||
+// 			texture === undefined ||
+// 			md === undefined ||
+// 			defect === undefined ||
+// 			!operator ||
+// 			!dest ||
+// 			!tro_id ||
+// 			weight_RM === undefined || 
+// 			weight_RM === null ||
+// 			tray_count === undefined || 
+// 			tray_count === null ||
+// 			(md === 1 && (!md_no || !WorkAreaCode))
+// 		) {
+// 			console.warn("⚠️ Validation Failed - Missing Required Fields");
+// 			return res.status(400).json({
+// 				success: false,
+// 				message: "กรุณากรอกข้อมูลให้ครบถ้วน",
+// 				missing_fields: {
+// 					mapping_id: !mapping_id || isNaN(mapping_id),
+// 					color: color === undefined,
+// 					odor: odor === undefined,
+// 					texture: texture === undefined,
+// 					md: md === undefined,
+// 					defect: defect === undefined,
+// 					operator: !operator,
+// 					dest: !dest,
+// 					tro_id: !tro_id,
+// 					weight_RM: weight_RM === undefined || weight_RM === null,
+// 					tray_count: tray_count === undefined || tray_count === null,
+// 					md_no: md === 1 && !md_no,
+// 					WorkAreaCode: md === 1 && !WorkAreaCode
+// 				}
+// 			});
+// 		}
 
-		// ========================================
-		// 🔄 DATE CONVERSION
-		// ========================================
-		let thaiMdDateTime = null;
-		if (md_time) {
-			try {
-				const dateObj = new Date(md_time);
-				dateObj.setHours(dateObj.getHours() + 7);
-				thaiMdDateTime = dateObj;
-				console.log("✅ MD Time converted:", thaiMdDateTime);
-			} catch (error) {
-				console.error("❌ Error parsing md_time:", error);
-				thaiMdDateTime = null;
-			}
-		}
+// 		// ========================================
+// 		// 🔄 DATE CONVERSION
+// 		// ========================================
+// 		let thaiMdDateTime = null;
+// 		if (md_time) {
+// 			try {
+// 				const dateObj = new Date(md_time);
+// 				dateObj.setHours(dateObj.getHours() + 7);
+// 				thaiMdDateTime = dateObj;
+// 				console.log("✅ MD Time converted:", thaiMdDateTime);
+// 			} catch (error) {
+// 				console.error("❌ Error parsing md_time:", error);
+// 				thaiMdDateTime = null;
+// 			}
+// 		}
 
-		const pool = await connectToDatabase();
+// 		const pool = await connectToDatabase();
 
-		// ========================================
-		// ✅ VALIDATION - Trolley Status
-		// ========================================
-		if (tro_id) {
-			const trolleyCheck = await pool
-				.request()
-				.input("tro_id", sql.NVarChar, tro_id)
-				.query(`
-					SELECT tro_status
-					FROM [PFCMv2].[dbo].[Trolley]
-					WHERE tro_id = @tro_id
-				`);
+// 		// ========================================
+// 		// ✅ VALIDATION - Trolley Status
+// 		// ========================================
+// 		if (tro_id) {
+// 			const trolleyCheck = await pool
+// 				.request()
+// 				.input("tro_id", sql.NVarChar, tro_id)
+// 				.query(`
+// 					SELECT tro_status
+// 					FROM [PFCMv2].[dbo].[Trolley]
+// 					WHERE tro_id = @tro_id
+// 				`);
 
-			if (trolleyCheck.recordset.length === 0) {
-				console.warn(`⚠️ Trolley ${tro_id} not found`);
-				return res.status(400).json({
-					success: false,
-					message: `ไม่พบรถเข็นหมายเลข ${tro_id} ในระบบ`
-				});
-			}
+// 			if (trolleyCheck.recordset.length === 0) {
+// 				console.warn(`⚠️ Trolley ${tro_id} not found`);
+// 				return res.status(400).json({
+// 					success: false,
+// 					message: `ไม่พบรถเข็นหมายเลข ${tro_id} ในระบบ`
+// 				});
+// 			}
 
-			const trolleyStatus = trolleyCheck.recordset[0].tro_status;
-			console.log(`📦 Trolley ${tro_id} status:`, trolleyStatus);
-		}
+// 			const trolleyStatus = trolleyCheck.recordset[0].tro_status;
+// 			console.log(`📦 Trolley ${tro_id} status:`, trolleyStatus);
+// 		}
 
-		// ========================================
-		// ✅ VALIDATION - Metal Detector
-		// ========================================
-		if (Number(md) === 1) {
-			const mdCheck = await pool
-				.request()
-				.input("md_no", sql.NVarChar, md_no)
-				.query(`
-					SELECT md_no
-					FROM [PFCMv2].[dbo].[MetalDetectors]
-					WHERE md_no = @md_no AND Status = CAST(1 AS BIT)
-				`);
+// 		// ========================================
+// 		// ✅ VALIDATION - Metal Detector
+// 		// ========================================
+// 		if (Number(md) === 1) {
+// 			const mdCheck = await pool
+// 				.request()
+// 				.input("md_no", sql.NVarChar, md_no)
+// 				.query(`
+// 					SELECT md_no
+// 					FROM [PFCMv2].[dbo].[MetalDetectors]
+// 					WHERE md_no = @md_no AND Status = CAST(1 AS BIT)
+// 				`);
 
-			if (mdCheck.recordset.length === 0) {
-				console.warn(`⚠️ Metal Detector ${md_no} not found or inactive`);
-				return res.status(400).json({
-					success: false,
-					message: `ไม่พบเครื่อง Metal Detector หมายเลข ${md_no} หรือเครื่องไม่พร้อมใช้งาน`,
-				});
-			}
-			console.log(`✅ Metal Detector ${md_no} validated`);
-		}
+// 			if (mdCheck.recordset.length === 0) {
+// 				console.warn(`⚠️ Metal Detector ${md_no} not found or inactive`);
+// 				return res.status(400).json({
+// 					success: false,
+// 					message: `ไม่พบเครื่อง Metal Detector หมายเลข ${md_no} หรือเครื่องไม่พร้อมใช้งาน`,
+// 				});
+// 			}
+// 			console.log(`✅ Metal Detector ${md_no} validated`);
+// 		}
 
-		// ========================================
-		// ✅ VALIDATION - Mapping ID
-		// ========================================
-		const mappingCheck = await pool
-			.request()
-			.input("mapping_id", sql.Int, mapping_id)
-			.query(`
-				SELECT mapping_id
-				FROM [PFCMv2].[dbo].[TrolleyRMMapping]
-				WHERE mapping_id = @mapping_id
-			`);
+// 		// ========================================
+// 		// ✅ VALIDATION - Mapping ID
+// 		// ========================================
+// 		const mappingCheck = await pool
+// 			.request()
+// 			.input("mapping_id", sql.Int, mapping_id)
+// 			.query(`
+// 				SELECT mapping_id
+// 				FROM [PFCMv2].[dbo].[TrolleyRMMapping]
+// 				WHERE mapping_id = @mapping_id
+// 			`);
 
-		if (mappingCheck.recordset.length === 0) {
-			console.warn(`⚠️ Mapping ID ${mapping_id} not found`);
-			return res.status(400).json({
-				success: false,
-				message: `ไม่พบ mapping_id ${mapping_id} ในระบบ`,
-			});
-		}
-		console.log(`✅ Mapping ID ${mapping_id} validated`);
+// 		if (mappingCheck.recordset.length === 0) {
+// 			console.warn(`⚠️ Mapping ID ${mapping_id} not found`);
+// 			return res.status(400).json({
+// 				success: false,
+// 				message: `ไม่พบ mapping_id ${mapping_id} ในระบบ`,
+// 			});
+// 		}
+// 		console.log(`✅ Mapping ID ${mapping_id} validated`);
 
-		// ========================================
-		// 🎯 BUSINESS LOGIC - QC Status Determination
-		// ========================================
-		let destlast = dest;
-		let rm_status = "QcCheck";
-		let qccheck = "ผ่าน";
-		let defect_check = "ผ่าน";
-		let md_check = "ผ่าน";
+// 		// ========================================
+// 		// 🎯 BUSINESS LOGIC - QC Status Determination
+// 		// ========================================
+// 		let destlast = dest;
+// 		let rm_status = "QcCheck";
+// 		let qccheck = "ผ่าน";
+// 		let defect_check = "ผ่าน";
+// 		let md_check = "ผ่าน";
 
-		console.log("=== QC Status Determination ===");
-		console.log("Original dest:", dest);
+// 		console.log("=== QC Status Determination ===");
+// 		console.log("Original dest:", dest);
 
-		// ตรวจสอบ Sensory Quality
-		if ([color, odor, texture].includes(0) && Sensoryacceptance !== 1) {
-			rm_status = "QcCheck รอแก้ไข";
-			qccheck = "ไม่ผ่าน";
-			destlast = "จุดเตรียม";
-			console.log("❌ Sensory Quality Failed → destlast = 'จุดเตรียม'");
-		}
+// 		// ตรวจสอบ Sensory Quality
+// 		if ([color, odor, texture].includes(0) && Sensoryacceptance !== 1) {
+// 			rm_status = "QcCheck รอแก้ไข";
+// 			qccheck = "ไม่ผ่าน";
+// 			destlast = "จุดเตรียม";
+// 			console.log("❌ Sensory Quality Failed → destlast = 'จุดเตรียม'");
+// 		}
 
-		// ตรวจสอบ Defect
-		if (defect === 0 && Defectacceptance !== 1) {
-			rm_status = "QcCheck รอแก้ไข";
-			defect_check = "ไม่ผ่าน";
-			destlast = "จุดเตรียม";
-			console.log("❌ Defect Check Failed → destlast = 'จุดเตรียม'");
-		}
+// 		// ตรวจสอบ Defect
+// 		if (defect === 0 && Defectacceptance !== 1) {
+// 			rm_status = "QcCheck รอแก้ไข";
+// 			defect_check = "ไม่ผ่าน";
+// 			destlast = "จุดเตรียม";
+// 			console.log("❌ Defect Check Failed → destlast = 'จุดเตรียม'");
+// 		}
 
-		// ตรวจสอบ Metal Detector
-		if (md === 0) {
-			if ((defect === 0 && Defectacceptance !== 1) || 
-			    ([color, odor, texture].includes(0) && Sensoryacceptance !== 1)) {
-				rm_status = "QcCheck รอแก้ไข";
-				destlast = "จุดเตรียม";
-				console.log("❌ MD + (Defect or Sensory) Failed → destlast = 'จุดเตรียม'");
-			} else {
-				rm_status = "QcCheck รอ MD";
-				md_check = "รอผ่าน MD";
-				console.log("⏳ Waiting for MD Check");
-			}
-		}
+// 		// ตรวจสอบ Metal Detector
+// 		if (md === 0) {
+// 			if ((defect === 0 && Defectacceptance !== 1) || 
+// 			    ([color, odor, texture].includes(0) && Sensoryacceptance !== 1)) {
+// 				rm_status = "QcCheck รอแก้ไข";
+// 				destlast = "จุดเตรียม";
+// 				console.log("❌ MD + (Defect or Sensory) Failed → destlast = 'จุดเตรียม'");
+// 			} else {
+// 				rm_status = "QcCheck รอ MD";
+// 				md_check = "รอผ่าน MD";
+// 				console.log("⏳ Waiting for MD Check");
+// 			}
+// 		}
 
-		// ✅ กรณีพิเศษ: dest = 'รอCheckin' และ QC ผ่านทั้งหมด
-		if (dest === 'รอCheckin' && rm_status === 'QcCheck') {
-			destlast = 'เข้าห้องเย็น';
-			console.log("✅ Special Case: 'รอCheckin' → 'เข้าห้องเย็น' (QC Passed)");
-		}
+// 		// ✅ กรณีพิเศษ: dest = 'รอCheckin' และ QC ผ่านทั้งหมด
+// 		if (dest === 'รอCheckin' && rm_status === 'QcCheck') {
+// 			destlast = 'เข้าห้องเย็น';
+// 			console.log("✅ Special Case: 'รอCheckin' → 'เข้าห้องเย็น' (QC Passed)");
+// 		}
 
-		console.log("=== Final QC Results ===");
-		console.log("✅ rm_status:", rm_status);
-		console.log("✅ destlast:", destlast);
-		console.log("✅ qccheck:", qccheck);
-		console.log("✅ md_check:", md_check);
-		console.log("✅ defect_check:", defect_check);
-		console.log("========================");
+// 		console.log("=== Final QC Results ===");
+// 		console.log("✅ rm_status:", rm_status);
+// 		console.log("✅ destlast:", destlast);
+// 		console.log("✅ qccheck:", qccheck);
+// 		console.log("✅ md_check:", md_check);
+// 		console.log("✅ defect_check:", defect_check);
+// 		console.log("========================");
 
-		// ========================================
-		// 🔄 START TRANSACTION
-		// ========================================
-		transaction = new sql.Transaction(pool);
-		await transaction.begin();
-		console.log("✅ Transaction started");
+// 		// ========================================
+// 		// 🔄 START TRANSACTION
+// 		// ========================================
+// 		transaction = new sql.Transaction(pool);
+// 		await transaction.begin();
+// 		console.log("✅ Transaction started");
 
-		// ========================================
-		// 📊 FETCH TIME DATA
-		// ========================================
-		const timeData = await transaction
-			.request()
-			.input("mapping_id", sql.Int, mapping_id)
-			.query(`
-				SELECT 
-					rmm.rework_time,
-					rmm.mix_time,
-					rmm.prep_to_pack_time,
-					rmg.prep_to_pack
-				FROM
-					TrolleyRMMapping rmm
-					JOIN RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
-					JOIN RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
-				WHERE mapping_id = @mapping_id
-			`);
+// 		// ========================================
+// 		// 📊 FETCH TIME DATA
+// 		// ========================================
+// 		const timeData = await transaction
+// 			.request()
+// 			.input("mapping_id", sql.Int, mapping_id)
+// 			.query(`
+// 				SELECT 
+// 					rmm.rework_time,
+// 					rmm.mix_time,
+// 					rmm.prep_to_pack_time,
+// 					rmg.prep_to_pack
+// 				FROM
+// 					TrolleyRMMapping rmm
+// 					JOIN RMForProd rmf ON rmm.rmfp_id = rmf.rmfp_id
+// 					JOIN RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
+// 				WHERE mapping_id = @mapping_id
+// 			`);
 
-		let rework_time = null;
-		let mix_time = null;
-		let prep_to_pack_time = null;
+// 		let rework_time = null;
+// 		let mix_time = null;
+// 		let prep_to_pack_time = null;
 
-		if (timeData.recordset.length > 0) {
-			rework_time = timeData.recordset[0].rework_time;
-			mix_time = timeData.recordset[0].mix_time;
+// 		if (timeData.recordset.length > 0) {
+// 			rework_time = timeData.recordset[0].rework_time;
+// 			mix_time = timeData.recordset[0].mix_time;
 
-			if (destlast === 'ไปบรรจุ') {
-				prep_to_pack_time = timeData.recordset[0].prep_to_pack_time ?? 
-				                   timeData.recordset[0].prep_to_pack;
-			} else {
-				prep_to_pack_time = timeData.recordset[0].prep_to_pack_time;
-			}
+// 			if (destlast === 'ไปบรรจุ') {
+// 				prep_to_pack_time = timeData.recordset[0].prep_to_pack_time ?? 
+// 				                   timeData.recordset[0].prep_to_pack;
+// 			} else {
+// 				prep_to_pack_time = timeData.recordset[0].prep_to_pack_time;
+// 			}
 
-			console.log("📊 Time Data Retrieved:");
-			console.log("  - rework_time:", rework_time);
-			console.log("  - mix_time:", mix_time);
-			console.log("  - prep_to_pack_time:", prep_to_pack_time);
-		}
+// 			console.log("📊 Time Data Retrieved:");
+// 			console.log("  - rework_time:", rework_time);
+// 			console.log("  - mix_time:", mix_time);
+// 			console.log("  - prep_to_pack_time:", prep_to_pack_time);
+// 		}
 
-		// ========================================
-		// 💾 INSERT QC RECORD
-		// ========================================
-		console.log("💾 Inserting QC record...");
-		const insertResult = await transaction
-			.request()
-			.input("color", sql.Bit, color ? 1 : 0)
-			.input("odor", sql.Bit, odor ? 1 : 0)
-			.input("texture", sql.Bit, texture ? 1 : 0)
-			.input("sq_remark", sql.NVarChar, sq_remark || null)
-			.input("md", sql.Bit, md ? 1 : 0)
-			.input("md_remark", sql.NVarChar, md_remark || null)
-			.input("defect", sql.Bit, defect ? 1 : 0)
-			.input("defect_remark", sql.NVarChar, defect_remark || null)
-			.input("Defectacceptance", sql.Bit, Defectacceptance ? 1 : 0)
-			.input("Sensoryacceptance", sql.Bit, Sensoryacceptance ? 1 : 0)
-			.input("md_no", sql.NVarChar, md_no || null)
-			.input("WorkAreaCode", sql.NVarChar, WorkAreaCode || null)
-			.input("qccheck", sql.NVarChar, qccheck)
-			.input("md_check", sql.NVarChar, md_check)
-			.input("defect_check", sql.NVarChar, defect_check)
-			.input("Moisture", sql.NVarChar, Moisture || null)
-			.input("Temp", sql.NVarChar, Temp || null)
-			.input("md_time", sql.DateTime, thaiMdDateTime)
-			.input("percent_fine", sql.NVarChar, percent_fine || null)
-			.input("general_remark", sql.NVarChar, general_remark || null)
-			.input("prepare_mor_night", sql.NVarChar, prepare_mor_night || null)
-			.query(`
-				DECLARE @InsertedTable TABLE (qc_id INT);
-				INSERT INTO [PFCMv2].[dbo].[QC] 
-					(color, odor, texture, sq_acceptance, sq_remark, md, md_remark, 
-					 defect, defect_acceptance, defect_remark, md_no, WorkAreaCode, 
-					 qccheck, mdcheck, defectcheck, Moisture, Temp, md_time, percent_fine, 
-					 qc_datetime, general_remark, prepare_mor_night)
-				OUTPUT INSERTED.qc_id INTO @InsertedTable
-				VALUES 
-					(@color, @odor, @texture, @Sensoryacceptance, @sq_remark, @md, 
-					 @md_remark, @defect, @Defectacceptance, @defect_remark, @md_no, 
-					 @WorkAreaCode, @qccheck, @md_check, @defect_check, @Moisture, @Temp, 
-					 @md_time, @percent_fine, GETDATE(), @general_remark, @prepare_mor_night);
-				SELECT qc_id FROM @InsertedTable;
-			`);
+// 		// ========================================
+// 		// 💾 INSERT QC RECORD
+// 		// ========================================
+// 		console.log("💾 Inserting QC record...");
+// 		const insertResult = await transaction
+// 			.request()
+// 			.input("color", sql.Bit, color ? 1 : 0)
+// 			.input("odor", sql.Bit, odor ? 1 : 0)
+// 			.input("texture", sql.Bit, texture ? 1 : 0)
+// 			.input("sq_remark", sql.NVarChar, sq_remark || null)
+// 			.input("md", sql.Bit, md ? 1 : 0)
+// 			.input("md_remark", sql.NVarChar, md_remark || null)
+// 			.input("defect", sql.Bit, defect ? 1 : 0)
+// 			.input("defect_remark", sql.NVarChar, defect_remark || null)
+// 			.input("Defectacceptance", sql.Bit, Defectacceptance ? 1 : 0)
+// 			.input("Sensoryacceptance", sql.Bit, Sensoryacceptance ? 1 : 0)
+// 			.input("md_no", sql.NVarChar, md_no || null)
+// 			.input("WorkAreaCode", sql.NVarChar, WorkAreaCode || null)
+// 			.input("qccheck", sql.NVarChar, qccheck)
+// 			.input("md_check", sql.NVarChar, md_check)
+// 			.input("defect_check", sql.NVarChar, defect_check)
+// 			.input("Moisture", sql.NVarChar, Moisture || null)
+// 			.input("Temp", sql.NVarChar, Temp || null)
+// 			.input("md_time", sql.DateTime, thaiMdDateTime)
+// 			.input("percent_fine", sql.NVarChar, percent_fine || null)
+// 			.input("general_remark", sql.NVarChar, general_remark || null)
+// 			.input("prepare_mor_night", sql.NVarChar, prepare_mor_night || null)
+// 			.query(`
+// 				DECLARE @InsertedTable TABLE (qc_id INT);
+// 				INSERT INTO [PFCMv2].[dbo].[QC] 
+// 					(color, odor, texture, sq_acceptance, sq_remark, md, md_remark, 
+// 					 defect, defect_acceptance, defect_remark, md_no, WorkAreaCode, 
+// 					 qccheck, mdcheck, defectcheck, Moisture, Temp, md_time, percent_fine, 
+// 					 qc_datetime, general_remark, prepare_mor_night)
+// 				OUTPUT INSERTED.qc_id INTO @InsertedTable
+// 				VALUES 
+// 					(@color, @odor, @texture, @Sensoryacceptance, @sq_remark, @md, 
+// 					 @md_remark, @defect, @Defectacceptance, @defect_remark, @md_no, 
+// 					 @WorkAreaCode, @qccheck, @md_check, @defect_check, @Moisture, @Temp, 
+// 					 @md_time, @percent_fine, GETDATE(), @general_remark, @prepare_mor_night);
+// 				SELECT qc_id FROM @InsertedTable;
+// 			`);
 
-		const qc_id = insertResult.recordset[0].qc_id;
-		console.log(`✅ QC record inserted (qc_id: ${qc_id})`);
+// 		const qc_id = insertResult.recordset[0].qc_id;
+// 		console.log(`✅ QC record inserted (qc_id: ${qc_id})`);
 
-		// ========================================
-		// 🔄 UPDATE TrolleyRMMapping
-		// ========================================
-		console.log("🔄 Updating TrolleyRMMapping...");
-		if (destlast === 'ไปบรรจุ') {
-			await transaction
-				.request()
-				.input("mapping_id", sql.Int, mapping_id)
-				.input("rm_status", sql.NVarChar, rm_status)
-				.input("dest", sql.NVarChar, destlast)
-				.input("qc_id", sql.Int, qc_id)
-				.input("prep_to_pack_time", sql.Int, prep_to_pack_time)
-				.query(`
-					UPDATE [PFCMv2].[dbo].[TrolleyRMMapping]
-					SET rm_status = @rm_status, 
-					    qc_id = @qc_id, 
-					    prep_to_pack_time = @prep_to_pack_time, 
-					    dest = @dest
-					WHERE mapping_id = @mapping_id
-				`);
-			console.log("✅ TrolleyRMMapping updated (with prep_to_pack_time)");
-		} else {
-			await transaction
-				.request()
-				.input("mapping_id", sql.Int, mapping_id)
-				.input("rm_status", sql.NVarChar, rm_status)
-				.input("dest", sql.NVarChar, destlast)
-				.input("qc_id", sql.Int, qc_id)
-				.query(`
-					UPDATE [PFCMv2].[dbo].[TrolleyRMMapping]
-					SET rm_status = @rm_status, 
-					    qc_id = @qc_id, 
-					    dest = @dest
-					WHERE mapping_id = @mapping_id
-				`);
-			console.log("✅ TrolleyRMMapping updated");
-		}
+// 		// ========================================
+// 		// 🔄 UPDATE TrolleyRMMapping
+// 		// ========================================
+// 		console.log("🔄 Updating TrolleyRMMapping...");
+// 		if (destlast === 'ไปบรรจุ') {
+// 			await transaction
+// 				.request()
+// 				.input("mapping_id", sql.Int, mapping_id)
+// 				.input("rm_status", sql.NVarChar, rm_status)
+// 				.input("dest", sql.NVarChar, destlast)
+// 				.input("qc_id", sql.Int, qc_id)
+// 				.input("prep_to_pack_time", sql.Int, prep_to_pack_time)
+// 				.query(`
+// 					UPDATE [PFCMv2].[dbo].[TrolleyRMMapping]
+// 					SET rm_status = @rm_status, 
+// 					    qc_id = @qc_id, 
+// 					    prep_to_pack_time = @prep_to_pack_time, 
+// 					    dest = @dest
+// 					WHERE mapping_id = @mapping_id
+// 				`);
+// 			console.log("✅ TrolleyRMMapping updated (with prep_to_pack_time)");
+// 		} else {
+// 			await transaction
+// 				.request()
+// 				.input("mapping_id", sql.Int, mapping_id)
+// 				.input("rm_status", sql.NVarChar, rm_status)
+// 				.input("dest", sql.NVarChar, destlast)
+// 				.input("qc_id", sql.Int, qc_id)
+// 				.query(`
+// 					UPDATE [PFCMv2].[dbo].[TrolleyRMMapping]
+// 					SET rm_status = @rm_status, 
+// 					    qc_id = @qc_id, 
+// 					    dest = @dest
+// 					WHERE mapping_id = @mapping_id
+// 				`);
+// 			console.log("✅ TrolleyRMMapping updated");
+// 		}
 
-		// ========================================
-		// 🔄 UPDATE History
-		// ========================================
-		console.log("🔄 Updating History...");
-		let adjusted_md_time = null;
-		if (md_time) {
-			adjusted_md_time = new Date(md_time);
-			adjusted_md_time.setHours(adjusted_md_time.getHours() + 7);
-		}
+// 		// ========================================
+// 		// 🔄 UPDATE History
+// 		// ========================================
+// 		console.log("🔄 Updating History...");
+// 		let adjusted_md_time = null;
+// 		if (md_time) {
+// 			adjusted_md_time = new Date(md_time);
+// 			adjusted_md_time.setHours(adjusted_md_time.getHours() + 7);
+// 		}
 
-		if (destlast === 'ไปบรรจุ') {
-			await transaction
-				.request()
-				.input("mapping_id", sql.Int, mapping_id)
-				.input("receiver", sql.NVarChar, operator)
-				.input("tro_id", sql.NVarChar, tro_id)
-				.input("Moisture", sql.NVarChar, Moisture || null)
-				.input("percent_fine", sql.NVarChar, percent_fine || null)
-				.input("Temp", sql.NVarChar, Temp || null)
-				.input("md_time", sql.DateTime, adjusted_md_time)
-				.input("rmm_line_name", sql.NVarChar, rmm_line_name)
-				.input("weight_RM", sql.Float, weight_RM)
-				.input("tray_count", sql.Int, tray_count)
-				.input("dest", sql.NVarChar, destlast)
-				.input("rework_time", sql.Int, rework_time)
-				.input("mix_time", sql.Int, mix_time)
-				.input("prep_to_pack_time", sql.Int, prep_to_pack_time)
-				.query(`
-					UPDATE [PFCMv2].[dbo].[History]
-					SET receiver_qc = @receiver,
-					    tro_id = @tro_id,
-					    Moisture = @Moisture,
-					    Temp = @Temp,
-					    percent_fine = @percent_fine,
-					    md_time = @md_time,
-					    rmm_line_name = @rmm_line_name,
-					    weight_RM = @weight_RM,
-					    tray_count = @tray_count,
-					    dest = @dest,
-					    qc_date = GETDATE(),
-					    rework_time = @rework_time,
-					    mix_time = @mix_time,
-					    prep_to_pack_time = @prep_to_pack_time
-					WHERE mapping_id = @mapping_id
-				`);
-			console.log("✅ History updated (ไปบรรจุ case)");
+// 		if (destlast === 'ไปบรรจุ') {
+// 			await transaction
+// 				.request()
+// 				.input("mapping_id", sql.Int, mapping_id)
+// 				.input("receiver", sql.NVarChar, operator)
+// 				.input("tro_id", sql.NVarChar, tro_id)
+// 				.input("Moisture", sql.NVarChar, Moisture || null)
+// 				.input("percent_fine", sql.NVarChar, percent_fine || null)
+// 				.input("Temp", sql.NVarChar, Temp || null)
+// 				.input("md_time", sql.DateTime, adjusted_md_time)
+// 				.input("rmm_line_name", sql.NVarChar, rmm_line_name)
+// 				.input("weight_RM", sql.Float, weight_RM)
+// 				.input("tray_count", sql.Int, tray_count)
+// 				.input("dest", sql.NVarChar, destlast)
+// 				.input("rework_time", sql.Int, rework_time)
+// 				.input("mix_time", sql.Int, mix_time)
+// 				.input("prep_to_pack_time", sql.Int, prep_to_pack_time)
+// 				.query(`
+// 					UPDATE [PFCMv2].[dbo].[History]
+// 					SET receiver_qc = @receiver,
+// 					    tro_id = @tro_id,
+// 					    Moisture = @Moisture,
+// 					    Temp = @Temp,
+// 					    percent_fine = @percent_fine,
+// 					    md_time = @md_time,
+// 					    rmm_line_name = @rmm_line_name,
+// 					    weight_RM = @weight_RM,
+// 					    tray_count = @tray_count,
+// 					    dest = @dest,
+// 					    qc_date = GETDATE(),
+// 					    rework_time = @rework_time,
+// 					    mix_time = @mix_time,
+// 					    prep_to_pack_time = @prep_to_pack_time
+// 					WHERE mapping_id = @mapping_id
+// 				`);
+// 			console.log("✅ History updated (ไปบรรจุ case)");
 
-			// เคลียร์รถเข็น
-			await clearTrolley(transaction, tro_id, mapping_id);
+// 			// เคลียร์รถเข็น
+// 			await clearTrolley(transaction, tro_id, mapping_id);
 
-		} else {
-			await transaction
-				.request()
-				.input("mapping_id", sql.Int, mapping_id)
-				.input("receiver", sql.NVarChar, operator)
-				.input("tro_id", sql.NVarChar, tro_id)
-				.input("Moisture", sql.NVarChar, Moisture || null)
-				.input("percent_fine", sql.NVarChar, percent_fine || null)
-				.input("Temp", sql.NVarChar, Temp || null)
-				.input("md_time", sql.DateTime, adjusted_md_time)
-				.input("rmm_line_name", sql.NVarChar, rmm_line_name)
-				.input("weight_RM", sql.Float, weight_RM)
-				.input("tray_count", sql.Int, tray_count)
-				.input("dest", sql.NVarChar, destlast)
-				.input("prepare_mor_night", sql.NVarChar, prepare_mor_night || null)
-				.query(`
-					UPDATE [PFCMv2].[dbo].[History]
-					SET receiver_qc = @receiver,
-					    tro_id = @tro_id,
-					    Moisture = @Moisture,
-					    Temp = @Temp,
-					    percent_fine = @percent_fine,
-					    md_time = @md_time,
-					    rmm_line_name = @rmm_line_name,
-					    weight_RM = @weight_RM,
-					    tray_count = @tray_count,
-					    dest = @dest,
-					    prepare_mor_night = @prepare_mor_night,
-					    qc_date = GETDATE()
-					WHERE mapping_id = @mapping_id
-				`);
-			console.log("✅ History updated");
-		}
+// 		} else {
+// 			await transaction
+// 				.request()
+// 				.input("mapping_id", sql.Int, mapping_id)
+// 				.input("receiver", sql.NVarChar, operator)
+// 				.input("tro_id", sql.NVarChar, tro_id)
+// 				.input("Moisture", sql.NVarChar, Moisture || null)
+// 				.input("percent_fine", sql.NVarChar, percent_fine || null)
+// 				.input("Temp", sql.NVarChar, Temp || null)
+// 				.input("md_time", sql.DateTime, adjusted_md_time)
+// 				.input("rmm_line_name", sql.NVarChar, rmm_line_name)
+// 				.input("weight_RM", sql.Float, weight_RM)
+// 				.input("tray_count", sql.Int, tray_count)
+// 				.input("dest", sql.NVarChar, destlast)
+// 				.input("prepare_mor_night", sql.NVarChar, prepare_mor_night || null)
+// 				.query(`
+// 					UPDATE [PFCMv2].[dbo].[History]
+// 					SET receiver_qc = @receiver,
+// 					    tro_id = @tro_id,
+// 					    Moisture = @Moisture,
+// 					    Temp = @Temp,
+// 					    percent_fine = @percent_fine,
+// 					    md_time = @md_time,
+// 					    rmm_line_name = @rmm_line_name,
+// 					    weight_RM = @weight_RM,
+// 					    tray_count = @tray_count,
+// 					    dest = @dest,
+// 					    prepare_mor_night = @prepare_mor_night,
+// 					    qc_date = GETDATE()
+// 					WHERE mapping_id = @mapping_id
+// 				`);
+// 			console.log("✅ History updated");
+// 		}
 
-		// ========================================
-		// 📦 MixToPack Process
-		// ========================================
-		if ((destlast === 'ผสมเตรียม' || dest === 'ผสมเตรียม') && rm_status === 'QcCheck') {
-			console.log("=== Starting MixToPack Process ===");
-			await processMixToPack(transaction, mapping_id, qc_id, {
-				operator,
-				tray_count,
-				weight_RM,
-				rmm_line_name,
-				prep_to_pack_time,
-				rework_time,
-				mix_time,
-				destlast
-			});
-			console.log("=== MixToPack Process Completed ===");
-		}
+// 		// ========================================
+// 		// 📦 MixToPack Process
+// 		// ========================================
+// 		if ((destlast === 'ผสมเตรียม' || dest === 'ผสมเตรียม') && rm_status === 'QcCheck') {
+// 			console.log("=== Starting MixToPack Process ===");
+// 			await processMixToPack(transaction, mapping_id, qc_id, {
+// 				operator,
+// 				tray_count,
+// 				weight_RM,
+// 				rmm_line_name,
+// 				prep_to_pack_time,
+// 				rework_time,
+// 				mix_time,
+// 				destlast
+// 			});
+// 			console.log("=== MixToPack Process Completed ===");
+// 		}
 
-		// ========================================
-		// ✅ COMMIT TRANSACTION
-		// ========================================
-		await transaction.commit();
-		console.log("✅ Transaction committed successfully");
+// 		// ========================================
+// 		// ✅ COMMIT TRANSACTION
+// 		// ========================================
+// 		await transaction.commit();
+// 		console.log("✅ Transaction committed successfully");
 
-		// ========================================
-		// 📡 SOCKET EMIT
-		// ========================================
-		const io = req.app.get("io");
-		if (io) {
-			const formattedData = {
-				mappingId: mapping_id,
-				qcId: qc_id,
-				rmStatus: rm_status,
-				qccheck,
-				mdcheck: md_check,
-				defectcheck: defect_check,
-				updatedAt: new Date(),
-				operator,
-				dest: destlast,
-				trayCount: tray_count,
-				weightRM: weight_RM,
-			};
-			io.to("QcCheckRoom").emit("dataUpdated", formattedData);
-			console.log("📡 Socket event emitted to QcCheckRoom");
-		}
+// 		// ========================================
+// 		// 📡 SOCKET EMIT
+// 		// ========================================
+// 		const io = req.app.get("io");
+// 		if (io) {
+// 			const formattedData = {
+// 				mappingId: mapping_id,
+// 				qcId: qc_id,
+// 				rmStatus: rm_status,
+// 				qccheck,
+// 				mdcheck: md_check,
+// 				defectcheck: defect_check,
+// 				updatedAt: new Date(),
+// 				operator,
+// 				dest: destlast,
+// 				trayCount: tray_count,
+// 				weightRM: weight_RM,
+// 			};
+// 			io.to("QcCheckRoom").emit("dataUpdated", formattedData);
+// 			console.log("📡 Socket event emitted to QcCheckRoom");
+// 		}
 
-		// ========================================
-		// ✅ SUCCESS RESPONSE
-		// ========================================
-		console.log("=== QC Check Completed Successfully ===");
-		res.json({ 
-			success: true, 
-			message: "บันทึกข้อมูลสำเร็จ", 
-			qc_id,
-			rm_status,
-			dest: destlast
-		});
+// 		// ========================================
+// 		// ✅ SUCCESS RESPONSE
+// 		// ========================================
+// 		console.log("=== QC Check Completed Successfully ===");
+// 		res.json({ 
+// 			success: true, 
+// 			message: "บันทึกข้อมูลสำเร็จ", 
+// 			qc_id,
+// 			rm_status,
+// 			dest: destlast
+// 		});
 
-	} catch (err) {
-		// ========================================
-		// ❌ ERROR HANDLING
-		// ========================================
-		console.error("=== QC Check Error ===");
-		console.error("❌ Error Message:", err.message);
-		console.error("❌ Error Stack:", err.stack);
-		console.error("❌ Request Body:", JSON.stringify(req.body, null, 2));
-		console.error("======================");
+// 	} catch (err) {
+// 		// ========================================
+// 		// ❌ ERROR HANDLING
+// 		// ========================================
+// 		console.error("=== QC Check Error ===");
+// 		console.error("❌ Error Message:", err.message);
+// 		console.error("❌ Error Stack:", err.stack);
+// 		console.error("❌ Request Body:", JSON.stringify(req.body, null, 2));
+// 		console.error("======================");
 
-		if (transaction) {
-			try {
-				await transaction.rollback();
-				console.log("✅ Transaction rolled back successfully");
-			} catch (rollbackErr) {
-				console.error("❌ Rollback failed:", rollbackErr);
-			}
-		}
+// 		if (transaction) {
+// 			try {
+// 				await transaction.rollback();
+// 				console.log("✅ Transaction rolled back successfully");
+// 			} catch (rollbackErr) {
+// 				console.error("❌ Rollback failed:", rollbackErr);
+// 			}
+// 		}
 
-		// ตรวจสอบประเภท error
-		if (err.message.includes("FOREIGN KEY")) {
-			return res.status(400).json({
-				success: false,
-				message: "ข้อมูลอ้างอิงไม่ถูกต้อง กรุณาตรวจสอบ mapping_id หรือ qc_id",
-				error: process.env.NODE_ENV === 'development' ? err.message : undefined
-			});
-		}
+// 		// ตรวจสอบประเภท error
+// 		if (err.message.includes("FOREIGN KEY")) {
+// 			return res.status(400).json({
+// 				success: false,
+// 				message: "ข้อมูลอ้างอิงไม่ถูกต้อง กรุณาตรวจสอบ mapping_id หรือ qc_id",
+// 				error: process.env.NODE_ENV === 'development' ? err.message : undefined
+// 			});
+// 		}
 
-		if (err.message.includes("UNIQUE")) {
-			return res.status(409).json({
-				success: false,
-				message: "พบข้อมูลซ้ำในระบบ",
-				error: process.env.NODE_ENV === 'development' ? err.message : undefined
-			});
-		}
+// 		if (err.message.includes("UNIQUE")) {
+// 			return res.status(409).json({
+// 				success: false,
+// 				message: "พบข้อมูลซ้ำในระบบ",
+// 				error: process.env.NODE_ENV === 'development' ? err.message : undefined
+// 			});
+// 		}
 
-		if (err.message.includes("Timeout")) {
-			return res.status(504).json({
-				success: false,
-				message: "การเชื่อมต่อหมดเวลา กรุณาลองใหม่อีกครั้ง",
-				error: process.env.NODE_ENV === 'development' ? err.message : undefined
-			});
-		}
+// 		if (err.message.includes("Timeout")) {
+// 			return res.status(504).json({
+// 				success: false,
+// 				message: "การเชื่อมต่อหมดเวลา กรุณาลองใหม่อีกครั้ง",
+// 				error: process.env.NODE_ENV === 'development' ? err.message : undefined
+// 			});
+// 		}
 
-		res.status(500).json({
-			success: false,
-			message: "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง",
-			error: process.env.NODE_ENV === 'development' ? err.message : undefined,
-			stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-		});
-	}
-});
+// 		res.status(500).json({
+// 			success: false,
+// 			message: "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง",
+// 			error: process.env.NODE_ENV === 'development' ? err.message : undefined,
+// 			stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+// 		});
+// 	}
+// });
 
 // ========================================
 // 🔧 HELPER FUNCTIONS

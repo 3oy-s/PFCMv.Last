@@ -68,24 +68,24 @@ const getItemStatus = (item) => {
   let timePassed = 0;
   let standardTimeInMinutes = 0;
   let timeRemaining = 0;
-  
+
   // กรณีวัตถุดิบที่มีสถานะ QcCheck และมีเวลาออกจากห้องเย็น
   if ((item.rm_status === 'QcCheck' || item.rm_status === 'รอแก้ไข') && (item.out_cold_date || item.out_cold_date_two || item.out_cold_date_three)) {
     console.log("❄️ กรณี QcCheck ที่มีเวลาออกจากห้องเย็น");
-    
+
     // หาเวลาออกจากห้องเย็นล่าสุด
     const outColdDates = [
       item.out_cold_date_three,
       item.out_cold_date_two,
       item.out_cold_date
     ].filter(date => date);
-    
+
     const latestOutColdDate = outColdDates[0]; // เรียงจากล่าสุดไปเก่าสุดแล้วเลือกตัวแรก
     console.log("❄️ เวลาออกจากห้องเย็นล่าสุด:", latestOutColdDate);
-    
+
     timePassed = calculateTimeDifference(latestOutColdDate);
     console.log("⏱️ เวลาที่ผ่านไปจาก out_cold_date:", timePassed, "นาที");
-    
+
     // ถ้ามี remaining_time ให้ใช้ remaining_time ในการคำนวณ
     if (item.remaining_time !== null && item.remaining_time !== undefined) {
       console.log("⏱️ พบค่า remaining_time =", item.remaining_time);
@@ -103,7 +103,7 @@ const getItemStatus = (item) => {
         timeRemaining = remainingTimeInMinutes - timePassed;
         console.log("⏱️ กรณีเวลาเหลือปกติ:", timeRemaining);
       }
-    } 
+    }
     // ถ้าไม่มี remaining_time ให้ใช้ standard_time
     else if (item.standard_time) {
       const stdHours = Math.floor(parseFloat(item.standard_time));
@@ -111,14 +111,14 @@ const getItemStatus = (item) => {
       standardTimeInMinutes = stdHours * 60 + stdMinutes;
       console.log("⏱️ เวลามาตรฐานจาก standard_time:", item.standard_time, "->", standardTimeInMinutes, "นาที");
       timeRemaining = standardTimeInMinutes - timePassed;
-    } 
+    }
     // ถ้าไม่มีทั้ง remaining_time และ standard_time ให้ใช้ค่าเริ่มต้น 2 ชั่วโมง
     else {
       standardTimeInMinutes = 120;
       console.log("⏱️ ไม่พบ standard_time ใช้ค่าเริ่มต้น 2 ชั่วโมง ->", standardTimeInMinutes, "นาที");
       timeRemaining = standardTimeInMinutes - timePassed;
     }
-    
+
     console.log("⏱️ เวลาที่เหลือหลังจากออกจากห้องเย็น:", timeRemaining);
   }
   // เพิ่มเงื่อนไขใหม่: ตรวจสอบว่ามี mix_time หรือไม่
@@ -204,6 +204,217 @@ const getItemStatus = (item) => {
     } else if (standardTimeInMinutes > 0) {
       timeRemaining = standardTimeInMinutes - timePassed;
       console.log("⏱️ ไม่พบค่า remaining_time ใช้ standardTime - timePassed:", timeRemaining);
+    }
+  }
+
+  let percentage = standardTimeInMinutes > 0 ? (timePassed / standardTimeInMinutes) * 100 : 0;
+  console.log("📊 เปอร์เซ็นต์เวลาที่ใช้ไป:", percentage, "%");
+
+  let statusMessage = timeRemaining > 0
+    ? `เหลืออีก ${formatTime(timeRemaining)}`
+    : `เลยกำหนด ${formatTime(Math.abs(timeRemaining))}`;
+
+  let textColor;
+  if (timeRemaining < 0) {
+    textColor = "#FF0000";
+  } else if (percentage >= 80) {
+    textColor = "#FFA500";
+  } else {
+    textColor = "#008000";
+  }
+
+  return {
+    textColor,
+    statusMessage,
+    hideDelayTime: timeRemaining > 0,
+    percentage,
+    timeRemaining
+  };
+};
+
+// เพิ่มฟังก์ชันใหม่หลังจาก getItemStatus
+const getColdToPackStatus = (item) => {
+  console.log("❄️📦 คำนวณเวลาห้องเย็นไปบรรจุ");
+  console.log("❄️📦 rm_status:", item.rm_status);
+
+  let timePassed = 0;
+  let standardTimeInMinutes = 0;
+  let timeRemaining = 0;
+
+  // กรณีวัตถุดิบที่มีสถานะ QcCheck และมีเวลาออกจากห้องเย็น
+  if ((item.rm_status === 'QcCheck' || item.rm_status === 'รอแก้ไข') && (item.out_cold_date || item.out_cold_date_two || item.out_cold_date_three)) {
+    console.log("❄️ กรณี QcCheck ที่มีเวลาออกจากห้องเย็น");
+
+    // หาเวลาออกจากห้องเย็นล่าสุด
+    const outColdDates = [
+      item.out_cold_date_three,
+      item.out_cold_date_two,
+      item.out_cold_date
+    ].filter(date => date);
+
+    const latestOutColdDate = outColdDates[0];
+    console.log("❄️ เวลาออกจากห้องเย็นล่าสุด:", latestOutColdDate);
+
+    timePassed = calculateTimeDifference(latestOutColdDate);
+    console.log("⏱️ เวลาที่ผ่านไปจาก out_cold_date:", timePassed, "นาที");
+
+    // ถ้ามี remaining_prep_to_pack_time ให้ใช้ในการคำนวณ
+    if (item.remaining_prep_to_pack_time !== null && item.remaining_prep_to_pack_time !== undefined) {
+      console.log("⏱️ พบค่า remaining_prep_to_pack_time =", item.remaining_prep_to_pack_time);
+      const remainingFloat = parseFloat(item.remaining_prep_to_pack_time);
+      const isNegative = remainingFloat < 0;
+      const absValue = Math.abs(remainingFloat);
+      const remainingHours = Math.floor(absValue);
+      const remainingMinutes = Math.round((absValue - remainingHours) * 100);
+      const remainingTimeInMinutes = remainingHours * 60 + remainingMinutes;
+
+      if (isNegative || remainingFloat === 0) {
+        timeRemaining = -(remainingTimeInMinutes + timePassed);
+        console.log("⏱️ กรณีเวลาเหลือติดลบหรือ 0:", timeRemaining);
+      } else {
+        timeRemaining = remainingTimeInMinutes - timePassed;
+        console.log("⏱️ กรณีเวลาเหลือปกติ:", timeRemaining);
+      }
+    }
+    // ถ้าไม่มี remaining_prep_to_pack_time ให้ใช้ standard_prep_to_pack_time
+    else if (item.standard_prep_to_pack_time) {
+      const stdHours = Math.floor(parseFloat(item.standard_prep_to_pack_time));
+      const stdMinutes = Math.round((parseFloat(item.standard_prep_to_pack_time) - stdHours) * 100);
+      standardTimeInMinutes = stdHours * 60 + stdMinutes;
+      console.log("⏱️ เวลามาตรฐานจาก standard_prep_to_pack_time:", item.standard_prep_to_pack_time, "->", standardTimeInMinutes, "นาที");
+      timeRemaining = standardTimeInMinutes - timePassed;
+    }
+    // ถ้าไม่มีทั้ง remaining_prep_to_pack_time และ standard_prep_to_pack_time
+    else {
+      console.log("⚠️ ไม่พบค่า standard_prep_to_pack_time");
+      return {
+        textColor: "#787878",
+        statusMessage: "-",
+        hideDelayTime: true,
+        percentage: 0,
+        timeRemaining: 0
+      };
+    }
+
+    console.log("⏱️ เวลาที่เหลือหลังจากออกจากห้องเย็น:", timeRemaining);
+  }
+  // เพิ่มเงื่อนไขใหม่: ตรวจสอบว่ามี mix_time หรือไม่
+  else if (item.mix_time !== null && item.mix_time !== undefined) {
+    console.log("🧪 กรณี MIX: พบค่า mix_time");
+    console.log("🧪 ใช้ mixed_date =", item.mixed_date);
+
+    timePassed = calculateTimeDifference(item.mixed_date);
+    console.log("⏱️ เวลาที่ผ่านไปจาก mixed_date:", timePassed, "นาที");
+
+    // คำนวณเวลามาตรฐานจาก standard_prep_to_pack_time
+    if (item.standard_prep_to_pack_time) {
+      const stdHours = Math.floor(parseFloat(item.standard_prep_to_pack_time));
+      const stdMinutes = Math.round((parseFloat(item.standard_prep_to_pack_time) - stdHours) * 100);
+      standardTimeInMinutes = stdHours * 60 + stdMinutes;
+      console.log("⏱️ เวลามาตรฐาน standard_prep_to_pack_time:", standardTimeInMinutes, "นาที");
+    } else {
+      console.log("⚠️ ไม่พบค่า standard_prep_to_pack_time");
+      return {
+        textColor: "#787878",
+        statusMessage: "-",
+        hideDelayTime: true,
+        percentage: 0,
+        timeRemaining: 0
+      };
+    }
+
+    // คำนวณเวลาที่เหลือ
+    timeRemaining = standardTimeInMinutes - timePassed;
+    console.log("⏱️ กรณี mix_time เวลาที่เหลือ:", timeRemaining);
+  }
+  else if (item.remaining_rework_time !== null && item.remaining_rework_time !== undefined) {
+    console.log("🔄 กรณี REWORK: พบค่า remaining_rework_time =", item.remaining_rework_time);
+    console.log("🔄 ใช้ qc_date =", item.qc_date);
+
+    timePassed = calculateTimeDifference(item.qc_date);
+    console.log("⏱️ เวลาที่ผ่านไปจาก qc_date:", timePassed, "นาที");
+
+    // คำนวณเวลามาตรฐานจาก standard_prep_to_pack_time
+    if (item.standard_prep_to_pack_time) {
+      const stdHours = Math.floor(parseFloat(item.standard_prep_to_pack_time));
+      const stdMinutes = Math.round((parseFloat(item.standard_prep_to_pack_time) - stdHours) * 100);
+      standardTimeInMinutes = stdHours * 60 + stdMinutes;
+      console.log("⏱️ เวลามาตรฐาน cold_to_pack:", item.standard_prep_to_pack_time, "->", standardTimeInMinutes, "นาที");
+    }
+
+    // คำนวณเวลาที่เหลือจาก remaining_prep_to_pack_time
+    if (item.remaining_prep_to_pack_time !== null && item.remaining_prep_to_pack_time !== undefined) {
+      const remainingFloat = parseFloat(item.remaining_prep_to_pack_time);
+      console.log("⏱️ remaining_prep_to_pack_time เป็นตัวเลข:", remainingFloat);
+
+      const isNegative = remainingFloat < 0;
+      const absValue = Math.abs(remainingFloat);
+      const remainingHours = Math.floor(absValue);
+      const remainingMinutes = Math.round((absValue - remainingHours) * 100);
+      const remainingTimeInMinutes = remainingHours * 60 + remainingMinutes;
+
+      if (isNegative || remainingFloat === 0) {
+        timeRemaining = -(remainingTimeInMinutes + timePassed);
+        console.log("⏱️ กรณีเวลาเหลือติดลบหรือ 0:", timeRemaining);
+      } else {
+        timeRemaining = remainingTimeInMinutes - timePassed;
+        console.log("⏱️ กรณีเวลาเหลือปกติ:", timeRemaining);
+      }
+    } else if (standardTimeInMinutes > 0) {
+      timeRemaining = standardTimeInMinutes - timePassed;
+      console.log("⏱️ ไม่พบค่า remaining_prep_to_pack_time ใช้ standardTime - timePassed:", timeRemaining);
+    } else {
+      return {
+        textColor: "#787878",
+        statusMessage: "-",
+        hideDelayTime: true,
+        percentage: 0,
+        timeRemaining: 0
+      };
+    }
+  }
+  // กรณีปกติ
+  else {
+    console.log("🕒 กรณีปกติ: ไม่พบค่า remaining_rework_time หรือ mix_time");
+    console.log("🕒 ใช้ค่า rmit_date หรือ cooked_date =", item.rmit_date || item.cooked_date);
+    timePassed = calculateTimeDifference(item.rmit_date || item.cooked_date);
+
+    console.log("⏱️ เวลาที่ผ่านไปจาก rmit_date/cooked_date:", timePassed, "นาที");
+
+    if (item.standard_prep_to_pack_time) {
+      const stdHours = Math.floor(parseFloat(item.standard_prep_to_pack_time));
+      const stdMinutes = Math.round((parseFloat(item.standard_prep_to_pack_time) - stdHours) * 100);
+      standardTimeInMinutes = stdHours * 60 + stdMinutes;
+      console.log("⏱️ เวลามาตรฐานปกติ:", item.standard_prep_to_pack_time, "->", standardTimeInMinutes, "นาที");
+    }
+
+    if (item.remaining_prep_to_pack_time !== null && item.remaining_prep_to_pack_time !== undefined) {
+      console.log("⏱️ พบค่า remaining_prep_to_pack_time =", item.remaining_prep_to_pack_time);
+      const remainingFloat = parseFloat(item.remaining_prep_to_pack_time);
+      const isNegative = remainingFloat < 0;
+      const absValue = Math.abs(remainingFloat);
+      const remainingHours = Math.floor(absValue);
+      const remainingMinutes = Math.round((absValue - remainingHours) * 100);
+      const remainingTimeInMinutes = remainingHours * 60 + remainingMinutes;
+
+      if (isNegative || remainingFloat === 0) {
+        timeRemaining = -(remainingTimeInMinutes + timePassed);
+        console.log("⏱️ กรณีเวลาเหลือติดลบหรือ 0:", timeRemaining);
+      } else {
+        timeRemaining = remainingTimeInMinutes - timePassed;
+        console.log("⏱️ กรณีเวลาเหลือปกติ:", timeRemaining);
+      }
+    } else if (standardTimeInMinutes > 0) {
+      timeRemaining = standardTimeInMinutes - timePassed;
+      console.log("⏱️ ไม่พบค่า remaining_prep_to_pack_time ใช้ standardTime - timePassed:", timeRemaining);
+    } else {
+      return {
+        textColor: "#787878",
+        statusMessage: "-",
+        hideDelayTime: true,
+        percentage: 0,
+        timeRemaining: 0
+      };
     }
   }
 
@@ -508,6 +719,7 @@ const Row = ({
                 <TableHead>
                   <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>สถานะเวลา</TableCell>
+                    {/* <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>สถานะห้องเย็นไปบรรจุ</TableCell> */}
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>Batch</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>Material</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>รายชื่อวัตถุดิบ</TableCell>
@@ -516,6 +728,8 @@ const Row = ({
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>Level Eu</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>น้ำหนัก</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>จำนวนถาด</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>ระยะเวลาห้องเย็นไปบรรจุ</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>ระยะเวลาจุดเตรียมเข้าห้องเย็น</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>สถานะวัตถุดิบ</TableCell>
                   </TableRow>
                 </TableHead>
@@ -523,6 +737,7 @@ const Row = ({
                   {row.rawMaterials ? (
                     row.rawMaterials.map((material, idx) => {
                       const materialStatus = getItemStatus(material);
+                      const coldToPackStatus = getColdToPackStatus(material);
                       return (
                         <TableRow
                           key={`${material.rmfp_id}-${idx}`}
@@ -531,10 +746,10 @@ const Row = ({
                             '&:hover': { backgroundColor: '#f0f7ff' }
                           }}
                         >
+                          {/* สถานะเวลา */}
                           <TableCell
                             align="center"
                             sx={{
-
                               color: materialStatus.textColor,
                               display: 'flex',
                               alignItems: 'center',
@@ -544,14 +759,31 @@ const Row = ({
                             <HourglassBottomIcon style={{ marginRight: 4, color: materialStatus.textColor }} />
                             {materialStatus.statusMessage}
                           </TableCell>
+
+                          {/* สถานะห้องเย็นไปบรรจุ - เพิ่มคอลัมน์นี้ */}
+                          <TableCell
+                            align="center"
+                            sx={{
+                              color: coldToPackStatus.textColor,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <HourglassBottomIcon style={{ marginRight: 4, color: coldToPackStatus.textColor }} />
+                            {coldToPackStatus.statusMessage}
+                          </TableCell>
+
                           <TableCell align="center">{material.batch || material.batch_after || '-'}</TableCell>
                           <TableCell align="center">{material.mat || material.mix_code || '-'}</TableCell>
                           <TableCell align="center">{material.mat_name || `Mixed : ${material.mix_code}` || '-'}</TableCell>
-                         <TableCell align="center">{material.rmit_date || '-'}</TableCell>
+                          <TableCell align="center">{material.rmit_date || '-'}</TableCell>
                           <TableCell align="center">{material.production || '-'}</TableCell>
                           <TableCell align="center">{material.level_eu || '-'}</TableCell>
                           <TableCell align="center">{material.weight_RM || '-'}</TableCell>
                           <TableCell align="center">{material.tray_count || '-'}</TableCell>
+                          <TableCell align="center">{material.standard_prep_to_pack_time || '-'}</TableCell>
+                          <TableCell align="center">{material.standard_time || '-'}</TableCell>
                           <TableCell align="center" style={{ color: getStatusColor(material.rm_status) }}>
                             {material.rm_status || (material.dest === "เข้าห้องเย็น" ? "รอห้องเย็นรับเข้า" : "-")}
                           </TableCell>
@@ -573,13 +805,31 @@ const Row = ({
                         <HourglassBottomIcon style={{ marginRight: 4, color: getItemStatus(row).textColor }} />
                         {getItemStatus(row).statusMessage}
                       </TableCell>
+
+                      {/* สถานะห้องเย็นไปบรรจุ - เพิ่มสำหรับกรณีไม่มี rawMaterials */}
+                      <TableCell
+                        align="center"
+                        sx={{
+                          color: getColdToPackStatus(row).textColor,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <HourglassBottomIcon style={{ marginRight: 4, color: getColdToPackStatus(row).textColor }} />
+                        {getColdToPackStatus(row).statusMessage}
+                      </TableCell>
+
                       <TableCell align="center">{row.batch || row.batch_after || '-'}</TableCell>
                       <TableCell align="center">{row.mat || '-'}</TableCell>
                       <TableCell align="center">{row.mat_name || '-'}</TableCell>
                       <TableCell align="center">{row.rmit_date || '-'}</TableCell>
+                      <TableCell align="center">{row.production || '-'}</TableCell>
                       <TableCell align="center">{row.level_eu || '-'}</TableCell>
                       <TableCell align="center">{row.weight_RM || '-'}</TableCell>
                       <TableCell align="center">{row.tray_count || '-'}</TableCell>
+                      <TableCell align="center">{row.standard_prep_to_pack_time || '-'}</TableCell>
+                      <TableCell align="center">{row.standard_time || '-'}</TableCell>
                       <TableCell align="center" style={{ color: getStatusColor(row.rm_status) }}>
                         {row.rm_status || (row.dest === "เข้าห้องเย็น" ? "รอห้องเย็นรับเข้า" : "-")}
                       </TableCell>
@@ -737,7 +987,7 @@ const TableOvenToCold = ({ handleOpenModal, handleOpenEditModal, handleOpenSucce
   };
 
   const mainColumns = [
-    "ป้ายทะเบียนรถเข็น", "แผนการผลิต", "น้ำหนักรถเข็น", "จำนวนถาด", "สถานะรถเข็น","เวลาเตรียม", "Action"
+    "ป้ายทะเบียนรถเข็น", "แผนการผลิต", "น้ำหนักรถเข็น", "จำนวนถาด", "สถานะรถเข็น", "เวลาเตรียม", "Action"
   ];
 
   return (
