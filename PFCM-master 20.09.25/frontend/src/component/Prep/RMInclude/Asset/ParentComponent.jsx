@@ -225,6 +225,7 @@ const ParentComponent = () => {
         handleOpenEditModal={handleOpenEditModal}
         handleOpenSuccess={handleOpenSuccess}
         data={tableData}
+        API_URL={API_URL}
       />
       <Modal1
         open={openModal1}

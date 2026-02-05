@@ -2454,7 +2454,7 @@ for (const gID of groupId) {
   //   }
   // });
 
- router.get("/prep/getRMForProdMixToPackList", async (req, res) => {
+router.get("/prep/getRMForProdMixToPackList", async (req, res) => {
   try {
     const pool = await connectToDatabase();
     const result = await pool.request().query(`
@@ -2476,8 +2476,7 @@ for (const gID of groupId) {
         rmfp_mix.batch AS Batch_MixToPack,
         pdrm_mix.mat AS mat_MixToPack,
         rm_mix.mat_name AS mat_name_MixToPack,
-        mtp.weight_RM AS mix_weight,
-        rmfp_mix.weight AS weight_MixToPack,
+        mtp.weight_RM AS mix_weight, 
         his_mix.withdraw_date AS mix_withdraw_date
       FROM RMForProd rmfp
       JOIN ProdRawMat pdrm ON rmfp.prod_rm_id = pdrm.prod_rm_id
@@ -2496,16 +2495,6 @@ for (const gID of groupId) {
       ORDER BY rmfp.rmfp_id DESC
     `);
 
-    // ฟังก์ชันแปลงเวลาเป็นเวลาไทย (UTC+7)
-    const convertToThaiTime = (date) => {
-      if (!date) return null;
-      const d = new Date(date);
-      // แปลงเป็นเวลาไทย โดยเพิ่ม 7 ชั่วโมง
-      d.setHours(d.getHours() + 7);
-      return d;
-    };
-
-    // แปลงผลลัพธ์เป็น nested structure
     const dataMap = {};
     result.recordset.forEach(row => {
       if (!dataMap[row.rmfp_id]) {
@@ -2514,7 +2503,7 @@ for (const gID of groupId) {
           Batch_RMForProd: row.Batch_RMForProd,
           mat_RMForProd: row.mat_RMForProd,
           mat_name_RMForProd: row.mat_name_RMForProd,
-          weight: row.weight_RMForProd,
+          weight: row.weight_RMForProd,  // น้ำหนักรวม
           production: row.production,
           rmfp_line_name: row.rmfp_line_name,
           level_eu: row.level_eu,
@@ -2531,8 +2520,7 @@ for (const gID of groupId) {
         Batch_MixToPack: row.Batch_MixToPack,
         mat_MixToPack: row.mat_MixToPack,
         mat_name_MixToPack: row.mat_name_MixToPack,
-        mix_weight: row.mix_weight,
-        weight_MixToPack: row.weight_MixToPack,
+        mix_weight: row.mix_weight,  // ✅ น้ำหนักที่เลือกผสม
         mix_withdraw_date: row.mix_withdraw_date
       });
     });
@@ -2545,6 +2533,34 @@ for (const gID of groupId) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+router.get("/prep/getRMForEmuList", async (req, res) => {
+    try {
+      const pool = await connectToDatabase();
+      const result = await pool.request().query(`
+      SELECT
+        r.rmfemu_id,
+        r.batch,
+        r.hu,
+        r.mat,
+        rm.mat_name,
+        r.weight,
+        h.withdraw_date,
+        r.level_eu
+      FROM RMForEmu r
+      LEFT JOIN History h ON r.hist_id_rmfemu = h.hist_id
+      JOIN Rawmat rm ON r.mat = rm.mat
+      WHERE emu_status = '1'
+      ORDER BY r.rmfemu_id DESC
+    `);
+
+
+      res.json({ success: true, data: result.recordset });
+    } catch (err) {
+      console.error("Fetch RMForEmu error:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
 
 
   router.get("/prep/getRMMixBatch", async (req, res) => {
@@ -8739,7 +8755,91 @@ router.post('/delete/MixToPack', async (req, res) => {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+  // ✅ API สำหรับดึงข้อมูล CheckIn (รอ QC ตรวจสอบ)
+router.get("/checkin/fetchCheckInData", async (req, res) => {
+  try {
+    const pool = await connectToDatabase();
 
+    const query = `
+      SELECT
+        rmf.rmfp_id,
+        STRING_AGG(b.batch_after, ', ') AS batch,
+        rm.mat,
+        rm.mat_name,
+        CONCAT(p.doc_no, ' (', rmm.rmm_line_name, ')') AS production,
+        rmm.tro_id,
+        rmm.level_eu,
+        rmm.weight_RM,
+        rmm.tray_count,
+        rmg.rm_type_id,
+        rmm.mapping_id,
+        rmm.dest,
+        rmm.stay_place,
+        rmm.rm_status,
+        MAX(htr.cooked_date) AS cooked_date
+      FROM
+        RMForProd rmf
+      JOIN 
+        TrolleyRMMapping rmm ON rmf.rmfp_id = rmm.rmfp_id        
+      JOIN
+        ProdRawMat pr ON rmm.tro_production_id = pr.prod_rm_id
+      JOIN
+        RawMat rm ON pr.mat = rm.mat
+      JOIN
+        Production p ON pr.prod_id = p.prod_id
+      JOIN
+        RawMatCookedGroup rmcg ON rm.mat = rmcg.mat
+      JOIN
+        RawMatGroup rmg ON rmcg.rm_group_id = rmg.rm_group_id
+      LEFT JOIN 
+        Batch b ON rmm.mapping_id = b.mapping_id
+      JOIN
+        History htr ON rmm.mapping_id = htr.mapping_id
+      WHERE 
+        rmm.rm_status = 'QcCheck'
+        AND rmm.dest = 'รอCheckin'
+        AND rmf.rm_group_id = rmg.rm_group_id
+      GROUP BY
+        rmf.rmfp_id,
+        rm.mat,
+        rm.mat_name,
+        p.doc_no,
+        rmm.rmm_line_name,
+        rmm.tro_id,
+        rmm.level_eu,
+        rmm.weight_RM,
+        rmm.tray_count,
+        rmg.rm_type_id,
+        rmm.mapping_id,
+        rmm.dest,
+        rmm.stay_place,
+        rmm.rm_status
+      ORDER BY MAX(htr.cooked_date) DESC
+    `;
+
+    const result = await pool.request().query(query);
+
+    // จัดรูปแบบวันที่
+    const formattedData = result.recordset.map(item => {
+      const date = new Date(item.cooked_date);
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      const hours = String(date.getUTCHours()).padStart(2, '0');
+      const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+      
+      item.CookedDateTime = `${year}-${month}-${day} ${hours}:${minutes}`;
+      delete item.cooked_date;
+      
+      return item;
+    });
+
+    res.json({ success: true, data: formattedData });
+  } catch (err) {
+    console.error("SQL error", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 
 

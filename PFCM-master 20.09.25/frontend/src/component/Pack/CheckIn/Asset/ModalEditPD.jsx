@@ -94,6 +94,8 @@ const QcCheck = ({
   remark_rework_cold,
   edit_rework,
   prepare_mor_night,
+  rawMatType, // ✅ เพิ่มบรรทัดนี้
+  mapping_id, // ✅ เพิ่มบรรทัดนี้
 }) => {
   const [showAlert, setShowAlert] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -394,16 +396,27 @@ const QcCheck = ({
       weight_RM: weight_RM,
       tray_count: tray_count,
       rmm_line_name: rmm_line_name,
+      mapping_id: mapping_id, // ✅ เพิ่ม mapping_id
       materials: processedMaterials.length > 0 ? processedMaterials : materials,
     };
 
     console.log("Sending payload:", JSON.stringify(payload, null, 2));
 
+    // try {
+    //   const response = await axios.put(
+    //     `${API_URL}/api/coldstorage/outcoldstorage`,
+    //     payload
+    //   );
     try {
-      const response = await axios.put(
-        `${API_URL}/api/coldstorage/outcoldstorage`,
-        payload
-      );
+    // ✅ เพิ่มการเช็คประเภทข้อมูลที่นี่
+    let apiEndpoint = `${API_URL}/api/coldstorage/outcoldstorage`; // default endpoint
+    
+    // ถ้าเป็นข้อมูล CheckIn ให้ใช้ endpoint สำหรับ CheckIn
+    if (rawMatType === 'checkin') {
+      apiEndpoint = `${API_URL}/api/checkin/pack`; // ✅ endpoint ใหม่สำหรับ CheckIn
+    }
+    
+    const response = await axios.put(apiEndpoint, payload);
       if (response.status === 200) {
         console.log("✅ Data sent successfully:", response.data);
         setDataForPrint({
@@ -868,9 +881,9 @@ const QcCheck = ({
             <Typography color="rgba(0, 0, 0, 0.6)">
               ผู้ดำเนินการ: {operator}
             </Typography>
-            <Typography color="rgba(0, 0, 0, 0.6)">
+            {/* <Typography color="rgba(0, 0, 0, 0.6)">
               สถานะรถเข็นในห้องเย็น: {rm_cold_status}
-            </Typography>
+            </Typography> */}
             {/* {prepare_mor_night && prepare_mor_night !== "-" && (
             <Typography color="rgba(0, 0, 0, 0.6)">เตรียมกะ: {prepare_mor_night}</Typography>
             )} */}
@@ -1020,6 +1033,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
     production,
     qccheck_cold,
     prepare_mor_night,
+    rawMatType, // ✅ เพิ่มบรรทัดนี้
     materials = [],
   } = data || {};
 
@@ -1782,7 +1796,7 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
             style={{ fontSize: "18px", color: "#787878" }}
             mb={2}
           >
-            กรุณาระบุข้อมูลในการส่งออก
+            บรรจุ Check In
           </Typography>
 
           {errorMessage && (
@@ -1925,12 +1939,12 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
             <Typography color="rgba(0, 0, 0, 0.6)">
               เลขรถเข็น: {tro_id}
             </Typography>
-            <Typography color="rgba(0, 0, 0, 0.6)">
+            {/* <Typography color="rgba(0, 0, 0, 0.6)">
               สถานะรถเข็นในห้องเย็น: {rm_cold_status}
-            </Typography>
-            <Typography color="rgba(0, 0, 0, 0.6)">
+            </Typography> */}
+            {/* <Typography color="rgba(0, 0, 0, 0.6)">
               ไลน์ผลิต: {rmm_line_name || "-"}
-            </Typography>
+            </Typography> */}
             <Divider />
 
             <Box
@@ -2179,6 +2193,8 @@ const ModalEditPD = ({ open, onClose, data, onSuccess, showModal }) => {
           remark_rework_cold={remark_rework_cold}
           edit_rework={edit_rework}
           prepare_mor_night={prepare_mor_night}
+          rawMatType={rawMatType} // ✅ เพิ่มบรรทัดนี้
+          mapping_id={data?.mapping_id} // ✅ เพิ่มบรรทัดนี้
         />
       )}
     </>

@@ -18,6 +18,8 @@ import ScanBarcodePage from "./ScanSAP/ScanBatcodePage.jsx"
 import ManageRawmatPack from "./manage copy/ManagePage.jsx"
 import ReportRawmatPack from "./manage copy 2/ManagePage.jsx"
 import TrackTroPage from "./TrackTrolley/TrackTroPage.jsx";
+import CheckInPage from "./CheckIn/CheckInPage.jsx";
+
 
 function AppPack() {
   return (
@@ -48,6 +50,7 @@ function AppPack() {
         <Route path="/User/LineSelectWP" element={<LineSelectWP />} />
         <Route path="/PackTro/PackTroPage" element={<PackTroPage />} />
         <Route path="/CheckOut" element={<CSCheckOutPage />} />
+        <Route path="/CheckIn" element={<CheckInPage />} />
         <Route path="/ScanBarcodePage" element={<ScanBarcodePage />} />
         <Route path="/ManageRawmatPack" element={<ManageRawmatPack />} />
         <Route path="/ReportRawmatPack" element={<ReportRawmatPack />} />

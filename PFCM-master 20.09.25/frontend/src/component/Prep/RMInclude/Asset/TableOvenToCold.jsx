@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Table, TableContainer, TableHead, TableBody, TableRow, TableCell, Paper, Box, TextField, Collapse, TablePagination, Typography } from '@mui/material';
-import { InputAdornment } from "@mui/material";
+import { Table, TableContainer, TableHead, TableBody, TableRow, TableCell, Paper, Box, TextField, Collapse, TablePagination, Typography, InputAdornment } from '@mui/material';
 import SearchIcon from "@mui/icons-material/Search";
 import VisibilityIcon from "@mui/icons-material/Visibility";
-import { FaRegCircle } from "react-icons/fa";
-import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
 import InfoIcon from '@mui/icons-material/Info';
 
 // ปรับขนาดของคอลัมน์ให้เหมาะสมกับข้อมูลใหม่
@@ -19,7 +16,6 @@ const CUSTOM_COLUMN_WIDTHS = {
 };
 
 const ViewActionCell = ({ width, onClick, icon, backgroundColor, status }) => {
-  // กำหนดสีของ icon ดวงตาให้เป็นสีเดียวกับ table head (สีฟ้า)
   const iconColor = "hsl(210, 100%, 60%)";
 
   return (
@@ -64,23 +60,339 @@ const ViewActionCell = ({ width, onClick, icon, backgroundColor, status }) => {
   );
 };
 
+// Component สำหรับแถว Emulsion
+const EmulsionRow = ({ emulsionItem, index }) => {
+  const rowBackgroundColor = index % 2 === 0 ? '#fafafa' : '#ffffff';
+
+  return (
+    <TableRow 
+      sx={{
+        backgroundColor: rowBackgroundColor,
+        '&:hover': { backgroundColor: '#e3f2fd' }
+      }}
+    >
+      <TableCell align="center" sx={{ fontSize: '13px', padding: '8px' }}>
+        {emulsionItem.Batch_Emulsion || '-'}
+      </TableCell>
+      <TableCell align="center" sx={{ fontSize: '13px', padding: '8px' }}>
+        {emulsionItem.mat || '-'}
+      </TableCell>
+      <TableCell align="center" sx={{ fontSize: '13px', padding: '8px' }}>
+        {emulsionItem.mat_name_Emulsion || '-'}
+      </TableCell>
+      <TableCell align="center" sx={{ fontSize: '13px', padding: '8px' }}>
+        {emulsionItem.emu_weight ? `${emulsionItem.emu_weight} kg` : '-'}
+      </TableCell>
+      <TableCell align="center" sx={{ fontSize: '13px', padding: '8px' }}>
+        {emulsionItem.emu_withdraw_date 
+          ? new Date(emulsionItem.emu_withdraw_date).toLocaleString('th-TH', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          : '-'
+        }
+      </TableCell>
+    </TableRow>
+  );
+};
+
+// Component สำหรับแถว MixToPack
+const MixToPackRow = ({ mixToPackItem, index, openMixToPackId, setOpenMixToPackId, API_URL }) => {
+  const rowBackgroundColor = index % 2 === 0 ? '#f9f9f9' : '#ffffff';
+  const isOpen = openMixToPackId === mixToPackItem.mixtp_id;
+  const [emulsionData, setEmulsionData] = useState([]);
+  const [isLoadingEmulsion, setIsLoadingEmulsion] = useState(false);
+  const [debugInfo, setDebugInfo] = useState(null);
+
+  const fetchEmulsionData = async () => {
+    const searchBatch = mixToPackItem.Batch_MixToPack;
+    const searchMaterial = mixToPackItem.mat_MixToPack;
+    
+    console.log('═══════════════════════════════════════════════════');
+    console.log('🔍 เริ่มค้นหาข้อมูล Emulsion');
+    console.log('📦 MixToPack Item:', mixToPackItem);
+    console.log('🔎 Search Criteria:');
+    console.log('   - Batch:', searchBatch);
+    console.log('   - Material:', searchMaterial);
+    console.log('═══════════════════════════════════════════════════');
+    
+    if (!searchBatch) {
+      console.log('⚠️ Batch_MixToPack is missing');
+      setDebugInfo({ error: 'ไม่มี Batch_MixToPack' });
+      return;
+    }
+    
+    setIsLoadingEmulsion(true);
+    try {
+      const url = `${API_URL}/api/prep/getRMForProdEmuMixedList`;
+      console.log('📡 Calling Emulsion API:', url);
+      
+      const response = await fetch(url, {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ API Response Status:', response.status);
+        console.log('📊 Full API Response:', result);
+        
+        if (result.success && result.data) {
+          console.log('📋 Total Records:', result.data.length);
+          
+          if (result.data.length > 0) {
+            console.log('🔍 Sample Record Structure:', result.data[0]);
+            console.log('Available Fields:', Object.keys(result.data[0]));
+          }
+          
+          console.log('🔎 กำลังค้นหาด้วยวิธีต่างๆ...');
+          
+          const method1 = result.data.find(item => item.Batch_RMForProd === searchBatch);
+          console.log(`   Method 1 (Batch_RMForProd === "${searchBatch}"):`, method1 ? '✅ Found' : '❌ Not Found');
+          
+          const method2 = result.data.find(item => item.mat_RMForProd === searchMaterial);
+          console.log(`   Method 2 (mat_RMForProd === "${searchMaterial}"):`, method2 ? '✅ Found' : '❌ Not Found');
+          
+          const method3 = result.data.find(item => item.Batch === searchBatch);
+          console.log(`   Method 3 (Batch === "${searchBatch}"):`, method3 ? '✅ Found' : '❌ Not Found');
+          
+          const method4 = result.data.find(item => item.batch === searchBatch);
+          console.log(`   Method 4 (batch === "${searchBatch}"):`, method4 ? '✅ Found' : '❌ Not Found');
+          
+          const filteredData = method1 || method2 || method3 || method4;
+          
+          console.log('🎯 Final Filtered Data:', filteredData);
+          
+          if (filteredData && filteredData.emulsion) {
+            setEmulsionData(filteredData.emulsion);
+            console.log('✅ Emulsion data set successfully:', filteredData.emulsion);
+            setDebugInfo({
+              success: true,
+              method: method1 ? 'Batch_RMForProd' : method2 ? 'mat_RMForProd' : method3 ? 'Batch' : 'batch',
+              recordsFound: filteredData.emulsion.length
+            });
+          } else {
+            setEmulsionData([]);
+            console.log('⚠️ No emulsion data found');
+            
+            const availableBatches = result.data.map(item => ({
+              Batch_RMForProd: item.Batch_RMForProd,
+              mat_RMForProd: item.mat_RMForProd,
+              hasEmulsion: !!item.emulsion,
+              emulsionCount: item.emulsion ? item.emulsion.length : 0
+            }));
+            
+            console.log('📋 Available Batches in API:', availableBatches);
+            
+            setDebugInfo({
+              success: false,
+              searchBatch,
+              searchMaterial,
+              totalRecords: result.data.length,
+              availableBatches
+            });
+          }
+        } else {
+          console.log('⚠️ API returned success: false or no data');
+          setEmulsionData([]);
+          setDebugInfo({ error: 'API ส่งคืน success: false หรือไม่มีข้อมูล' });
+        }
+      } else {
+        console.error('❌ API Response not OK:', response.status);
+        setEmulsionData([]);
+        setDebugInfo({ error: `API Error: ${response.status}` });
+      }
+    } catch (error) {
+      console.error('❌ Error fetching Emulsion data:', error);
+      setEmulsionData([]);
+      setDebugInfo({ error: error.message });
+    } finally {
+      setIsLoadingEmulsion(false);
+      console.log('═══════════════════════════════════════════════════');
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      console.log('👁️ Detail opened for Batch:', mixToPackItem.Batch_MixToPack);
+      fetchEmulsionData();
+    } else {
+      setEmulsionData([]);
+      setDebugInfo(null);
+    }
+  }, [isOpen]);
+
+  return (
+    <>
+      <TableRow
+        sx={{
+          backgroundColor: rowBackgroundColor,
+          '&:hover': { backgroundColor: '#f0f7ff' }
+        }}
+      >
+        <TableCell align="center">{mixToPackItem.Batch_MixToPack || '-'}</TableCell>
+        <TableCell align="center">{mixToPackItem.mat_MixToPack || '-'}</TableCell>
+        <TableCell align="center">{mixToPackItem.mat_name_MixToPack || '-'}</TableCell>
+        <TableCell align="center">
+          {mixToPackItem.mix_weight ? `${mixToPackItem.mix_weight} kg` : '-'}
+        </TableCell>
+        <TableCell align="center">
+          {mixToPackItem.mix_withdraw_date 
+            ? new Date(mixToPackItem.mix_withdraw_date).toLocaleString('th-TH', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+              })
+            : '-'
+          }
+        </TableCell>
+        <TableCell 
+          align="center"
+          sx={{
+            cursor: 'pointer',
+            transition: 'all 0.2s ease-in-out',
+            '&:hover': {
+              backgroundColor: '#007BFF',
+              '& svg': {
+                color: '#fff !important'
+              }
+            }
+          }}
+          onClick={() => {
+            console.log('👁️ Eye icon clicked for mixtp_id:', mixToPackItem.mixtp_id);
+            setOpenMixToPackId(isOpen ? null : mixToPackItem.mixtp_id);
+          }}
+        >
+          <VisibilityIcon 
+            sx={{ 
+              color: 'hsl(210, 100%, 60%)', 
+              fontSize: '20px',
+              transition: 'color 0.2s ease-in-out'
+            }} 
+          />
+        </TableCell>
+      </TableRow>
+
+      {/* แสดงเฉพาะตาราง Emulsion */}
+      <TableRow>
+        <TableCell colSpan={6} style={{ paddingBottom: 0, paddingTop: 0, border: 0 }}>
+          <Collapse in={isOpen} timeout="auto" unmountOnExit>
+            <Box sx={{
+              margin: 2,
+              padding: 2,
+              borderRadius: 2,
+              backgroundColor: '#f9f9f9',
+              boxShadow: '0px 1px 3px rgba(0,0,0,0.1)'
+            }}>
+              <Typography
+                variant="subtitle1"
+                gutterBottom
+                sx={{
+                  fontSize: '15px',
+                  fontWeight: 'bold',
+                  color: '#0066cc',
+                  marginBottom: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1
+                }}
+              >
+                🧪 รายละเอียด Emulsion ของ Batch: {mixToPackItem.Batch_MixToPack}
+              </Typography>
+
+              {debugInfo && !debugInfo.success && (
+                <Box sx={{
+                  backgroundColor: '#fff3cd',
+                  border: '1px solid #ffc107',
+                  borderRadius: '6px',
+                  padding: '10px',
+                  marginBottom: '10px',
+                  fontSize: '12px'
+                }}>
+                  <Typography sx={{ fontWeight: 'bold', marginBottom: 1, color: '#856404' }}>
+                    🔍 Debug Information:
+                  </Typography>
+                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
+                    {JSON.stringify(debugInfo, null, 2)}
+                  </pre>
+                </Box>
+              )}
+
+              {isLoadingEmulsion ? (
+                <Box sx={{ textAlign: 'center', padding: '20px' }}>
+                  <Typography sx={{ fontSize: '13px', color: '#787878' }}>
+                    กำลังโหลดข้อมูล Emulsion...
+                  </Typography>
+                </Box>
+              ) : emulsionData.length > 0 ? (
+                <Table size="small" sx={{
+                  backgroundColor: 'white',
+                  borderRadius: '6px',
+                  overflow: 'hidden',
+                  border: '1px solid #ccc'
+                }}>
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: '#e3f2fd' }}>
+                      <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '13px', padding: '8px' }}>Batch Emulsion</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '13px', padding: '8px' }}>Material</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '13px', padding: '8px' }}>รายชื่อวัตถุดิบ</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '13px', padding: '8px' }}>น้ำหนัก</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '13px', padding: '8px' }}>วันที่เบิก</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {emulsionData.map((emuItem, idx) => (
+                      <EmulsionRow
+                        key={`emulsion-${emuItem.emu_id || idx}`}
+                        emulsionItem={emuItem}
+                        index={idx}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <Box sx={{ 
+                  textAlign: 'center', 
+                  padding: '15px',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '6px'
+                }}>
+                  <Typography sx={{ fontSize: '13px', color: '#787878', fontStyle: 'italic' }}>
+                    ไม่มีข้อมูล Emulsion สำหรับ Batch: {mixToPackItem.Batch_MixToPack}
+                  </Typography>
+                  <Typography sx={{ fontSize: '11px', color: '#999', marginTop: 1 }}>
+                    (ตรวจสอบ Console สำหรับข้อมูลเพิ่มเติม - กด F12)
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </>
+  );
+};
+
 const Row = ({
   row,
   openRowId,
   setOpenRowId,
-  index
+  index,
+  API_URL
 }) => {
   const backgroundColor = index % 2 === 0 ? '#ffffff' : "hsl(210, 100.00%, 88%)";
   const isOpen = openRowId === row.rmfp_id;
+  const [openMixToPackId, setOpenMixToPackId] = useState(null);
 
   const mainRowData = {
     batch: row.Batch_RMForProd || '-',
     material: row.mat_RMForProd || '-',
     materialName: row.mat_name_RMForProd || '-',
-    // ⭐ เปลี่ยนจาก row.weight เป็น row.mixToPack[0]?.weight_MixToPack
-    weight: (row.mixToPack && row.mixToPack[0]?.weight_MixToPack) 
-      ? `${row.mixToPack[0].weight_MixToPack} kg` 
-      : (row.weight ? `${row.weight} kg` : '-'),
+    weight: row.weight ? `${row.weight} kg` : '-', 
     docNo: row.production || '-',
     lineName: row.rmfp_line_name || '-'
   };
@@ -123,6 +435,9 @@ const Row = ({
           onClick={(e) => {
             e.stopPropagation();
             setOpenRowId(isOpen ? null : row.rmfp_id);
+            if (isOpen) {
+              setOpenMixToPackId(null);
+            }
           }}
           backgroundColor={backgroundColor}
           status={null}
@@ -169,40 +484,24 @@ const Row = ({
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>รายชื่อวัตถุดิบ</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>น้ำหนัก</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>วันที่เบิก</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '14px' }}>Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {row.mixToPack && row.mixToPack.length > 0 ? (
                     row.mixToPack.map((mixToPackItem, idx) => (
-                      <TableRow
+                      <MixToPackRow
                         key={`${mixToPackItem.mixtp_id}-${idx}`}
-                        sx={{
-                          '&:nth-of-type(odd)': { backgroundColor: '#f9f9f9' },
-                          '&:hover': { backgroundColor: '#f0f7ff' }
-                        }}
-                      >
-                        <TableCell align="center">{mixToPackItem.Batch_MixToPack || '-'}</TableCell>
-                        <TableCell align="center">{mixToPackItem.mat_MixToPack || '-'}</TableCell>
-                        <TableCell align="center">{mixToPackItem.mat_name_MixToPack || '-'}</TableCell>
-                        {/* ⭐ เปลี่ยนจาก mix_weight เป็น weight (ของ RMForProd เดิม) */}
-                        <TableCell align="center">{row.weight ? `${row.weight} kg` : '-'}</TableCell>
-                        <TableCell align="center">
-                          {mixToPackItem.mix_withdraw_date 
-                            ? new Date(mixToPackItem.mix_withdraw_date).toLocaleString('th-TH', {
-                                year: 'numeric',
-                                month: '2-digit',
-                                day: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })
-                            : '-'
-                          }
-                        </TableCell>
-                      </TableRow>
+                        mixToPackItem={mixToPackItem}
+                        index={idx}
+                        openMixToPackId={openMixToPackId}
+                        setOpenMixToPackId={setOpenMixToPackId}
+                        API_URL={API_URL}
+                      />
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ 
+                      <TableCell colSpan={6} align="center" sx={{ 
                         padding: "20px", 
                         fontSize: "14px", 
                         color: "#787878",
@@ -226,7 +525,7 @@ const Row = ({
   );
 };
 
-const TableRMForProd = ({ data }) => {
+const TableRMForProd = ({ data, API_URL }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredRows, setFilteredRows] = useState([]);
   const [page, setPage] = useState(0);
@@ -236,30 +535,24 @@ const TableRMForProd = ({ data }) => {
 
   useEffect(() => {
     setIsLoading(true);
-
     if (data && data.length > 0) {
-      // ข้อมูลมาในรูปแบบ array ของ RMForProd แล้ว ไม่ต้องจัดกลุ่ม
       setFilteredRows(data);
     } else {
       setFilteredRows([]);
     }
-
     setIsLoading(false);
   }, [data]);
 
   useEffect(() => {
     const filterData = () => {
-      let filtered = [...data]; // สร้างสำเนาของข้อมูลต้นฉบับ
+      let filtered = [...data];
 
-      // กรองตามคำค้นหา
       if (searchTerm) {
         filtered = filtered.filter((item) => {
-          // ค้นหาในข้อมูลหลัก
           const mainDataMatch = Object.values(item).some(value =>
             value && typeof value === 'string' && value.toLowerCase().includes(searchTerm.toLowerCase())
           );
 
-          // ค้นหาในข้อมูล mixToPack
           const mixToPackMatch = item.mixToPack && item.mixToPack.some(mixToPackItem =>
             Object.values(mixToPackItem).some(value =>
               value && typeof value === 'string' && value.toLowerCase().includes(searchTerm.toLowerCase())
@@ -370,7 +663,6 @@ const TableRMForProd = ({ data }) => {
                 </TableCell>
               ))}
 
-              {/* Action column */}
               <TableCell
                 align="center"
                 style={{
@@ -406,6 +698,7 @@ const TableRMForProd = ({ data }) => {
                   openRowId={openRowId}
                   index={index}
                   setOpenRowId={setOpenRowId}
+                  API_URL={API_URL}
                 />
               ))
             ) : (

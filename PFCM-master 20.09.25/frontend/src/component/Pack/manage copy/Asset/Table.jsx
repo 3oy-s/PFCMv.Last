@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Table, TableContainer, TableHead, TableBody, TableRow, TableCell, Paper, Box, TextField, TablePagination, IconButton, Chip } from '@mui/material';
+import { Table, TableContainer, TableHead, TableBody, TableRow, TableCell, Paper, Box, TextField, TablePagination, IconButton, Chip, Button } from '@mui/material';
 import { LiaShoppingCartSolid } from 'react-icons/lia';
 import { InputAdornment } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
@@ -15,6 +15,7 @@ import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import dayjs from 'dayjs';
 
 const CUSTOM_COLUMN_WIDTHS = {
+  checkbox: '40px',
   weight: '120px',
   prepDateTime: '100px',
   confirm: '40px',
@@ -22,6 +23,33 @@ const CUSTOM_COLUMN_WIDTHS = {
   complete: '40px',
   edit: '40px',
   delete: '40px'
+};
+
+// ─── Helper: คำนวณ sort date จากลำดับความสำคัญ ───────────────────────────────
+// Priority: out_cold_date_three → out_cold_date_two → out_cold_date → rmit_date
+const getSortDate = (row) => {
+  const candidates = [
+    row.out_cold_date_three,
+    row.out_cold_date_two,
+    row.out_cold_date,
+    row.rmit_date,
+  ];
+  for (const val of candidates) {
+    if (val && val !== '-' && val.trim() !== '') {
+      const parsed = dayjs(val);
+      if (parsed.isValid()) return parsed;
+    }
+  }
+  return dayjs(0); // fallback: เก่าสุด (ไปอยู่ท้าย)
+};
+
+// ─── Sort: เวลาใหม่อยู่ข้างบน (descending) ──────────────────────────────────
+const sortByDate = (rows) => {
+  return [...rows].sort((a, b) => {
+    const dateA = getSortDate(a);
+    const dateB = getSortDate(b);
+    return dateB.valueOf() - dateA.valueOf();
+  });
 };
 
 // SearchableDropdown Component
@@ -198,22 +226,42 @@ const Row = ({
   openRowId,
   setOpenRowId,
   index,
-  displayColumns
+  displayColumns,
+  // ── bulk select props ──
+  isSelected,
+  onSelectChange,
+  isBulkMode
 }) => {
-  const backgroundColor = index % 2 === 0 ? '#ffffff' : '#F0F8FF';
-  const isOpen = openRowId === row.rmfp_id;
+  const backgroundColor = isSelected
+    ? '#E3F2FD'                                   // highlight แถวที่ checked
+    : index % 2 === 0 ? '#ffffff' : '#F0F8FF';
+
+  const isOpen = openRowId === row.mapping_id;
   const isConfirmed = row.sc_pack_date && row.sc_pack_date !== '-';
 
   const [weight, setWeight] = useState(row.weight || '');
+  const [group, setGroup] = useState(row.group || '');
   const [prepDateTime, setPrepDateTime] = useState(row.sc_pack_date || '');
-  const [errors, setErrors] = useState({ weight: '', prepDateTime: '' });
+  const [errors, setErrors] = useState({ weight: '', prepDateTime: '', group: '' });
+
+  // sync local state เมื่อ row เปลี่ยน (หลัง bulk update)
+  useEffect(() => {
+    setWeight(row.weight || '');
+    setGroup(row.group || '');
+    setPrepDateTime(row.sc_pack_date || '');
+  }, [row.weight, row.group, row.sc_pack_date]);
 
   const validateInputs = () => {
-    const newErrors = { weight: '', prepDateTime: '' };
+    const newErrors = { weight: '', prepDateTime: '', group: '' };
     let isValid = true;
 
     if (!weight || parseFloat(weight) <= 0) {
       newErrors.weight = 'น้ำหนักต้องมากกว่า 0';
+      isValid = false;
+    }
+
+    if (isNaN(Number(group)) || Number(group) <= 0) {
+      newErrors.group = 'ต้องมีค่ามากกว่า 0';
       isValid = false;
     }
 
@@ -224,7 +272,7 @@ const Row = ({
       const selectedDate = new Date(prepDateTime);
       const now = new Date();
       if (selectedDate > now) {
-        newErrors.prepDateTime = 'เวลาต้องไม่เป็นอดีต';
+        newErrors.prepDateTime = 'เวลาห้ามเป็นอนาคต';
         isValid = false;
       }
     }
@@ -234,17 +282,17 @@ const Row = ({
   };
 
   const handleConfirm = () => {
-    if (validateInputs()) {
-      handleConfirmRow({
-        mapping_id: row.mapping_id,
-        weight: parseFloat(weight),
-        sc_pack_date: prepDateTime
-      });
-       // Clear ข้อมูลหลังจาก confirm สำเร็จ
-    setWeight('');
-    setPrepDateTime('');
-    setErrors({ weight: '', prepDateTime: '' });
-    }
+    if (!validateInputs()) return;
+
+    const payload = {
+      mapping_id: row.mapping_id,
+      weight: Number(weight),
+      group: Number(group),
+      sc_pack_date: prepDateTime
+    };
+
+    console.log("CONFIRM PAYLOAD:", payload);
+    handleConfirmRow(payload);
   };
 
   const displayRow = {};
@@ -261,28 +309,59 @@ const Row = ({
       <TableRow>
         <TableCell style={{ height: "7px", padding: "0px", border: "0px solid" }}></TableCell>
       </TableRow>
-      <TableRow 
+      <TableRow
         onClick={() => {
-          setOpenRowId(isOpen ? null : row.rmfp_id);
-          handleRowClick(row.rmfp_id);
+          if (isBulkMode) return; // ใน bulk mode ไม่ let row click เปิด detail
+          setOpenRowId(isOpen ? null : row.mapping_id);
+          handleRowClick(row.mapping_id);
         }}
         style={{
           transition: 'all 0.2s ease',
-          cursor: 'pointer'
+          cursor: isBulkMode ? 'default' : 'pointer'
         }}
         onMouseEnter={(e) => {
+          if (isSelected) return;
           const cells = e.currentTarget.querySelectorAll('td');
           cells.forEach(cell => {
             cell.style.backgroundColor = index % 2 === 0 ? '#F5F9FF' : '#E8F4FF';
           });
         }}
         onMouseLeave={(e) => {
+          if (isSelected) return;
           const cells = e.currentTarget.querySelectorAll('td');
           cells.forEach(cell => {
             cell.style.backgroundColor = backgroundColor;
           });
         }}
       >
+        {/* ── Checkbox column ── */}
+        <TableCell
+          align="center"
+          style={{
+            width: CUSTOM_COLUMN_WIDTHS.checkbox,
+            borderLeft: "1px solid #E3F2FD",
+            borderTop: '1px solid #E3F2FD',
+            borderBottom: '1px solid #E3F2FD',
+            height: '48px',
+            padding: '0px',
+            backgroundColor: backgroundColor,
+            transition: 'background-color 0.2s ease'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onSelectChange(row)}
+            style={{
+              width: '18px',
+              height: '18px',
+              cursor: 'pointer',
+              accentColor: '#2196F3'
+            }}
+          />
+        </TableCell>
+
         {Object.entries(displayRow).map(([key, value], idx) => (
           <TableCell
             key={idx}
@@ -312,6 +391,58 @@ const Row = ({
         <TableCell
           align="center"
           style={{
+            width: CUSTOM_COLUMN_WIDTHS.group,
+            borderLeft: "1px solid #E3F2FD",
+            borderTop: '1px solid #E3F2FD',
+            borderBottom: '1px solid #E3F2FD',
+            fontSize: '14px',
+            height: '48px',
+            padding: '5px',
+            backgroundColor: backgroundColor,
+            transition: 'background-color 0.2s ease'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {isConfirmed ? (
+            <span style={{ color: '#28a745', fontWeight: 'bold' }}>{group || row.group || '-'}</span>
+          ) : (
+            <TextField
+              type="number"
+              value={group}
+              // onChange={(e) => setGroup(e.target.value)}
+              onChange={(e) => {
+             const val = e.target.value;
+             setGroup(val);
+              row.group = val;   // ⭐ สำคัญมาก
+              }}
+
+              error={!!errors.group}
+              helperText={errors.group}
+              InputProps={{
+                sx: {
+                  height: "35px",
+                  fontSize: "13px",
+                  backgroundColor: '#fff'
+                },
+              }}
+              sx={{
+                width: '100%',
+                "& .MuiOutlinedInput-root": {
+                  height: "35px",
+                  fontSize: "13px",
+                },
+                "& input": {
+                  padding: "6px",
+                  textAlign: 'center'
+                },
+              }}
+            />
+          )}
+        </TableCell>
+
+        <TableCell
+          align="center"
+          style={{
             width: CUSTOM_COLUMN_WIDTHS.weight,
             borderLeft: "1px solid #E3F2FD",
             borderTop: '1px solid #E3F2FD',
@@ -327,10 +458,21 @@ const Row = ({
           {isConfirmed ? (
             <span style={{ color: '#28a745', fontWeight: 'bold' }}>{weight || row.weight || '-'}</span>
           ) : (
+            // <TextField
+            //   type="number"
+            //   value={weight}
+            //   onChange={(e) => setWeight(e.target.value)}
             <TextField
-              type="number"
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
+             type="number"
+             value={weight}
+           onChange={(e) => {
+            const val = e.target.value;
+
+            setWeight(val);
+             row.weight = val;
+            }}
+
+
               error={!!errors.weight}
               helperText={errors.weight}
               InputProps={{
@@ -381,8 +523,8 @@ const Row = ({
               <DateTimePicker
                 ampm={false}
                 minutesStep={1}
-                // timeSteps={{ minutes: 1 }}  // ⬅️ เพิ่มบรรทัดนี้
-                // maxDateTime={dayjs()} // เพิ่มบรรทัดนี้ - จำกัดไม่ให้เลือกเวลาในอนาคต
+                timeSteps={{ minutes: 1 }}
+                maxDateTime={dayjs()}
                 value={prepDateTime ? dayjs(prepDateTime) : null}
                 onChange={(newValue) => {
                   setPrepDateTime(
@@ -576,6 +718,151 @@ const PackEdit = ({ width, onClick, icon, backgroundColor }) => {
   );
 };
 
+// ─── BulkEditBar: แสดงเมื่อมี row ถูก select ─────────────────────────────────
+const BulkEditBar = ({ selectedCount, bulkGroup, setBulkGroup, bulkPrepDateTime, setBulkPrepDateTime, onApply, onCancel }) => {
+  const [errors, setErrors] = useState({ group: '', prepDateTime: '' });
+
+  const validate = () => {
+    const newErrors = { group: '', prepDateTime: '' };
+    let isValid = true;
+
+    if (isNaN(Number(bulkGroup)) || Number(bulkGroup) <= 0) {
+      newErrors.group = 'ต้องมีค่ามากกว่า 0';
+      isValid = false;
+    }
+
+    if (!bulkPrepDateTime) {
+      newErrors.prepDateTime = 'กรุณาระบุเวลา';
+      isValid = false;
+    } else {
+      const selectedDate = new Date(bulkPrepDateTime);
+      const now = new Date();
+      if (selectedDate > now) {
+        newErrors.prepDateTime = 'เวลาต้องไม่เป็นอดีต';
+        isValid = false;
+      }
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const handleApply = () => {
+    if (!validate()) return;
+    onApply();
+  };
+
+  return (
+    <Box sx={{
+      display: 'flex',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 2,
+      padding: '12px 20px',
+      backgroundColor: '#FFF3E0',
+      borderBottom: '2px solid #FF9800',
+      animation: 'slideDown 0.25s ease'
+    }}>
+      {/* เท้าความ */}
+      <Chip
+        label={`เลือกแล้ว ${selectedCount} แถว`}
+        sx={{
+          backgroundColor: '#FF9800',
+          color: '#fff',
+          fontWeight: '600',
+          fontSize: '13px',
+          height: '32px'
+        }}
+      />
+
+      {/* หม้อที่ input */}
+      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+        <TextField
+          type="number"
+          placeholder="หม้อที่"
+          value={bulkGroup}
+          onChange={(e) => setBulkGroup(e.target.value)}
+          error={!!errors.group}
+          helperText={errors.group}
+          InputProps={{
+            sx: { height: '36px', fontSize: '13px', backgroundColor: '#fff' }
+          }}
+          sx={{
+            width: '100px',
+            "& .MuiOutlinedInput-root": { height: "36px", fontSize: "13px" },
+            "& input": { padding: "6px 10px", textAlign: 'center' },
+            "& .MuiFormHelperText-root": { fontSize: '11px', margin: '2px 0 0' }
+          }}
+        />
+      </Box>
+
+      {/* เวลาบรรจุเสร็จ picker */}
+      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <DateTimePicker
+            ampm={false}
+            minutesStep={1}
+            timeSteps={{ minutes: 1 }}
+            maxDateTime={dayjs()}
+            value={bulkPrepDateTime ? dayjs(bulkPrepDateTime) : null}
+            onChange={(newValue) => {
+              setBulkPrepDateTime(newValue ? newValue.format('YYYY-MM-DDTHH:mm') : '');
+            }}
+            slotProps={{
+              textField: {
+                size: "small",
+                placeholder: "เวลาบรรจุเสร็จ",
+                error: !!errors.prepDateTime,
+                helperText: errors.prepDateTime,
+                sx: {
+                  width: '180px',
+                  "& .MuiOutlinedInput-root": { height: "36px", fontSize: "13px", backgroundColor: "#fff" },
+                  "& input": { padding: "6px 10px" },
+                  "& .MuiFormHelperText-root": { fontSize: '11px', margin: '2px 0 0' }
+                },
+              },
+            }}
+          />
+        </LocalizationProvider>
+      </Box>
+
+      {/* ปุ่ม Apply */}
+      <Button
+        variant="contained"
+        onClick={handleApply}
+        sx={{
+          backgroundColor: '#28a745',
+          height: '36px',
+          fontSize: '13px',
+          fontWeight: '600',
+          borderRadius: '8px',
+          minWidth: '100px',
+          '&:hover': { backgroundColor: '#218838' }
+        }}
+      >
+        อัปเดตทั้งหมด
+      </Button>
+
+      {/* ปุ่ม Cancel */}
+      <Button
+        variant="outlined"
+        onClick={onCancel}
+        sx={{
+          height: '36px',
+          fontSize: '13px',
+          borderRadius: '8px',
+          color: '#666',
+          borderColor: '#ccc',
+          minWidth: '80px',
+          '&:hover': { backgroundColor: '#f5f5f5' }
+        }}
+      >
+        ยกเลิก
+      </Button>
+    </Box>
+  );
+};
+
 const TableMainPrep = ({
   handleOpenModal,
   data,
@@ -587,13 +874,20 @@ const TableMainPrep = ({
   onConfirmRow
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredRows, setFilteredRows] = useState(data);
+  const [filteredRows, setFilteredRows] = useState([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(100);
   const [openRowId, setOpenRowId] = useState(null);
   const [selectedDocNo, setSelectedDocNo] = useState('');
 
-  const displayColumns = ['batch_after', 'mat_name', 'production', 'rmit_date', 'out_cold_date', 'weight_RM'];
+  // ── bulk select state ──
+  const [selectedRows, setSelectedRows] = useState([]); // array of row objects
+  const [bulkGroup, setBulkGroup] = useState('');
+  const [bulkPrepDateTime, setBulkPrepDateTime] = useState('');
+
+  const isBulkMode = selectedRows.length > 0;
+
+  const displayColumns = ['batch_after', 'mat_name', 'production', 'rmit_date', 'out_cold_date', 'out_cold_date_two', 'weight_RM'];
 
   const uniqueDocNos = [...new Set(data.map(row => row.doc_no).filter(Boolean))].sort();
 
@@ -603,6 +897,7 @@ const TableMainPrep = ({
     return sum + weight;
   }, 0);
 
+  // ── filter + sort ──
   useEffect(() => {
     let filtered = data;
 
@@ -618,9 +913,101 @@ const TableMainPrep = ({
       filtered = filtered.filter(row => row.doc_no === selectedDocNo);
     }
 
+    // เรียง sort หลัง filter
+    filtered = sortByDate(filtered);
+
     setFilteredRows(filtered);
     setPage(0);
   }, [searchTerm, data, selectedDocNo]);
+
+  // ── select / deselect row ──
+  const handleSelectRow = (row) => {
+    setSelectedRows(prev => {
+      const alreadySelected = prev.some(r => r.mapping_id === row.mapping_id);
+      if (alreadySelected) {
+        return prev.filter(r => r.mapping_id !== row.mapping_id);
+      }
+      return [...prev, row];
+    });
+  };
+
+  // ── select all on current page ──
+  const currentPageRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const allCurrentPageSelected = currentPageRows.length > 0 &&
+    currentPageRows.every(row => selectedRows.some(r => r.mapping_id === row.mapping_id));
+
+  const handleSelectAll = () => {
+    if (allCurrentPageSelected) {
+      // deselect all on page
+      setSelectedRows(prev => prev.filter(r => !currentPageRows.some(pr => pr.mapping_id === r.mapping_id)));
+    } else {
+      // add all on page (avoid duplicates)
+      setSelectedRows(prev => {
+        const existing = new Set(prev.map(r => r.mapping_id));
+        const newRows = currentPageRows.filter(r => !existing.has(r.mapping_id));
+        return [...prev, ...newRows];
+      });
+    }
+  };
+
+  // ── apply bulk update → call onConfirmRow per row ──
+  // const handleBulkApply = () => {
+  //   selectedRows.forEach(row => {
+  //     const payload = {
+  //       mapping_id: row.mapping_id,
+  //       weight: Number(row.weight) || 0, // weight ไม่เปลี่ยน คงเดิม
+  //       group: Number(bulkGroup),
+  //       sc_pack_date: bulkPrepDateTime
+  //     };
+  //     console.log("BULK CONFIRM PAYLOAD:", payload);
+  //     onConfirmRow(payload);
+  //   });
+
+  //   // reset
+  //   setSelectedRows([]);
+  //   setBulkGroup('');
+  //   setBulkPrepDateTime('');
+  // };
+  const handleBulkApply = async () => {
+  const groupVal = Number(bulkGroup);
+
+  if (!groupVal || !bulkPrepDateTime) return;
+
+  try {
+    for (const row of selectedRows) {
+
+      // ⭐ ใช้ค่าที่ user กรอก
+      const weightVal = Number(row.weight);
+
+      if (!weightVal || weightVal <= 0) continue;
+
+      const payload = {
+        mapping_id: Number(row.mapping_id),
+        weight: weightVal,
+        group: groupVal,
+        sc_pack_date: bulkPrepDateTime
+      };
+
+      await onConfirmRow(payload); // เหมือนกด confirm ทีละแถว
+    }
+
+    setSelectedRows([]);
+    setBulkGroup('');
+    setBulkPrepDateTime('');
+
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+
+
+const handleBulkCancel = () => {
+    setSelectedRows([]);
+    setBulkGroup('');
+    setBulkPrepDateTime('');
+  };
+
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -638,28 +1025,30 @@ const TableMainPrep = ({
 
   const headerNames = {
     "batch_after": "Batch",
-    "mat_name": "รายชื่อวัตถุดิบ",
+    "mat_name": "ชื่อวัตถุดิบ",
     "rmit_date": "เวลาเตรียม",
-    "out_cold_date": "เวลาออกห้องเย็น",
+    "out_cold_date": "ออกห้องเย็น 1",
+    "out_cold_date_two": "ออกห้องเย็น 2",
     "production": "แผน",
     "weight_RM": "น้ำหนัก",
   };
 
   const getColumnWidth = (header) => {
-    if (header === "mat_name") return "180px";
+    if (header === "mat_name") return "150px";
     if (header === "rmit_date") return "110px";
     if (header === "out_cold_date") return "110px";
+    if (header === "out_cold_date_two") return "110px";
     if (header === "production") return "80px";
     if (header === "tro_id") return "180px";
-    if (["weight_RM"].includes(header)) return "70px";
-    if (header === "batch_after") return "120px";
+    if (["weight_RM"].includes(header)) return "10px";
+    if (header === "batch_after") return "50px";
     return "150px";
   };
 
   return (
-    <Paper sx={{ 
-      width: '100%', 
-      overflow: 'hidden', 
+    <Paper sx={{
+      width: '100%',
+      overflow: 'hidden',
       boxShadow: '0px 4px 20px rgba(33, 150, 243, 0.1)',
       borderRadius: '16px',
       background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)'
@@ -689,16 +1078,16 @@ const TableMainPrep = ({
       </style>
 
       {/* Header Section */}
-      <Box sx={{ 
+      <Box sx={{
         background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
         padding: '20px 24px',
         borderRadius: '16px 16px 0 0'
       }}>
         {/* Search Row */}
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: { xs: 'column', sm: 'row' }, 
-          alignItems: 'center', 
+        <Box sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: 'center',
           gap: 2,
           marginBottom: 2
         }}>
@@ -714,7 +1103,7 @@ const TableMainPrep = ({
                   <SearchIcon style={{ color: '#2196F3' }} />
                 </InputAdornment>
               ),
-              sx: { 
+              sx: {
                 height: "44px",
                 backgroundColor: '#fff',
                 borderRadius: '12px',
@@ -753,7 +1142,7 @@ const TableMainPrep = ({
             <FilterListIcon sx={{ color: '#fff', fontSize: '20px' }} />
             <span style={{ color: '#fff', fontSize: '14px', fontWeight: '500' }}>ตัวกรอง:</span>
           </Box>
-          
+
           <SearchableDropdown
             label="Doc No"
             options={uniqueDocNos}
@@ -784,15 +1173,28 @@ const TableMainPrep = ({
         </Box>
       </Box>
 
-      <TableContainer 
-        style={{ padding: '0px 20px' }} 
-        sx={{ 
-          height: 'calc(68vh)', 
-          overflowY: 'auto', 
-          whiteSpace: 'nowrap', 
-          '@media (max-width: 1200px)': { 
-            overflowX: 'scroll', 
-            minWidth: "200px" 
+      {/* ── Bulk Edit Bar (แสดงเมื่อ select แล้ว) ── */}
+      {isBulkMode && (
+        <BulkEditBar
+          selectedCount={selectedRows.length}
+          bulkGroup={bulkGroup}
+          setBulkGroup={setBulkGroup}
+          bulkPrepDateTime={bulkPrepDateTime}
+          setBulkPrepDateTime={setBulkPrepDateTime}
+          onApply={handleBulkApply}
+          onCancel={handleBulkCancel}
+        />
+      )}
+
+      <TableContainer
+        style={{ padding: '0px 20px' }}
+        sx={{
+          height: 'calc(68vh)',
+          overflowY: 'auto',
+          whiteSpace: 'nowrap',
+          '@media (max-width: 1200px)': {
+            overflowX: 'scroll',
+            minWidth: "200px"
           },
           '&::-webkit-scrollbar': {
             width: '8px',
@@ -814,6 +1216,38 @@ const TableMainPrep = ({
         <Table stickyHeader style={{ tableLayout: 'auto' }} sx={{ minWidth: '1270px', width: 'max-content' }}>
           <TableHead style={{ marginBottom: "10px" }}>
             <TableRow sx={{ height: '48px' }}>
+              {/* ── Checkbox header (Select All) ── */}
+              <TableCell
+                align="center"
+                style={{
+                  backgroundColor: "#2196F3",
+                  borderTop: "1px solid #1976D2",
+                  borderBottom: "1px solid #1976D2",
+                  borderLeft: "1px solid #1976D2",
+                  borderRight: "1px solid rgba(255,255,255,0.1)",
+                  fontSize: '14px',
+                  color: '#fff',
+                  padding: '12px',
+                  width: CUSTOM_COLUMN_WIDTHS.checkbox,
+                  fontWeight: '600',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  borderTopLeftRadius: '12px',
+                  borderBottomLeftRadius: '12px'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={allCurrentPageSelected}
+                  onChange={handleSelectAll}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    cursor: 'pointer',
+                    accentColor: '#fff'
+                  }}
+                />
+              </TableCell>
+
               {displayColumns.map((header, index) => (
                 <TableCell
                   key={index}
@@ -822,7 +1256,7 @@ const TableMainPrep = ({
                     backgroundColor: "#2196F3",
                     borderTop: "1px solid #1976D2",
                     borderBottom: "1px solid #1976D2",
-                    borderLeft: index === 0 ? "1px solid #1976D2" : "1px solid rgba(255,255,255,0.1)",
+                    borderLeft: "1px solid rgba(255,255,255,0.1)",
                     borderRight: "1px solid rgba(255,255,255,0.1)",
                     fontSize: '14px',
                     color: '#fff',
@@ -830,8 +1264,6 @@ const TableMainPrep = ({
                     width: getColumnWidth(header),
                     fontWeight: '600',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    borderTopLeftRadius: index === 0 ? '12px' : '0',
-                    borderBottomLeftRadius: index === 0 ? '12px' : '0'
                   }}
                 >
                   <Box style={{ fontSize: '15px', color: '#ffffff', letterSpacing: '0.3px' }}>
@@ -840,14 +1272,29 @@ const TableMainPrep = ({
                 </TableCell>
               ))}
 
-              <TableCell align="center" style={{ 
-                backgroundColor: "#2196F3", 
-                borderTop: "1px solid #1976D2", 
-                borderBottom: "1px solid #1976D2", 
-                borderRight: "1px solid rgba(255,255,255,0.1)", 
-                fontSize: '14px', 
-                color: '#fff', 
-                padding: '12px', 
+              <TableCell align="center" style={{
+                backgroundColor: "#2196F3",
+                borderTop: "1px solid #1976D2",
+                borderBottom: "1px solid #1976D2",
+                borderRight: "1px solid rgba(255,255,255,0.1)",
+                fontSize: '14px',
+                color: '#fff',
+                padding: '12px',
+                width: CUSTOM_COLUMN_WIDTHS.group,
+                fontWeight: '600',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}>
+                <Box style={{ fontSize: '15px', color: '#ffffff', letterSpacing: '0.3px' }}>หม้อที่</Box>
+              </TableCell>
+
+              <TableCell align="center" style={{
+                backgroundColor: "#2196F3",
+                borderTop: "1px solid #1976D2",
+                borderBottom: "1px solid #1976D2",
+                borderRight: "1px solid rgba(255,255,255,0.1)",
+                fontSize: '14px',
+                color: '#fff',
+                padding: '12px',
                 width: CUSTOM_COLUMN_WIDTHS.weight,
                 fontWeight: '600',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
@@ -855,14 +1302,14 @@ const TableMainPrep = ({
                 <Box style={{ fontSize: '15px', color: '#ffffff', letterSpacing: '0.3px' }}>น้ำหนัก (kg)</Box>
               </TableCell>
 
-              <TableCell align="center" style={{ 
-                backgroundColor: "#2196F3", 
-                borderTop: "1px solid #1976D2", 
-                borderBottom: "1px solid #1976D2", 
-                borderRight: "1px solid rgba(255,255,255,0.1)", 
-                fontSize: '14px', 
-                color: '#fff', 
-                padding: '12px', 
+              <TableCell align="center" style={{
+                backgroundColor: "#2196F3",
+                borderTop: "1px solid #1976D2",
+                borderBottom: "1px solid #1976D2",
+                borderRight: "1px solid rgba(255,255,255,0.1)",
+                fontSize: '14px',
+                color: '#fff',
+                padding: '12px',
                 width: CUSTOM_COLUMN_WIDTHS.prepDateTime,
                 fontWeight: '600',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
@@ -870,14 +1317,14 @@ const TableMainPrep = ({
                 <Box style={{ fontSize: '15px', color: '#ffffff', letterSpacing: '0.3px' }}>เวลาบรรจุเสร็จ</Box>
               </TableCell>
 
-              <TableCell align="center" style={{ 
-                backgroundColor: "#2196F3", 
-                borderTop: "1px solid #1976D2", 
-                borderBottom: "1px solid #1976D2", 
-                borderRight: "1px solid rgba(255,255,255,0.1)", 
-                fontSize: '14px', 
-                color: '#fff', 
-                padding: '12px', 
+              <TableCell align="center" style={{
+                backgroundColor: "#2196F3",
+                borderTop: "1px solid #1976D2",
+                borderBottom: "1px solid #1976D2",
+                borderRight: "1px solid rgba(255,255,255,0.1)",
+                fontSize: '14px',
+                color: '#fff',
+                padding: '12px',
                 width: CUSTOM_COLUMN_WIDTHS.confirm,
                 fontWeight: '600',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
@@ -885,29 +1332,29 @@ const TableMainPrep = ({
                 <Box style={{ fontSize: '15px', color: '#ffffff', letterSpacing: '0.3px' }}>ยืนยัน</Box>
               </TableCell>
 
-              <TableCell align="center" style={{ 
-                backgroundColor: "#2196F3", 
-                borderTop: "1px solid #1976D2", 
-                borderBottom: "1px solid #1976D2", 
-                borderRight: "1px solid rgba(255,255,255,0.1)", 
-                fontSize: '14px', 
-                color: '#fff', 
-                padding: '12px', 
+              <TableCell align="center" style={{
+                backgroundColor: "#2196F3",
+                borderTop: "1px solid #1976D2",
+                borderBottom: "1px solid #1976D2",
+                borderRight: "1px solid rgba(255,255,255,0.1)",
+                fontSize: '14px',
+                color: '#fff',
+                padding: '12px',
                 width: "90px",
                 fontWeight: '600',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}>
                 <Box style={{ fontSize: '15px', color: '#ffffff', letterSpacing: '0.3px' }}>รถเข็น</Box>
               </TableCell>
-              
-              <TableCell align="center" style={{ 
-                backgroundColor: "#2196F3", 
-                borderTop: "1px solid #1976D2", 
-                borderBottom: "1px solid #1976D2", 
-                borderRight: "1px solid rgba(255,255,255,0.1)", 
-                fontSize: '14px', 
-                color: '#fff', 
-                padding: '12px', 
+
+              <TableCell align="center" style={{
+                backgroundColor: "#2196F3",
+                borderTop: "1px solid #1976D2",
+                borderBottom: "1px solid #1976D2",
+                borderRight: "1px solid rgba(255,255,255,0.1)",
+                fontSize: '14px',
+                color: '#fff',
+                padding: '12px',
                 width: "90px",
                 fontWeight: '600',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
@@ -915,16 +1362,16 @@ const TableMainPrep = ({
                 <Box style={{ fontSize: '15px', color: '#ffffff', letterSpacing: '0.3px' }}>แก้ไข</Box>
               </TableCell>
 
-              <TableCell align="center" style={{ 
-                backgroundColor: "#2196F3", 
-                borderTop: "1px solid #1976D2", 
-                borderBottom: "1px solid #1976D2", 
-                borderRight: "1px solid #1976D2", 
-                fontSize: '14px', 
-                color: '#fff', 
-                padding: '12px', 
-                borderTopRightRadius: '12px', 
-                borderBottomRightRadius: '12px', 
+              <TableCell align="center" style={{
+                backgroundColor: "#2196F3",
+                borderTop: "1px solid #1976D2",
+                borderBottom: "1px solid #1976D2",
+                borderRight: "1px solid #1976D2",
+                fontSize: '14px',
+                color: '#fff',
+                padding: '12px',
+                borderTopRightRadius: '12px',
+                borderBottomRightRadius: '12px',
                 width: "90px",
                 fontWeight: '600',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
@@ -938,7 +1385,7 @@ const TableMainPrep = ({
             {filteredRows.length > 0 ? (
               filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, index) => (
                 <Row
-                  key={index}
+                  key={row.mapping_id ?? index}
                   row={row}
                   columnWidths={columnWidths}
                   handleOpenModal={handleOpenModal}
@@ -952,13 +1399,16 @@ const TableMainPrep = ({
                   index={index}
                   setOpenRowId={setOpenRowId}
                   displayColumns={displayColumns}
+                  isSelected={selectedRows.some(r => r.mapping_id === row.mapping_id)}
+                  onSelectChange={handleSelectRow}
+                  isBulkMode={isBulkMode}
                 />
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={displayColumns.length + 7} align="center" sx={{ 
-                  padding: "40px", 
-                  fontSize: "16px", 
+                <TableCell colSpan={displayColumns.length + 8} align="center" sx={{
+                  padding: "40px",
+                  fontSize: "16px",
                   color: "#90A4AE",
                   fontWeight: '500'
                 }}>
@@ -972,7 +1422,7 @@ const TableMainPrep = ({
           </TableBody>
         </Table>
       </TableContainer>
-      
+
       <TablePagination
         sx={{
           borderTop: '1px solid #E3F2FD',
@@ -1010,3 +1460,5 @@ const TableMainPrep = ({
 };
 
 export default TableMainPrep;
+
+

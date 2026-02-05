@@ -964,11 +964,11 @@ router.post("/qc/checkV2", async (req, res) => {
 			}
 		}
 
-		// ✅ กรณีพิเศษ: dest = 'รอCheckin' และ QC ผ่านทั้งหมด
-		if (dest === 'รอCheckin' && rm_status === 'QcCheck') {
-			destlast = 'เข้าห้องเย็น';
-			console.log("✅ Special Case: 'รอCheckin' → 'เข้าห้องเย็น' (QC Passed)");
-		}
+		// // ✅ กรณีพิเศษ: dest = 'รอCheckin' และ QC ผ่านทั้งหมด
+		// if (dest === 'รอCheckin' && rm_status === 'QcCheck') {
+		// 	destlast = 'เข้าห้องเย็น';
+		// 	console.log("✅ Special Case: 'รอCheckin' → 'เข้าห้องเย็น' (QC Passed)");
+		// }
 
 		console.log("=== Final QC Results ===");
 		console.log("✅ rm_status:", rm_status);

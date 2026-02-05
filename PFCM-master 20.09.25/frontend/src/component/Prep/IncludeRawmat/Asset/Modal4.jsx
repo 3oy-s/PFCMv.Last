@@ -144,13 +144,19 @@ const Modal4 = ({ open, onClose, onSuccess }) => {
     return;
   }
 
-  // 🔍 ตรวจสอบว่าทั้งหมดเป็น Doc (doc_no) เดียวกัน
-  const firstProduction = selectedMaterials[0].production;
-  const allSameProduction = selectedMaterials.every(
-    (m) => m.production === firstProduction
+  // 🔍 ฟังก์ชันแยกเอาแค่ doc_no (ตัดส่วน Line/Cup ออก)
+  const getDocNo = (production) => {
+    if (!production) return "";
+    // ตัด "M152 (Cup1)" → เหลือ "M152"
+    return production.split(' (')[0].trim();
+  };
+
+  const firstDocNo = getDocNo(selectedMaterials[0].production);
+  const allSameDocNo = selectedMaterials.every(
+    (m) => getDocNo(m.production) === firstDocNo
   );
 
-  if (!allSameProduction) {
+  if (!allSameDocNo) {
     showSnackbar("ไม่สามารถผสมได้เนื่องจากคนละ Doc", "error");
     return;
   }

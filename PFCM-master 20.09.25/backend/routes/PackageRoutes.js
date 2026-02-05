@@ -318,7 +318,68 @@ module.exports = (io) => {
     }
   });
 
- 
+ router.put("/checkin/pack", async (req, res) => {
+  const transaction = new sql.Transaction();
+
+  try {
+    const { tro_id, operator } = req.body;
+
+    if (!tro_id) {
+      return res.status(400).json({ error: "tro_id is required" });
+    }
+
+    const pool = await connectToDatabase();
+    transaction.connection = pool;
+    await transaction.begin();
+
+    // 1. Update TrolleyRMMapping → dest = 'บรรจุ'
+    const updateMappingResult = await new sql.Request(transaction)
+      .input("tro_id", tro_id)
+      .query(`
+        UPDATE TrolleyRMMapping
+        SET 
+          dest = N'บรรจุ',
+          tro_id = null
+        WHERE tro_id = @tro_id
+      `);
+
+    if (updateMappingResult.rowsAffected[0] === 0) {
+      throw new Error("No data updated in TrolleyRMMapping");
+    }
+
+    // 2. Update Trolley status
+    await new sql.Request(transaction)
+      .input("tro_id", tro_id)
+      .query(`
+        UPDATE Trolley
+        SET tro_status = 1
+        WHERE tro_id = @tro_id
+      `);
+
+  
+
+    await transaction.commit();
+
+    const payload = {
+      message: "นำวัตถุดิบออกจากห้องเย็นไปบรรจุเรียบร้อย",
+      tro_id,
+      operator,
+      updatedAt: new Date()
+    };
+
+    io.to("saveRMForProdRoom").emit("dataUpdated", payload);
+    io.to("QcCheckRoom").emit("dataUpdated", payload);
+
+    res.status(200).json(payload);
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error("checkin/pack error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 
   router.put("/coldstorage/outcoldstorage/pack/pull", async (req, res) => {
     try {
@@ -5569,7 +5630,7 @@ WHERE
   // });
 
   router.post("/pack/mixed/delay-time/test", async (req, res) => {
-    const { mapping_id, sc_pack_date, weight } = req.body;
+    const { mapping_id, sc_pack_date, weight,group } = req.body;
 
     if (!mapping_id || isNaN(mapping_id)) {
       return res.status(400).json({ message: "mapping_id ต้องเป็นตัวเลข" });
@@ -5580,6 +5641,11 @@ WHERE
     if (weight == null || isNaN(weight) || weight <= 0) {
       return res.status(400).json({ message: "weight ต้องมากกว่า 0" });
     }
+
+    // เพิ่มการตรวจสอบ group
+  if (group && (isNaN(group) || group <= 0)) {
+    return res.status(400).json({ message: "group ต้องมากกว่า 0" });
+  }
 
     const pool = await connectToDatabase();
     const transaction = new sql.Transaction(pool);
@@ -5662,6 +5728,7 @@ WHERE
         .input("from_mapping_id", mapping_id)
         .input("tl_status", src.tl_status)
         .input("qc_id", newQcId)
+        .input("group_no", sql.Int, group)  // ✅ เปลี่ยนเป็น group_no
         .query(`
         INSERT INTO TrolleyRMMapping (
           rmfp_id, tro_production_id, process_id,
@@ -5670,7 +5737,8 @@ WHERE
           status, production_batch, created_by,
           rmm_line_name, mix_time, from_mapping_id,
           tl_status, qc_id,
-          stay_place, dest
+          stay_place, dest,
+          group_no 
         )
         VALUES (
           @rmfp_id, @tro_production_id, @process_id,
@@ -5679,7 +5747,8 @@ WHERE
           @status, @production_batch, @created_by,
           @rmm_line_name, @mix_time, @from_mapping_id,
           @tl_status, @qc_id,
-          N'บรรจุเสร็จ', N'บรรจุเสร็จ'
+          N'บรรจุเสร็จ', N'บรรจุเสร็จ',
+           @group_no
         );
 
         SELECT SCOPE_IDENTITY() AS newMappingId;
@@ -5813,7 +5882,8 @@ WHERE
       res.status(200).json({
         success: true,
         newMappingId,
-        usedWeight: weight
+        usedWeight: weight,
+        group: group  // ✅ ส่งกลับไปด้วย
       });
 
     } catch (err) {
