@@ -2234,20 +2234,25 @@ module.exports = (io) => {
 
   router.put("/pack/matmanage/Add/rm/TrolleyMapping", async (req, res) => {
     const { tro_id, rmfpID, mapping_id, weight_per_tro, ntray, batch_after } = req.body;
+
     console.log("body :", req.body);
+
     const pool = await connectToDatabase();
     const transaction = new sql.Transaction(pool);
 
+    const toVarChar = (v) => (v !== undefined && v !== null ? String(v).trim() : null);
+
     try {
       await transaction.begin();
+
       let batch_id = null;
 
       if (batch_after) {
         const batchResult = await transaction.request()
-          .input("batch_after", sql.NVarChar, batch_after)
+          .input("batch_after", sql.NVarChar, toVarChar(batch_after))
           .query(`
-          SELECT batch_id 
-          FROM Batch 
+          SELECT batch_id
+          FROM Batch
           WHERE batch_after = @batch_after
         `);
 
@@ -2256,13 +2261,16 @@ module.exports = (io) => {
         }
       }
 
-      // ดึงข้อมูล mapping ปัจจุบัน
+      // ===============================
+      // ดึง mapping เดิม
+      // ===============================
       const selectRawMat = await transaction.request()
         .input("mapping_id", sql.Int, mapping_id)
         .query(`
-        SELECT rmfp.hist_id_rmfp, rmm.tro_production_id, rmm.process_id, rmm.qc_id, rmm.cold_time, rmm.rmfp_id,
-              rmm.weight_RM, rmm.level_eu, rmm.prep_to_cold_time, rmm.rm_cold_status,
-              rmm.mix_code, rmm.prod_mix, rmm.production_batch,rmm_line_name
+        SELECT rmfp.hist_id_rmfp, rmm.tro_production_id, rmm.process_id, rmm.qc_id,
+               rmm.cold_time, rmm.rmfp_id, rmm.weight_RM, rmm.level_eu,
+               rmm.prep_to_cold_time, rmm.rm_cold_status,
+               rmm.mix_code, rmm.prod_mix, rmm.production_batch, rmm_line_name
         FROM TrolleyRMMapping AS rmm
         JOIN RMForProd AS rmfp ON rmfp.rmfp_id = rmm.rmfp_id
         WHERE mapping_id = @mapping_id
@@ -2272,32 +2280,18 @@ module.exports = (io) => {
         throw new Error("ไม่พบข้อมูลใน TrolleyRMMapping");
       }
 
-      const {
-        hist_id_rmfp,
-        tro_production_id,
-        process_id,
-        qc_id,
-        cold_time,
-        rmfp_id,
-        weight_RM,
-        level_eu,
-        prep_to_cold_time,
-        rm_cold_status,
-        mix_code,
-        prod_mix,
-        production_batch,
-        rmm_line_name
-      } = selectRawMat.recordset[0];
+      const data = selectRawMat.recordset[0];
 
-      // ตรวจสอบน้ำหนักก่อน
-      const remainingWeight = weight_RM - weight_per_tro;
+      const remainingWeight = data.weight_RM - weight_per_tro;
       if (remainingWeight < 0) {
         throw new Error("น้ำหนักที่ย้ายมากกว่าน้ำหนักที่มีอยู่");
       }
-      // ตรวจสอบว่าน้ำหนักที่เหลือเป็น 0 หรือไม่ (ย้ายทั้งหมด)
+
       const isMovingAll = remainingWeight === 0;
 
-      // อัปเดตน้ำหนักใน mapping เดิม
+      // ===============================
+      // update mapping เดิม
+      // ===============================
       await transaction.request()
         .input("mapping_id", sql.Int, mapping_id)
         .input("remainingWeight", sql.Float, remainingWeight)
@@ -2311,18 +2305,12 @@ module.exports = (io) => {
         WHERE mapping_id = @mapping_id
       `);
 
-      // ดึงข้อมูลจาก History เดิม
+      // ===============================
+      // History เดิม
+      // ===============================
       const selectHis = await transaction.request()
         .input("mapping_id", sql.Int, mapping_id)
-        .query(`
-        SELECT withdraw_date, cooked_date, rmit_date, qc_date, come_cold_date, out_cold_date, 
-               come_cold_date_two, out_cold_date_two, come_cold_date_three, out_cold_date_three, 
-               sc_pack_date, rework_date, receiver, receiver_prep_two, receiver_qc, 
-               receiver_out_cold, receiver_out_cold_two, receiver_out_cold_three, 
-               receiver_oven_edit, receiver_pack_edit, remark_rework, location
-        FROM History
-        WHERE mapping_id = @mapping_id
-      `);
+        .query(`SELECT * FROM History WHERE mapping_id = @mapping_id`);
 
       if (selectHis.recordset.length === 0) {
         throw new Error("ไม่พบข้อมูลใน History");
@@ -2330,7 +2318,6 @@ module.exports = (io) => {
 
       const historyData = selectHis.recordset[0];
 
-      // เพิ่มข้อมูลใหม่ใน History (ยังไม่ใส่ mapping_id ตอนนี้)
       const insertHis = await transaction.request()
         .input("withdraw_date", historyData.withdraw_date)
         .input("cooked_date", historyData.cooked_date)
@@ -2353,31 +2340,36 @@ module.exports = (io) => {
         .input("receiver_oven_edit", historyData.receiver_oven_edit)
         .input("receiver_pack_edit", historyData.receiver_pack_edit)
         .input("remark_rework", historyData.remark_rework)
-        .input("rmm_line_name", rmm_line_name)
         .input("location", historyData.location)
+        .input("rmm_line_name", toVarChar(data.rmm_line_name))
         .input("weight_RM", sql.Float, weight_per_tro)
         .input("tray_count", sql.Int, ntray)
         .query(`
-        INSERT INTO History 
-        (withdraw_date, cooked_date, rmit_date, qc_date, come_cold_date, out_cold_date, 
-         come_cold_date_two, out_cold_date_two, come_cold_date_three, out_cold_date_three, 
-         sc_pack_date, rework_date, receiver, receiver_prep_two, receiver_qc, 
-         receiver_out_cold, receiver_out_cold_two, receiver_out_cold_three, 
-         receiver_oven_edit, receiver_pack_edit, remark_rework, location, mapping_id, rmm_line_name,created_at,weight_RM,tray_count)
+        INSERT INTO History
+        (withdraw_date,cooked_date,rmit_date,qc_date,come_cold_date,out_cold_date,
+         come_cold_date_two,out_cold_date_two,come_cold_date_three,out_cold_date_three,
+         sc_pack_date,rework_date,receiver,receiver_prep_two,receiver_qc,
+         receiver_out_cold,receiver_out_cold_two,receiver_out_cold_three,
+         receiver_oven_edit,receiver_pack_edit,remark_rework,location,
+         mapping_id,rmm_line_name,created_at,weight_RM,tray_count)
         OUTPUT INSERTED.hist_id
-        VALUES (@withdraw_date, @cooked_date, @rmit_date, @qc_date, @come_cold_date, @out_cold_date, 
-                @come_cold_date_two, @out_cold_date_two, @come_cold_date_three, @out_cold_date_three, 
-                @sc_pack_date, @rework_date, @receiver, @receiver_prep_two, @receiver_qc, 
-                @receiver_out_cold, @receiver_out_cold_two, @receiver_out_cold_three, 
-                @receiver_oven_edit, @receiver_pack_edit, @remark_rework, @location, NULL, @rmm_line_name,GETDATE(),@weight_RM,@tray_count)
+        VALUES
+        (@withdraw_date,@cooked_date,@rmit_date,@qc_date,@come_cold_date,@out_cold_date,
+         @come_cold_date_two,@out_cold_date_two,@come_cold_date_three,@out_cold_date_three,
+         @sc_pack_date,@rework_date,@receiver,@receiver_prep_two,@receiver_qc,
+         @receiver_out_cold,@receiver_out_cold_two,@receiver_out_cold_three,
+         @receiver_oven_edit,@receiver_pack_edit,@remark_rework,@location,
+         NULL,@rmm_line_name,GETDATE(),@weight_RM,@tray_count)
       `);
 
       const pkhis = insertHis.recordset[0].hist_id;
       const currentDate = new Date();
 
-      // เพิ่มรายการใหม่ใน TrolleyRMMapping
-      await transaction.request()
-        .input("tro_id", sql.VarChar(4), tro_id)
+      // ===============================
+      // insert mapping ใหม่
+      // ===============================
+      const insertMapping = await transaction.request()
+        .input("tro_id", sql.VarChar(4), toVarChar(tro_id))
         .input("rmfp_id", sql.Int, rmfpID)
         .input("batch_id", sql.Int, batch_id)
         .input("weight_RM", sql.Float, weight_per_tro)
@@ -2387,60 +2379,73 @@ module.exports = (io) => {
         .input("status", sql.VarChar(25), "active")
         .input("dest", sql.VarChar(25), "รถเข็นรอจัดส่ง")
         .input("stay_place", sql.VarChar(25), "บรรจุ")
-        .input("created_by", sql.VarChar(50), req.user?.username || "system2095")
-        .input("tro_production_id", sql.Int, tro_production_id)
-        .input("process_id", sql.Int, process_id)
-        .input("qc_id", sql.Int, qc_id)
-        .input("cold_time", sql.Float, cold_time)
-        .input("level_eu", sql.NVarChar(50), level_eu)
-        .input("prep_to_cold_time", sql.Float, prep_to_cold_time)
-        .input("rm_cold_status", sql.VarChar(20), rm_cold_status)
-        .input("mix_code", sql.VarChar(20), mix_code)
-        .input("prod_mix", sql.VarChar(20), prod_mix)
-        .input("production_batch", sql.VarChar(20), production_batch)
-        .input("rmm_line_name", sql.VarChar(20), rmm_line_name)
+        .input("created_by", sql.VarChar(50), toVarChar(req.user?.username || "system2095"))
+        .input("tro_production_id", sql.Int, data.tro_production_id)
+        .input("process_id", sql.Int, data.process_id)
+        .input("qc_id", sql.Int, data.qc_id)
+        .input("cold_time", sql.Float, data.cold_time)
+        .input("level_eu", sql.NVarChar(50), toVarChar(data.level_eu))
+        .input("prep_to_cold_time", sql.Float, data.prep_to_cold_time)
+        .input("rm_cold_status", sql.VarChar(20), toVarChar(data.rm_cold_status))
+        .input("mix_code", sql.VarChar(20), toVarChar(data.mix_code))
+        .input("prod_mix", sql.VarChar(20), toVarChar(data.prod_mix))
+        .input("production_batch", sql.VarChar(20), toVarChar(data.production_batch))
+        .input("rmm_line_name", sql.VarChar(20), toVarChar(data.rmm_line_name))
         .input("from_mapping_id", sql.Int, mapping_id)
-        .input("tl_status", "1.5")
+        .input("tl_status", sql.VarChar(10), "1.5")
         .query(`
-        INSERT INTO TrolleyRMMapping 
-        (tro_id, rmfp_id, batch_id, weight_RM, tray_count, rm_status, allocation_date, status, dest, stay_place, created_by, 
-         tro_production_id, process_id, qc_id, cold_time, level_eu, prep_to_cold_time, rm_cold_status, rmm_line_name,
-         mix_code, prod_mix, production_batch, from_mapping_id,created_at,tl_status)
-        VALUES 
-        (@tro_id, @rmfp_id, @batch_id, @weight_RM, @tray_count, @rm_status, @allocation_date, @status, @dest, @stay_place, @created_by, 
-         @tro_production_id, @process_id, @qc_id, @cold_time, @level_eu, @prep_to_cold_time, @rm_cold_status, @rmm_line_name,
-         @mix_code, @prod_mix, @production_batch, @from_mapping_id,GETDATE(),@tl_status)
+        INSERT INTO TrolleyRMMapping
+        (tro_id,rmfp_id,batch_id,weight_RM,tray_count,rm_status,allocation_date,status,
+         dest,stay_place,created_by,tro_production_id,process_id,qc_id,cold_time,
+         level_eu,prep_to_cold_time,rm_cold_status,rmm_line_name,mix_code,
+         prod_mix,production_batch,from_mapping_id,created_at,tl_status)
+        OUTPUT INSERTED.mapping_id
+        VALUES
+        (@tro_id,@rmfp_id,@batch_id,@weight_RM,@tray_count,@rm_status,@allocation_date,@status,
+         @dest,@stay_place,@created_by,@tro_production_id,@process_id,@qc_id,@cold_time,
+         @level_eu,@prep_to_cold_time,@rm_cold_status,@rmm_line_name,@mix_code,
+         @prod_mix,@production_batch,@from_mapping_id,GETDATE(),@tl_status)
       `);
 
-      // ดึง mapping_id ที่เพิ่ง insert
-      const newMappingResult = await transaction.request()
-        .input("tro_id", sql.VarChar(4), tro_id)
-        .input("rmfp_id", sql.Int, rmfpID)
-        .input("allocation_date", sql.DateTime, currentDate)
+      const newMappingId = insertMapping.recordset[0].mapping_id;
+
+      // ===============================
+      // ⭐ COPY BATCH จาก mapping เดิม ⭐
+      // ===============================
+      const oldBatch = await transaction.request()
+        .input("mapping_id", sql.Int, mapping_id)
         .query(`
-        SELECT TOP 1 mapping_id
-        FROM TrolleyRMMapping
-        WHERE tro_id = @tro_id AND rmfp_id = @rmfp_id AND allocation_date = @allocation_date
-        ORDER BY mapping_id DESC
+        SELECT batch_before, batch_after
+        FROM Batch
+        WHERE mapping_id = @mapping_id
       `);
 
-      const newMappingId = newMappingResult.recordset[0]?.mapping_id;
-      if (!newMappingId) {
-        throw new Error("ไม่สามารถดึง mapping_id ของรายการใหม่ได้");
+      if (oldBatch.recordset.length > 0) {
+        const b = oldBatch.recordset[0];
+
+        await transaction.request()
+          .input("mapping_id", sql.Int, newMappingId)
+          .input("batch_before", sql.NVarChar(50), toVarChar(b.batch_before))
+          .input("batch_after", sql.NVarChar(50), toVarChar(batch_after || b.batch_after))
+          .query(`
+          INSERT INTO Batch
+          (mapping_id, batch_before, batch_after)
+          VALUES
+          (@mapping_id, @batch_before, @batch_after)
+        `);
       }
 
-      // อัปเดต mapping_id ลงใน History
+      // ===============================
+      // update history mapping ใหม่
+      // ===============================
       await transaction.request()
         .input("hist_id", sql.Int, pkhis)
         .input("mapping_id", sql.Int, newMappingId)
-        .query(`
-        UPDATE History
-        SET mapping_id = @mapping_id
-        WHERE hist_id = @hist_id
-      `);
+        .query(`UPDATE History SET mapping_id = @mapping_id WHERE hist_id = @hist_id`);
 
       await transaction.commit();
-      return res.status(200).json({ success: true, message: "บันทึกและย้ายวัตถุเสร็จสิ้น" });
+
+      res.status(200).json({ success: true, message: "บันทึกและย้ายวัตถุเสร็จสิ้น" });
 
     } catch (err) {
       await transaction.rollback();
@@ -2448,6 +2453,8 @@ module.exports = (io) => {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
+
 
 
   router.post("/pack/matmanage/Add/rm/Trolley", async (req, res) => {
@@ -2752,6 +2759,7 @@ module.exports = (io) => {
                 SELECT
                     rmm.mapping_id,
                     rmm.mix_code,
+                    b.batch_after,
                     FORMAT(rmm.cold_to_pack_time, 'N2') AS remaining_ctp_time,
                     FORMAT(rmg.cold_to_pack, 'N2') AS standard_ctp_time,
                     FORMAT(rmm.prep_to_pack_time, 'N2') AS remaining_ptp_time,
@@ -2771,6 +2779,8 @@ module.exports = (io) => {
                     RawMatGroup rmg ON rmf.rm_group_id = rmg.rm_group_id
                 JOIN
                     History h ON rmm.mapping_id = h.mapping_id
+                JOIN
+                    Batch b ON rmm.mapping_id = b.mapping_id
                 WHERE 
                     rmm.tro_id = @tro_id
             `);
@@ -3370,8 +3380,8 @@ module.exports = (io) => {
 
 
 
- 
-router.put("/pack/mixed/trolley", async (req, res) => {
+
+  router.put("/pack/mixed/trolley", async (req, res) => {
     const { mapping_id, weights, tro_production_id } = req.body;
 
     if (!mapping_id || !Array.isArray(weights) || weights.length === 0 || !tro_production_id) {
@@ -3460,9 +3470,9 @@ router.put("/pack/mixed/trolley", async (req, res) => {
         FROM Batch
         WHERE mapping_id IN (${mapping_id.map(id => `'${id}'`).join(',')})
       `;
-      
+
       const batchResult = await pool.request().query(batchQuery);
-      
+
       // จัดกลุ่ม Batch ตาม mapping_id
       const batchByMappingId = {};
       batchResult.recordset.forEach(batch => {
@@ -3646,7 +3656,7 @@ router.put("/pack/mixed/trolley", async (req, res) => {
         // อัปเดตรายการวัตถุดิบในรถเข็นเดิม
         // ปัดเศษเพื่อป้องกันความผิดพลาดจากทศนิยม
         const roundedRemainingWeight = Math.round(remainingWeight * 100) / 100;
-        
+
         if (roundedRemainingWeight > 0.01) {
           const remainingTrays = Math.round((record.tray_count - roundedTraysUsed) * 100) / 100;
           await transaction.request()
@@ -6023,23 +6033,23 @@ WHERE
     }
   });
 
-router.get("/pack/manage/mixed/all/line", async (req, res) => {
-  try {
-    const { line_id } = req.query;
+  router.get("/pack/manage/mixed/all/line", async (req, res) => {
+    try {
+      const { line_id } = req.query;
 
-    if (!line_id) {
-      return res.status(400).json({
-        success: false,
-        message: "line_id is required"
-      });
-    }
+      if (!line_id) {
+        return res.status(400).json({
+          success: false,
+          message: "line_id is required"
+        });
+      }
 
-    const pool = await getPool();
-    const request = pool.request();
+      const pool = await getPool();
+      const request = pool.request();
 
-    request.input("line_id", line_id);
+      request.input("line_id", line_id);
 
-    const result = await request.query(`
+      const result = await request.query(`
       SELECT
           rmf.rmfp_id,
           STRING_AGG(b.batch_after, ', ') AS batch_after,
@@ -6135,19 +6145,19 @@ router.get("/pack/manage/mixed/all/line", async (req, res) => {
           q.qc_id
     `);
 
-    res.json({
-      success: true,
-      data: result.recordset
-    });
+      res.json({
+        success: true,
+        data: result.recordset
+      });
 
-  } catch (error) {
-    console.error("Error /pack/manage/mixed/all/line:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-});
+    } catch (error) {
+      console.error("Error /pack/manage/mixed/all/line:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  });
 
 
   router.get("/pack/report/fetchRM/all/line", async (req, res) => {

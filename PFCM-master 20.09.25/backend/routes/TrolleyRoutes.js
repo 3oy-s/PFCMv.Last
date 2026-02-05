@@ -293,7 +293,7 @@ router.post("/re/reserveTrolley", async (req, res) => {
 //       Object.keys(destGroups).forEach(dest => {
 //         const items = destGroups[dest];
 //         errorMessage += `\n วัตถุดิบอยู่ที่ ${dest} (${items.length} รายการ)`;
-        
+
 //         // เพิ่มรายละเอียดวัตถุดิบถ้าต้องการ
 //         if (dest === "บรรจุ") {
 //           items.forEach(item => {
@@ -325,7 +325,7 @@ router.post("/re/reserveTrolley", async (req, res) => {
 
 //     if (selectedOption in statusMap) {
 //       const validStatuses = statusMap[selectedOption];
-      
+
 //       const invalidStatusItems = rmResult.recordset.filter(item => !validStatuses.includes(item.rm_status));
 
 //       if (invalidStatusItems.length === 0) {
@@ -340,7 +340,7 @@ router.post("/re/reserveTrolley", async (req, res) => {
 //     }
 
 //     return res.status(400).json({ success: false, message: "ตัวเลือกไม่ถูกต้อง" });
-    
+
 //   } catch (err) {
 //     console.error("SQL error", err);
 //     res.status(500).json({ success: false, error: err.message });
@@ -427,7 +427,11 @@ router.get("/cold/checkin/check/Trolley", async (req, res) => {
     }
 
     // 7️⃣ ตรวจสอบ dest วัตถุดิบทั้งหมดต้องเป็น "เข้าห้องเย็น"
-    const invalidDestItems = rmResult.recordset.filter(item => item.dest !== "เข้าห้องเย็น");
+    const allowedDests = ["เข้าห้องเย็น", "รอCheckin"];
+
+    const invalidDestItems = rmResult.recordset.filter(
+      item => !allowedDests.includes(item.dest)
+    );
     if (invalidDestItems.length > 0) {
       const destGroups = invalidDestItems.reduce((groups, item) => {
         if (!groups[item.dest]) groups[item.dest] = [];
@@ -524,7 +528,7 @@ router.put("/cold/clear/Trolley", async (req, res) => {
       .input("tro_id", sql.NVarChar(4), tro_id)
       .query(`DELETE FROM PackTrolley WHERE tro_id = @tro_id`);
 
-      
+
 
     await pool.request()
       .input("tro_id", sql.NVarChar(4), tro_id)
@@ -580,12 +584,12 @@ router.put('/trolley/status/reset/return/rawmat', async (req, res) => {
         `);
     }
 
- // รีเซ็ตสถานะ trolley
+    // รีเซ็ตสถานะ trolley
     await pool.request()
       .input("tro_id", sql.NVarChar(4), tro_id)
       .query(`UPDATE Slot SET tro_status = 1 WHERE tro_id = @tro_id`);
 
-    
+
     // รีเซ็ตสถานะ trolley
     await pool.request()
       .input("tro_id", sql.NVarChar(4), tro_id)

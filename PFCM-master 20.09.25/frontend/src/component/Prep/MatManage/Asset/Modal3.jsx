@@ -187,7 +187,7 @@ const Modal3 = ({ open, onClose, data, onEdit, cookedDateTimeNew, mat_name, with
       console.log("Payload before sending:", payload);
 
       const apiResponse = await axios.post(
-        `${API_URL}/api/prep/manage/saveTrolley`,
+        `${API_URL}/api/prep/manage/saveTrolleyV2`,
         payload,
         {
           headers: {
